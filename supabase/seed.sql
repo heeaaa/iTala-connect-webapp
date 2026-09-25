@@ -1,0 +1,3 @@
+-- Local seed data. Intentionally empty in phase 1.
+-- Accounts are created with `npm run admin:create` (local or production),
+-- and tests create their own isolated users and events.

@@ -147,6 +147,14 @@ Everything above still applies. Where this section is more specific, it wins for
 - The iTala mobile Supabase project is read only from iTala Connect: select queries only, server-side only, through `src/server/mobile/reader.ts`, as an anonymous session cached on the server. Tests must assert zero writes to it. Build and test mobile features against recorded fixtures first; connect to the real mobile project only when the user says go, and record that check as NOT RUN until then.
 - Schema changes go in `supabase/migrations` with a pgTAP test for every new or changed RLS policy.
 
+### Phase 1 conventions (added 25/09/2026)
+
+- Next.js 16 ships its own docs in `node_modules/next/dist/docs/` (`next dev` also writes an AGENTS.md pointing there). Read them before using an unfamiliar Next API.
+- Access rules live in one pure module, `src/server/access.ts`; `src/server/auth.ts` wraps it with `getClaims()`. Pages use `requireAdmin` / `requireSuperadmin`; Server Actions use `authorizeAdmin` and return `ActionResult`.
+- A profile with `role` null or `disabled_at` set has no admin rights anywhere (UI, RLS, storage). Anonymous auth users never get a profile.
+- Trigger guards that must see the caller's role (`profiles_guard`, `events_owner_guard`) are security invoker on purpose; do not make them security definer.
+- Local stack keys come from `npm run env:local`; integration and E2E tests refuse any non-local Supabase URL.
+
 ### Status
 
-- Planning complete, nothing scaffolded yet. Next action and checkpoint: docs/work-status.md.
+- Phase 1 (Foundations) built and verified locally on 25/09/2026. Next action and checkpoint: docs/work-status.md.

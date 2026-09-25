@@ -1,0 +1,13 @@
+.next
+node_modules
+coverage
+playwright-report
+test-results
+supabase/.branches
+supabase/.temp
+src/lib/supabase/database.types.ts
+package-lock.json
+*.sql
+*.md
+.agents
+.claude

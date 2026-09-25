@@ -1,0 +1,45 @@
+@import 'tailwindcss';
+
+/*
+ * Pre-design placeholder tokens. The approved visual system (palette, type,
+ * spacing) is chosen in phase 3 and recorded in DESIGN.md; these neutral
+ * values only keep phase 1 screens legible and accessible until then.
+ *
+ * Two theme layers (plan section 6):
+ *   --brand-*  iTala Connect screens (home, login, admin)
+ *   --ev-*     inside /events/[eventId] only, from the organiser's colours
+ */
+:root {
+  --brand-bg: #ffffff;
+  --brand-surface: #f5f6f8;
+  --brand-text: #111827;
+  --brand-muted: #4b5563;
+  --brand-border: #d1d5db;
+  --brand-accent: #0f3d5e;
+  --brand-accent-text: #ffffff;
+  --brand-danger: #b42318;
+  --brand-focus: #0f3d5e;
+}
+
+@theme inline {
+  --color-brand-bg: var(--brand-bg);
+  --color-brand-surface: var(--brand-surface);
+  --color-brand-text: var(--brand-text);
+  --color-brand-muted: var(--brand-muted);
+  --color-brand-border: var(--brand-border);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-text: var(--brand-accent-text);
+  --color-brand-danger: var(--brand-danger);
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+body {
+  background: var(--brand-bg);
+  color: var(--brand-text);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 3px solid var(--brand-focus);
+  outline-offset: 2px;
+}
