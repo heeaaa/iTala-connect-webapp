@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { platformStyles as s, TitlePlate } from '@/components/platform/platform-frame';
 import { createClient } from '@/lib/supabase/server';
 import { requireSuperadmin } from '@/server/auth';
 
@@ -17,36 +18,36 @@ export default async function AdminsPage() {
     .order('display_name');
 
   return (
-    <section className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Admins</h1>
+    <section aria-labelledby="admins-title">
+      <TitlePlate id="admins-title" title="Admins" sub="Accounts and roles" />
+      <p className={s.lede}>
+        Inviting admins, changing roles and disabling accounts arrive with the rest of the admin tools. Until then a
+        superadmin uses the admin:create script.
+      </p>
       {error ? (
-        <p role="alert" className="text-brand-danger">
+        <p role="alert" className={s.error}>
           Could not load accounts. Please refresh the page.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-md border border-brand-border">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-brand-surface">
+        <div className={s.tableScroll} tabIndex={0} role="region" aria-label="Accounts">
+          <table className={s.table}>
+            <thead>
               <tr>
-                <th scope="col" className="px-3 py-2 font-medium">
-                  Name
-                </th>
-                <th scope="col" className="px-3 py-2 font-medium">
-                  Role
-                </th>
-                <th scope="col" className="px-3 py-2 font-medium">
-                  Status
-                </th>
+                <th scope="col">Name</th>
+                <th scope="col">Role</th>
+                <th scope="col">Status</th>
               </tr>
             </thead>
             <tbody>
               {(profiles ?? []).map((p) => (
-                <tr key={p.id} className="border-t border-brand-border">
-                  <td className="px-3 py-2">{p.display_name}</td>
-                  <td className="px-3 py-2">
-                    {p.role === 'superadmin' ? 'Superadmin' : p.role === 'admin' ? 'Admin' : 'No access'}
+                <tr key={p.id}>
+                  <td>{p.display_name}</td>
+                  <td>{p.role === 'superadmin' ? 'Superadmin' : p.role === 'admin' ? 'Admin' : 'No access'}</td>
+                  <td>
+                    <span className={s.statusBug} data-status={p.disabled_at ? 'disabled' : 'published'}>
+                      {p.disabled_at ? 'Disabled' : 'Active'}
+                    </span>
                   </td>
-                  <td className="px-3 py-2">{p.disabled_at ? 'Disabled' : 'Active'}</td>
                 </tr>
               ))}
             </tbody>

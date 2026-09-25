@@ -49,7 +49,7 @@ Rebuild the iTala Platform scheduler as iTala Connect (Next.js + Supabase) with 
 
 ## Blockers
 
-- Phase 2 needs read access to the old code folder `..\iTala-platform` (golden parity fixtures). Not yet connected to the Cowork session.
+- **Docker / local Supabase not available on this machine (25/09/2026).** Everything that needs the database is NOT RUN here: pgTAP, integration tests, the full Playwright suite. See "Docker verification plan" below; run it on the PC with Docker before starting phase 4.
 - Phase 6 needs access details for the mobile Supabase project. Phase 7 needs a Firebase service account or JSON export.
 
 ## Next action
@@ -66,5 +66,118 @@ Rebuild the iTala Platform scheduler as iTala Connect (Next.js + Supabase) with 
    Finish review re-scored: ship (8 fixes plus 2 regressions resolved). DESIGN.md and `.impeccable/design.json` written from the built world (event pages only; platform navy/teal/lime screens not designed yet).
    Next: phase 4 wires `/events/[eventId]` to real data using these components; design the platform screens (home, login, admin) in the iTala logo palette.
 2. You: phase 0, rotate the two old admin passwords and check the live Firebase rules.
-3. You: save the CI workflow from the chat as `.github/workflows/ci.yml` (Cowork cannot write inside `.github`). Then (optional now) `git init`, commit, push to GitHub so CI runs; set branch protection with the five CI checks as required.
-4. Next session: phase 2 domain port and golden parity suite, once the iTala-platform folder is connected.
+3. Done: `.github/workflows/ci.yml` is committed (commit "Add ci"). Still open for you: push to GitHub so CI runs, then set branch protection with the CI checks as required.
+4. Done 25/09/2026: phase 2 domain port and golden parity suite (details below).
+5. Done 26/09/2026: phase 4 public pages, code complete (details below). Next: run the Docker verification plan on the PC with Docker, then phase 5 (admin dashboard and editor).
+
+## Phase 2: domain port (25/09/2026)
+
+- Port in `src/domain`:
+  - `scheduler.ts`: slot grid, circle rounds, groups, placement, sort, generateSchedule, post-publish round robin, bracket.
+  - `standings.ts`: standings, group complete.
+  - `playoffs.ts`: resolve sources, resolveAllPlayoffs, playoff placement.
+  - `schedule-edit.ts`: reconcile, matchup counts.
+  - `mobile-matching.ts`: matchFinals, reviewReason, toMs, settling, drift, norm, proposeTeamPairs, scoredGameIds, orient, dayOf.
+  - `types.ts`.
+- Golden suite:
+  - `scripts/golden/legacy/` holds verbatim copies of `scheduler.js` and `integration.js`, and `app-extract.js` (verbatim `app.js` functions with line ranges, plus two marked harness wrappers).
+  - `scripts/golden/generate.mjs` (`npm run golden:generate`) runs only the legacy code on 10 fixed and 40 seeded-random events and writes `tests/golden/*.json` (1.4 MB, deterministic).
+  - `tests/unit/golden-parity.test.ts` checks 305 cases.
+  - Never regenerate the golden files to make a test pass.
+- Recorded changes against the old code, each tested:
+  - E-64: playoff games that do not fit go to Unscheduled, and so do all later rounds. The old code overflowed, sometimes before earlier rounds.
+  - E-41: playoff placement keeps the end time's minutes.
+  - M-08: "same day" uses the event time zone.
+  - Labels use " - " instead of a long dash.
+  - The old playoff "court 1 taken" check was provably dead and was dropped; the golden cases confirm no change.
+- Evidence:
+  - Mutation check: 4 planted defects each failed the golden suite (51, 48, 40 and 4 failing cases), and all passed again after restoring.
+  - `npm run test:coverage`: 451 tests pass, `src/domain` 100% (threshold 100%).
+  - Lint, typecheck, build and check:secrets pass (the pre-existing Prettier warning on `skills-lock.json` is unchanged from HEAD).
+- Independent review (read only; 200,000 fuzz cases against an instrumented legacy copy):
+  - It confirmed the dead-check claim for normal inputs.
+  - It found 4 real defects. Each got a regression test that failed first and passed after the fix:
+    - a repeated schedule day double-booked playoff slots (days are now made distinct);
+    - "HH:MM:SS" times from Postgres did not occupy their slot (occupancy is now keyed on minutes);
+    - an empty `{}` score counted as scored;
+    - a fractional games-per-team value was not truncated.
+  - 3 golden cases were added with an unlisted day, an off-grid time and court 4.
+  - Final run: 451 tests pass.
+- Handed to later phases (from the review, not fixed here):
+  - Phase 6: `hasDrifted` compares `lastEventAt` as exact text, like the old code. Postgres `timestamptz` returns "+00:00" where the mobile view says "Z", so every approval would look drifted. Store the raw mobile string in a text column, or compare with `toMs` (an Improve row). Test both forms.
+  - Phase 5:
+    - Add a distinct-days rule for `events.schedule_days` (schema, zod).
+    - Make the games-per-team override zod schema `.int()`.
+    - Validate `events.timezone` (`dayOf` throws on an invalid zone).
+    - Add a unique constraint so the division team map is one-to-one.
+    - The mapper from DB rows to domain shapes must pass stored, resolved playoff team ids to round robin, exactly as the old code did.
+  - Phase 7 migration:
+    - Convert scores as the old `parseInt` did (`""` is not a score).
+    - Order teams by their Firebase key (RTDB returns key-sorted objects), not by `created_at`.
+- Not yet wired into the app: publish and editor actions (phase 5) and the public standings (phase 4) will call these modules.
+
+## Phase 4: public pages (26/09/2026, code complete, database checks NOT RUN)
+
+- Built:
+  - Home `/` (H-01 to H-05): published only, current and upcoming first, today judged in each event time zone. Functional styling on placeholder tokens; the platform look is a later Impeccable round (user decision 26/09/2026).
+  - Event page `/events/[eventId]`: Schedule, Standings, Teams and Rules tabs in the URL; sponsor rows and logo (P-01); draft preview for owners (A-06); share previews (P-12); real 404 and an error page (N-04).
+  - Live island (`src/components/event/live-event.tsx`): Supabase Realtime on `game_scores` and `games`, with standings and playoff seeds recomputed on the client from `src/domain`.
+  - Owner score entry (P-08): the `saveScore` Server Action calls `set_score`, debounced 700 ms, and a failure is reported and rolled back.
+  - Legacy `#/event/{id}` redirect via `/l/[legacyId]`.
+  - Rules are sanitised with `sanitize-html` (new dependency, MIT; allow-list of the old toolbar tags, no attributes).
+- Mapping: `src/lib/public-event/model.ts` normalises Postgres `HH:MM:SS` times, validates stored playoff sources with zod, orders games by `position`, and keeps a playoff-flagged game out of standings even when its bracket link is unreadable. That last point was a bug caught by a unit test.
+- Evidence (26/09/2026, this machine):
+  - `npm run test:coverage`: 504 tests pass. They include XSS payloads for the sanitiser, the mapper, Home ordering, loaders and the score action against a fake Supabase client, and the live island with mocked Realtime (score paint-in, DELETE, refresh debounce, reconnecting, debounced save, failure rollback, live standings).
+  - Lint, typecheck, build and check:secrets pass.
+  - Visual and axe pass: the new tabs in the prototype, the 404s and the Home error state at 390 and 1440 px, all clean after two fixes (Standings overflowed the page at 390 px, and rules list markers were missing). Screenshots are in `.impeccable/review/phase4/` (gitignored).
+  - A malformed id returned HTTP 200 because of `loading.tsx` streaming. The file was removed; it now returns 404 (PRD N-04 note).
+- NOT RUN (needs Docker):
+  - the real Realtime delivery under RLS;
+  - `set_score` through the action;
+  - the nested PostgREST select shape against a real database;
+  - draft visibility and the legacy lookup against real rows;
+  - `tests/e2e/public-event.spec.ts` (journeys 3, 6 and 8, axe on every tab, Home).
+- Follow-ups:
+  - Realtime DELETE payloads carry only the key and are not filtered by event; the island ignores ids that are not in the event.
+  - Platform look for Home, login and admin.
+
+## Platform look (26/09/2026, Impeccable, shipped)
+
+- Direction: **Broadcast Package**, chosen on the decision page over the rolled Season Program Guide (seed a20866ff, code-led). The mobile app's colour-role rule was declared not binding by the user; the platform's own law is teal for identity and plate edges, lime only for LIVE pips and the one primary action on a screen.
+- Built: Home, Sign in, the admin shell (Dashboard, Settings, Admins), the 404 pages and the error pages.
+  - Brand tokens are in `src/app/globals.css`; the font is Saira with its width axis (`src/app/platform-fonts.ts`).
+  - Components are in `src/components/platform/`.
+  - The logo is `public/brand/itala-mark.png`: the mobile app's `favicon.png` copied unchanged, with provenance embedded. Its ground #0B0F18 equals the page ground.
+- Contract: `.impeccable/surfaces/src-app-public-page-tsx.md`. DESIGN.md and `.impeccable/design.json` now document both worlds (event pages: Painted Lines; platform: Broadcast Package).
+- Evidence: `/prototype/platform` shows the screens with sample data because there is no database here (404 unless ENABLE_PROTOTYPES=1).
+  - Captures at 390 and 1440 are in `.impeccable/review/platform/` (gitignored); axe is clean and nothing scrolls sideways.
+  - Finish review: fix (8), then a second verdict: fix (1 unresolved plus 2 regressions), then a third: ship.
+  - Not captured: the Admins screen, and the hover, focus and loading states.
+  - Tests pass, including new platform-frame component tests; lint, types, build and check:secrets pass.
+- Still to check with Docker: the real signed-in admin screens and Home with real data (`auth.spec.ts`, `public-event.spec.ts`).
+
+## Docker verification plan (for the PC with Docker, e.g. a Codex session)
+
+Nothing below has run yet. Run it in order and record each result (command, pass/fail counts) in this file.
+
+1. Install Docker Desktop and Node 24 LTS (`.nvmrc`). Then:
+   ```bash
+   npm ci
+   npx playwright install chromium
+   npm run db:start        # local Supabase in Docker, applies supabase/migrations
+   npm run env:local       # writes .env.local for the LOCAL stack only
+   ```
+2. Database and backend:
+   ```bash
+   npm run test:db           # pgTAP: RLS, functions, storage (130 assertions at phase 1)
+   npm run test:integration  # Auth, PostgREST RLS, RPC, Storage against the local stack
+   ```
+3. App gates:
+   ```bash
+   npm run lint && npm run typecheck && npm run test:coverage
+   npm run build && npm run check:secrets
+   npm run test:e2e          # full suite at 390 and 1440 px: auth.spec.ts, today-prototype.spec.ts, public-event.spec.ts (50 tests)
+   ```
+   `tests/e2e/global-setup.ts` now also seeds a published league night (`tests/e2e/seed-public-event.ts`) with the secret key; it needs `SUPABASE_SECRET_KEY` in `.env.local` (`npm run env:local` writes it). The Playwright web server sets `ENABLE_PROTOTYPES=1` itself. Watch `public-event.spec.ts` "Live scores" closely: it is the first real test of Realtime under RLS. `today-prototype.spec.ts` passed 8/8 here only through a scratch config without the Supabase seeding; this is its first run inside the real suite.
+4. Anything that fails: follow CLAUDE.md "reproduce -> fail -> fix -> pass". Do not weaken tests. The known baseline Prettier warning is `skills-lock.json`.
+5. Then push so GitHub Actions runs the same gates. Phase 4 (public pages: home, event tabs, realtime scores, standings from `src/domain/standings.ts`, legacy redirects, share previews) needs this stack for its queries and E2E journeys 3 and 6.

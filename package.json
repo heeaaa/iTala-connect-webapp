@@ -19,7 +19,8 @@
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts",
     "admin:create": "tsx --env-file=.env.local scripts/create-admin.ts",
-    "env:local": "tsx scripts/local-env.ts"
+    "env:local": "tsx scripts/local-env.ts",
+    "golden:generate": "node scripts/golden/generate.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -27,6 +28,7 @@
     "next": "16.3.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "sanitize-html": "^2.17.7",
     "server-only": "^0.0.1",
     "zod": "^4.6.5"
   },
@@ -41,6 +43,7 @@
     "@types/node": "^24.13.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sanitize-html": "^2.16.1",
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^5.0.1",
     "eslint": "^9",

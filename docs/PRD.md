@@ -65,7 +65,7 @@ Organisers create basketball events (tournaments or leagues), define divisions a
 | N-01 | Top bar with iTala logo, "Events", and (admin) "Dashboard", (superadmin) "Settings", then "Log out" or "Admin login". Sticky. | `renderNav` app.js:66 | Keep |
 | N-02 | "Local Mode" badge. | Shown when Firebase was not configured | Retire (no local-storage mode, see M-10) |
 | N-03 | Leaving a public event page removes that event's theme and live subscriptions. | `clearEventTheme` app.js:83 | Keep (automatic with route scoping) |
-| N-04 | Not-found and loading states: "Event not found" (editor and public page), loading placeholders on every data screen, mobile screens "Not your event." and "Could not load this event". Real 404 status for unknown events. | app.js:176, 1440; mobile-ui.js:70-84 | Keep + Improve (skeletons, 404) |
+| N-04 | Not-found and loading states: "Event not found" (editor and public page), loading placeholders on every data screen, mobile screens "Not your event." and "Could not load this event". Real 404 status for unknown events. The public event page renders in one pass with no streamed skeleton, because streaming sends status 200 before the 404 is known (decided 26/09/2026). | app.js:176, 1440; mobile-ui.js:70-84 | Keep + Improve (skeletons, 404) |
 
 ## 5. Home (public event list)
 

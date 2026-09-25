@@ -1,0 +1,382 @@
+/*
+ * Standings, Teams, Rules and sponsor media (PRD P-01, P-09 to P-11).
+ * Painted Lines world (DESIGN.md): --ev-* organiser tokens and --div only;
+ * 2 px paint for structure, hairline rules between rows, space between
+ * sections. Rank and difference are words and numbers first, colour second.
+ */
+
+.stack {
+  display: grid;
+  /* minmax(0, 1fr): wide tables scroll inside their region, never the page (X-05). */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2.75rem;
+  padding-top: 1.75rem;
+}
+
+.divisionTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0 0 0.875rem;
+  color: var(--ev-heading);
+  font-family: var(--font-ev-display), system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 1.5rem;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.swatch {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  background: var(--div, var(--ev-accent));
+}
+
+.empty {
+  margin: 1.75rem 0;
+  color: var(--ev-muted);
+  font-size: 1.0625rem;
+}
+
+.quiet {
+  margin: 0.5rem 0 0;
+  color: var(--ev-muted);
+}
+
+/* Standings --------------------------------------------------------------- */
+
+.tableScroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  min-width: 20rem;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  padding: 0.625rem 0.5rem;
+  text-align: right;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.table thead th {
+  border-bottom: var(--line) solid var(--ev-accent);
+  color: var(--ev-muted);
+  font-family: var(--font-ev-display), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 0.875rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.table abbr {
+  text-decoration: none;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid var(--rule);
+}
+
+@media (max-width: 29.99rem) {
+  /* All seven columns fit a phone; the region still scrolls if names are long. */
+  .table th,
+  .table td {
+    padding-inline: 0.3rem;
+  }
+}
+
+.table th:first-child,
+.table td:first-child {
+  width: 2.75rem;
+  text-align: left;
+}
+
+.teamCol {
+  width: 100%;
+  text-align: left !important;
+  white-space: normal !important;
+}
+
+.table tbody th {
+  color: var(--ev-heading);
+  font-weight: 600;
+}
+
+.strong {
+  color: var(--ev-heading);
+  font-weight: 700;
+}
+
+/* Top three: filled paint for first, a painted outline for second and third. */
+.rank {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  border: var(--line) solid transparent;
+  border-radius: 2px;
+  font-family: var(--font-ev-display), system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.rank[data-rank='1'] {
+  background: var(--ev-accent);
+  color: var(--ev-on-accent);
+}
+
+.rank[data-rank='2'],
+.rank[data-rank='3'] {
+  border-color: var(--ev-accent);
+  color: var(--ev-heading);
+}
+
+.diff[data-sign='1'] {
+  color: var(--ev-heading);
+  font-weight: 700;
+}
+
+.diff[data-sign='-1'] {
+  color: var(--ev-muted);
+}
+
+/* Teams ------------------------------------------------------------------- */
+
+.teamList {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team {
+  border-bottom: 1px solid var(--rule);
+}
+
+.team summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  min-height: 2.75rem;
+  padding: 0.75rem 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.team summary::-webkit-details-marker {
+  display: none;
+}
+
+/* A drawn chevron in paint, turned down while open. */
+.team summary::before {
+  content: '';
+  flex: none;
+  align-self: center;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.25rem;
+  border-right: var(--line) solid var(--ev-accent);
+  border-bottom: var(--line) solid var(--ev-accent);
+  rotate: -45deg;
+  transition: rotate 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.team[open] summary::before {
+  rotate: 45deg;
+}
+
+.teamName {
+  flex: 1;
+  color: var(--ev-heading);
+  font-weight: 700;
+  font-size: 1.0625rem;
+}
+
+.teamMeta {
+  display: flex;
+  gap: 1rem;
+  color: var(--ev-muted);
+  font-size: 0.875rem;
+}
+
+.players {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0 0 1rem;
+  padding: 0 0 0 1.25rem;
+  list-style: none;
+}
+
+.players li {
+  display: grid;
+  grid-template-columns: 1.75rem 3rem 1fr;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.playerIndex {
+  color: var(--ev-muted);
+  font-size: 0.8125rem;
+}
+
+.playerNumber {
+  color: var(--ev-heading);
+  font-family: var(--font-ev-display), system-ui, sans-serif;
+  font-weight: 700;
+}
+
+/* Rules ------------------------------------------------------------------- */
+
+.rules {
+  max-width: 68ch;
+  padding-top: 1.75rem;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+}
+
+.rules h2,
+.rules h3 {
+  margin: 2rem 0 0.5rem;
+  color: var(--ev-heading);
+  font-family: var(--font-ev-display), system-ui, sans-serif;
+  font-weight: 800;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.rules h2 {
+  font-size: 1.5rem;
+}
+
+.rules h3 {
+  font-size: 1.1875rem;
+}
+
+.rules > :first-child {
+  margin-top: 0;
+}
+
+.rules p,
+.rules ul,
+.rules ol {
+  margin: 0 0 1rem;
+}
+
+.rules ul,
+.rules ol {
+  padding-left: 1.5rem;
+}
+
+/* The reset removes list markers; rules lists need them back (E-70). */
+.rules ul {
+  list-style: disc;
+}
+
+.rules ol {
+  list-style: decimal;
+}
+
+.rules li::marker {
+  color: var(--ev-accent);
+}
+
+.rules strong,
+.rules b {
+  color: var(--ev-heading);
+}
+
+/* Sponsor and logo media ------------------------------------------------------ */
+
+.media {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: 0 var(--gutter) 1.25rem;
+}
+
+.logo {
+  display: block;
+  max-width: 11rem;
+  max-height: 6rem;
+  object-fit: contain;
+}
+
+.sponsorsLarge,
+.sponsorsSmall {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sponsorsLarge img {
+  display: block;
+  max-width: 14rem;
+  max-height: 4.5rem;
+  object-fit: contain;
+}
+
+.sponsorsSmall img {
+  display: block;
+  max-width: 7rem;
+  max-height: 2.5rem;
+  object-fit: contain;
+}
+
+/* Desktop: sponsor rows first (small, then large), logo to the right. */
+@media (min-width: 48rem) {
+  .media {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'small logo'
+      'large logo';
+    align-items: center;
+  }
+
+  .logo {
+    grid-area: logo;
+  }
+
+  .sponsorsSmall {
+    grid-area: small;
+  }
+
+  .sponsorsLarge {
+    grid-area: large;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team summary::before {
+    transition: none;
+  }
+}
+
+/* Owner score entry failed (P-08): a solid rule and plain words. */
+.saveError {
+  margin: 1rem 0 0;
+  padding: 0.625rem 0.875rem;
+  border: var(--line) solid var(--ev-text);
+  border-radius: 2px;
+  color: var(--ev-heading);
+  font-weight: 600;
+}

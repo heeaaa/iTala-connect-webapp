@@ -6,7 +6,8 @@ import { parseEventTab } from '@/components/event/tabs';
 import { toMinutes } from '@/domain/game-day';
 import { serverEnv } from '@/env';
 import { clockInZone } from '@/lib/event-time';
-import { LIGHT_ORGANISER_THEME, SAMPLE_GAME_DAY, sampleLeague } from '@/prototype/league-night';
+import { sanitizeRulesHtml } from '@/lib/rules-html';
+import { LIGHT_ORGANISER_THEME, SAMPLE_GAME_DAY, SAMPLE_RULES_HTML, sampleLeague } from '@/prototype/league-night';
 
 import { eventFontClassName } from '../../event-fonts';
 import { PrototypeToday } from './prototype-today';
@@ -48,6 +49,7 @@ export default async function TodayPrototypePage({ searchParams }: PageProps<'/p
       feed={one('feed') === 'reconnecting' ? 'reconnecting' : 'live'}
       owner={one('owner') === '1'}
       fontClassName={eventFontClassName}
+      rulesHtml={sanitizeRulesHtml(SAMPLE_RULES_HTML)}
     />
   );
 }

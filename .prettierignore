@@ -12,3 +12,5 @@ package-lock.json
 .agents
 .claude
 .impeccable
+scripts/golden/legacy
+tests/golden

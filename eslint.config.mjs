@@ -41,5 +41,7 @@ export default defineConfig([
     'src/lib/supabase/database.types.ts',
     '.agents/**',
     '.claude/**',
+    // Verbatim legacy code for the golden parity suite; never reformat or lint.
+    'scripts/golden/legacy/**',
   ]),
 ]);

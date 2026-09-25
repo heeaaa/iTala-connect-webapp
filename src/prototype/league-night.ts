@@ -169,3 +169,21 @@ function withScores(g: TodayGame, clock: Clock): TodayGame {
   const share = elapsed / 60;
   return { ...g, score1: Math.round(s1 * share), score2: Math.round(s2 * share) };
 }
+
+const FIRST = ['Ari', 'Bea', 'Cam', 'Dev', 'Eli', 'Fin', 'Gus', 'Hana', 'Isla', 'Jo'];
+
+/** SAMPLE roster: 5 to 8 invented players per team, numbered like jerseys. */
+export function sampleRoster(teamId: string, index: number) {
+  const count = 5 + (index % 4);
+  return Array.from({ length: count }, (_, i) => ({
+    id: `${teamId}-p${i}`,
+    name: `${FIRST[(index + i) % FIRST.length]} Sample`,
+    number: String(((index * 7 + i * 3) % 30) + 1),
+  }));
+}
+
+/** SAMPLE rules in the old toolbar's formatting (sanitised before render). */
+export const SAMPLE_RULES_HTML =
+  '<h2>Game time</h2><p>Four <strong>10-minute</strong> quarters, running clock except the last two minutes of the fourth.</p>' +
+  '<h3>Fouls</h3><ul><li>Five personal fouls and you are out.</li><li>Team bonus from the fifth team foul each half.</li></ul>' +
+  '<h3>Ties</h3><ol><li>A tied group game stays level.</li><li>Playoff games go to a two-minute overtime.</li></ol>';

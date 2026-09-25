@@ -37,6 +37,7 @@ npm run dev                   # http://localhost:3000
 | `npm run test:integration` | Auth, PostgREST and Storage against the local stack |
 | `npm run test:e2e` | Playwright journeys at 390 px and 1440 px (run `npm run build` first) |
 | `npm run build` | Production build |
+| `npm run golden:generate` | Rewrite `tests/golden/*.json` from the legacy code in `scripts/golden/legacy` (only when the case list changes; never to make a test pass) |
 | `npm run check:secrets` | Fails if any server-only value or secret pattern is in `.next/static` |
 | `npm run db:reset` | Recreate the local database from migrations |
 | `npm run db:types` | Regenerate `src/lib/supabase/database.types.ts` |
@@ -49,7 +50,7 @@ Integration and E2E tests refuse to run unless `NEXT_PUBLIC_SUPABASE_URL` is a l
 
 ```
 src/app          routes (public, auth, admin)
-src/domain       pure scheduling, standings and matching logic (phase 2)
+src/domain       pure scheduling, standings, playoff and matching logic (golden parity with the old app)
 src/server       server-only: access checks, Server Actions
 src/lib          Supabase clients, security headers, formatting
 supabase/        migrations, pgTAP tests, local config

@@ -1,42 +1,63 @@
 @import 'tailwindcss';
 
 /*
- * Pre-design placeholder tokens. The approved visual system (palette, type,
- * spacing) is chosen in phase 3 and recorded in DESIGN.md; these neutral
- * values only keep phase 1 screens legible and accessible until then.
- *
  * Two theme layers (plan section 6):
- *   --brand-*  iTala Connect screens (home, login, admin)
+ *   --brand-*  iTala Connect platform screens (Home, Sign in, admin):
+ *              Broadcast Package direction, .impeccable/surfaces/src-app-public-page-tsx.md
  *   --ev-*     inside /events/[eventId] only, from the organiser's colours
+ *              (Painted Lines, DESIGN.md). Event pages never read --brand-*.
+ *
+ * Network ground #0B0F18 is exactly the ground of the iTala mark
+ * (public/brand/itala-mark.png), so the mark sits on the page seamlessly.
+ * Colour law: teal is identity and plate edges; lime is only LIVE pips and
+ * the one primary action on a screen.
  */
 :root {
-  --brand-bg: #ffffff;
-  --brand-surface: #f5f6f8;
-  --brand-text: #111827;
-  --brand-muted: #4b5563;
-  --brand-border: #d1d5db;
-  --brand-accent: #0f3d5e;
-  --brand-accent-text: #ffffff;
-  --brand-danger: #b42318;
-  --brand-focus: #0f3d5e;
+  color-scheme: dark;
+  --brand-bg: #0b0f18;
+  --brand-surface: #172033;
+  --brand-raised: #1f2a40;
+  --brand-text: #f4f8ff;
+  --brand-muted: #8b95b5;
+  --brand-border: #243049;
+  --brand-accent: #12d7d0;
+  --brand-accent-text: #0b0f18;
+  --brand-live: #c7f000;
+  --brand-live-text: #0b0f18;
+  --brand-live-hover: #d8ff3a;
+  --brand-accent-hover: #45e6e0;
+  --brand-raised-hover: #2a3752;
+  --brand-danger: #ff7a7a;
+  --brand-focus: #12d7d0;
 }
 
 @theme inline {
   --color-brand-bg: var(--brand-bg);
   --color-brand-surface: var(--brand-surface);
+  --color-brand-raised: var(--brand-raised);
   --color-brand-text: var(--brand-text);
   --color-brand-muted: var(--brand-muted);
   --color-brand-border: var(--brand-border);
   --color-brand-accent: var(--brand-accent);
   --color-brand-accent-text: var(--brand-accent-text);
+  --color-brand-live: var(--brand-live);
   --color-brand-danger: var(--brand-danger);
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: var(--font-platform), system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 body {
   background: var(--brand-bg);
   color: var(--brand-text);
   font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  caret-color: var(--brand-accent);
+  accent-color: var(--brand-accent);
+  scrollbar-color: var(--brand-border) var(--brand-bg);
+}
+
+::selection {
+  background: var(--brand-accent);
+  color: var(--brand-accent-text);
 }
 
 :focus-visible {

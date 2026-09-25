@@ -2,7 +2,10 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import { NO_ACCESS_MESSAGES, safeNextPath } from '@/server/access';
+import { BrandName, platformStyles as st, TitlePlate } from '@/components/platform/platform-frame';
 import { getAccess } from '@/server/auth';
+
+import { PlatformChrome } from '../../platform-chrome';
 import { LoginForm } from './login-form';
 
 export const metadata: Metadata = { title: 'Sign in' };
@@ -21,14 +24,25 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
   const notice = errorKey ? NO_ACCESS_MESSAGES[errorKey] : undefined;
 
   return (
-    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6 px-4 py-12">
-      <h1 className="text-2xl font-semibold">Sign in to iTala Connect</h1>
-      {notice ? (
-        <p role="alert" className="rounded-md border border-brand-border bg-brand-surface p-3 text-sm">
-          {notice}
-        </p>
-      ) : null}
-      <LoginForm next={next} />
-    </main>
+    <PlatformChrome current="login">
+      <main className={st.wrap}>
+        <TitlePlate
+          title={
+            <>
+              Sign in to <BrandName /> Connect
+            </>
+          }
+          sub="Organisers only. Fans never need an account."
+        />
+        <div className="flex flex-col gap-4 pb-12">
+          {notice ? (
+            <p role="alert" className={st.notice}>
+              {notice}
+            </p>
+          ) : null}
+          <LoginForm next={next} />
+        </div>
+      </main>
+    </PlatformChrome>
   );
 }

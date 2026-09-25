@@ -5,11 +5,13 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { EventShell } from '@/components/event/event-shell';
-import { EVENT_TABS, type EventTabId } from '@/components/event/tabs';
+import { RulesTab, StandingsTab, TeamsTab } from '@/components/event/event-tabs-content';
+import { type EventTabId } from '@/components/event/tabs';
 import { type FeedState, type TodayEvent, type TodayGame } from '@/components/event/today/model';
 import { TodaySchedule } from '@/components/event/today/today-schedule';
 import { type Clock, gameStatus } from '@/domain/game-day';
 import { clockInZone } from '@/lib/event-time';
+import { sampleRoster } from '@/prototype/league-night';
 
 type ScoreOverride = Pick<TodayGame, 'score1' | 'score2' | 'changedAt'>;
 
@@ -22,6 +24,8 @@ export interface PrototypeTodayProps {
   feed: FeedState;
   owner: boolean;
   fontClassName: string;
+  /** Sample rules, already sanitised on the server. */
+  rulesHtml: string;
 }
 
 /**
@@ -30,7 +34,7 @@ export interface PrototypeTodayProps {
  * set_score action until phase 4.
  */
 export function PrototypeToday(props: PrototypeTodayProps) {
-  const { event, liveClock, selectedDay, tab, feed, owner, fontClassName } = props;
+  const { event, liveClock, selectedDay, tab, feed, owner, fontClassName, rulesHtml } = props;
   const [clock, setClock] = useState(props.clock);
   const [overrides, setOverrides] = useState<Record<string, ScoreOverride>>({});
 
@@ -56,11 +60,14 @@ export function PrototypeToday(props: PrototypeTodayProps) {
   };
 
   const onCourt = games.filter((g) => gameStatus(g, clock) === 'on-court' && g.team1Id && g.team2Id);
+  // A fixed cycle rather than randomness, so demos and screenshots repeat.
+  const [baskets, setBaskets] = useState(0);
   const simulateBasket = () => {
-    const g = onCourt[Math.floor(Math.random() * onCourt.length)];
+    const g = onCourt[baskets % onCourt.length];
     if (!g) return;
-    const side = Math.random() < 0.5 ? 1 : 2;
-    setScore(g.id, side, ((side === 1 ? g.score1 : g.score2) ?? 0) + (Math.random() < 0.3 ? 3 : 2));
+    const side = baskets % 2 === 0 ? 1 : 2;
+    setScore(g.id, side, ((side === 1 ? g.score1 : g.score2) ?? 0) + (baskets % 3 === 2 ? 3 : 2));
+    setBaskets((b) => b + 1);
   };
 
   return (
@@ -80,10 +87,26 @@ export function PrototypeToday(props: PrototypeTodayProps) {
             feed={feed}
             onScoreChange={owner ? setScore : undefined}
           />
+        ) : tab === 'standings' ? (
+          <StandingsTab
+            divisions={event.divisions.map((d) => ({
+              ...d,
+              teamIds: event.teams.filter((t) => t.divisionId === d.id).map((t) => t.id),
+            }))}
+            games={games.map((g) => ({ ...g, groupId: null }))}
+            teamName={(id) => event.teams.find((t) => t.id === id)?.name ?? 'Unknown team'}
+          />
+        ) : tab === 'teams' ? (
+          <TeamsTab
+            divisions={event.divisions}
+            teams={event.teams.map((t, i) => ({
+              ...t,
+              coach: i % 2 ? '' : 'Sample coach',
+              players: sampleRoster(t.id, i),
+            }))}
+          />
         ) : (
-          <p className="py-8">
-            {EVENT_TABS.find((t) => t.id === tab)?.label} is not part of this prototype. The Schedule tab is.
-          </p>
+          <RulesTab html={rulesHtml} empty={!rulesHtml} />
         )}
       </EventShell>
       <PrototypeControls canSimulate={onCourt.length > 0} onSimulate={simulateBasket} />

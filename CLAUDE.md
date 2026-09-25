@@ -157,4 +157,4 @@ Everything above still applies. Where this section is more specific, it wins for
 
 ### Status
 
-- Phase 1 (Foundations) built and verified locally on 25/09/2026. Next action and checkpoint: docs/work-status.md.
+- Phase 1 (Foundations) built and verified locally on 25/09/2026. Phase 3 Today prototype (Painted Lines, DESIGN.md) and Phase 2 domain port (golden parity) done 25/09/2026; Phase 4 public pages code complete 26/09/2026; database checks await a machine with Docker. Next action and checkpoint: docs/work-status.md.

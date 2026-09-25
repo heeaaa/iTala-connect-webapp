@@ -11,6 +11,8 @@
   --floor-tint: color-mix(in srgb, var(--ev-accent) 5%, var(--ev-bg));
   --rule: color-mix(in srgb, var(--ev-muted) 38%, var(--ev-bg));
 
+  /* The platform sets a dark UA scheme; event pages keep their own (organiser palettes can be light or dark). */
+  color-scheme: normal;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -39,6 +41,17 @@
   .root {
     --gutter: 2rem;
   }
+}
+
+/* Draft preview notice: a full-width painted band, words carry the meaning. */
+.notice {
+  margin: 0;
+  padding: 0.625rem var(--gutter);
+  background: var(--ev-accent);
+  color: var(--ev-on-accent);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  text-align: center;
 }
 
 .header {

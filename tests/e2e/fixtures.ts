@@ -3,12 +3,14 @@ import { readFileSync } from 'node:fs';
 import { expect, type Page } from '@playwright/test';
 
 import type { TestUser } from '../support/supabase';
+import type { PublicEventFixture } from './seed-public-event';
 
 export const FIXTURE_FILE = 'test-results/e2e-fixtures.json';
 
 export interface E2EFixtures {
   users: { superadmin: TestUser; adminA: TestUser; adminB: TestUser; noRole: TestUser };
-  events: { aDraft: string; bPublished: string };
+  events: { aDraft: string; bPublished: string; aDraftId: string };
+  publicEvent: PublicEventFixture;
 }
 
 export function fixtures(): E2EFixtures {

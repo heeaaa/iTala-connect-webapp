@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 
 import { adminClient, createUser } from '../support/supabase';
 import { FIXTURE_FILE, type E2EFixtures } from './fixtures';
+import { seedPublicEvent } from './seed-public-event';
 
 /** Seeds isolated users and events for this run on the LOCAL stack. */
 export default async function globalSetup() {
@@ -32,7 +33,9 @@ export default async function globalSetup() {
     events: {
       aDraft: data.find((e) => e.name.startsWith('A '))!.name,
       bPublished: data.find((e) => e.name.startsWith('B '))!.name,
+      aDraftId: data.find((e) => e.name.startsWith('A '))!.id,
     },
+    publicEvent: await seedPublicEvent(adminClient(), adminA.id, stamp),
   };
   mkdirSync('test-results', { recursive: true });
   writeFileSync(FIXTURE_FILE, JSON.stringify(fixtures));

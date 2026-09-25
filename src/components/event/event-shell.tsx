@@ -14,20 +14,28 @@ export interface EventShellProps {
   tab: EventTabId;
   /** next/font variable classes, applied by the route. */
   fontClassName: string;
+  /** Logo and sponsor rows (P-01), shown under the event name. */
+  media?: ReactNode;
+  /** Shown above everything, e.g. the draft preview notice (A-06). */
+  notice?: ReactNode;
   children: ReactNode;
 }
 
 /**
  * Public event page frame (PRD P-01 to P-03). The organiser's colours are
  * set here as --ev-* tokens and nothing inside reads --brand-*.
- * Sponsor rows and the event logo join in phase 4 with real storage.
  */
-export function EventShell({ name, days, theme, tab, fontClassName, children }: EventShellProps) {
+export function EventShell({ name, days, theme, tab, fontClassName, media, notice, children }: EventShellProps) {
   const sorted = [...days].sort();
   const first = sorted[0];
   const last = sorted.at(-1);
   return (
     <div className={`${styles.root} ${fontClassName}`} style={eventThemeVars(theme)}>
+      {notice ? (
+        <p className={styles.notice} role="status">
+          {notice}
+        </p>
+      ) : null}
       <header className={styles.header}>
         <h1 className={styles.name}>{name}</h1>
         {first && last ? (
@@ -36,6 +44,7 @@ export function EventShell({ name, days, theme, tab, fontClassName, children }: 
           </p>
         ) : null}
       </header>
+      {media}
       <EventTabs current={tab} />
       <main className={styles.content}>{children}</main>
       <footer className={styles.footer}>
