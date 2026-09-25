@@ -183,8 +183,8 @@ Organisers create basketball events (tournaments or leagues), define divisions a
 | P-01 | Header: event name, date range, sponsor rows (global secondary + event minor small; global primary + event major large), event logo; empty blocks hidden; on mobile the order is logo, major, minor. | `renderPublicEvent` app.js:1467 | Keep |
 | P-02 | **Organiser theme**: the five event colours apply to the whole page (nav, tabs, tables, chips, legend, rules). iTala Connect brand tokens apply outside event pages and never override event colours inside. | `--ev-*` vars, `body.pub-themed` | Keep |
 | P-03 | Tabs: Schedule, Standings, Teams, Rules. Selected tab is in the URL (shareable, survives reload). | `pubSwitchTab`, module variable | Keep + Improve |
-| P-04 | Schedule: legend of division colours plus "Semis / Finals"; team filter chips grouped by division with active chip in the division colour and "Clear"; non-matching games dimmed, matching highlighted, non-matching unscheduled games hidden. | `renderPublicScheduleBody` app.js:1782, `pubSetFilter` | Keep |
-| P-05 | Per-day tables showing only time rows with games, court columns up to the highest used court; card shows label, teams, score row once both teams are known; "Unscheduled" table; "No schedule yet." | same | Keep |
+| P-04 | Schedule: legend of division colours plus "Semis / Finals"; team filter chips grouped by division with active chip in the division colour and "Clear"; non-matching games dimmed, matching highlighted, non-matching unscheduled games hidden. The chosen team is remembered on this device per event (confirmed 25/09/2026). | `renderPublicScheduleBody` app.js:1782, `pubSetFilter` (filter reset on reload) | Keep + Improve |
+| P-05 | Per-day tables with rows sized to time from the first game to the last (an empty hour shows as a gap; confirmed 25/09/2026), court columns up to the highest used court; card shows label, teams, score row once both teams are known; "Unscheduled" table; "No schedule yet." | same | Keep + Improve |
 | P-06 | Playoff teams resolve from standings and bracket results using the exact same rules (section 12.5). | `resolveAllPlayoffs` app.js:1736 | Keep |
 | P-07 | Live scores: every device updates within a few seconds of a score change without reload (Supabase Realtime). Schedule edits also refresh live. | Firebase listener on scores only | Keep + Improve |
 | P-08 | Owners and superadmins see score inputs (number, min 0) on the public page; blank clears; writes on change; editing a score by hand removes its mobile provenance. | `pubScoreChange` app.js:1926 | Keep |
@@ -192,6 +192,7 @@ Organisers create basketball events (tournaments or leagues), define divisions a
 | P-10 | Teams: per division, expandable team cards with name, "Coach: X", "N players", and a player list (index, #number, name). "No teams." | `renderPublicTeams` app.js:1963 | Keep |
 | P-11 | Rules: sanitised rules HTML. "No rules." | `renderPublicRules` app.js:1979 | Keep + Fix |
 | P-12 | Page is server-rendered (fast first load, shareable link previews with event name and logo). | Client-rendered | Improve |
+| P-13 | Game day ("Today" screen): when the chosen day is today in the event time zone, each court shows Final, On court and Up next above the grid, with a "now" line across the grid. On court = the 60-minute slot is in progress; Final = the slot has passed and both scores are in; otherwise "Awaiting score". Opens on today, else the next event day, else the last. Design: Today surface brief (Painted Lines). | None | New |
 
 ## 10. Mobile scorekeeper integration
 

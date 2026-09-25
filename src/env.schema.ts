@@ -53,6 +53,9 @@ export const serverEnvSchema = clientEnvSchema
     DEFAULT_EVENT_TIMEZONE: optionalBlank(
       z.string().trim().refine(isValidTimeZone, 'is not a valid IANA time zone'),
     ).transform((v) => v ?? 'Pacific/Auckland'),
+    // Design prototypes with sample data (/prototype/*). Off unless "1";
+    // never set in production.
+    ENABLE_PROTOTYPES: optionalBlank(z.enum(['0', '1'], { error: 'must be 0 or 1' })).transform((v) => v === '1'),
   })
   .superRefine((env, ctx) => {
     if (env.MOBILE_SUPABASE_URL && !env.MOBILE_SUPABASE_PUBLISHABLE_KEY) {

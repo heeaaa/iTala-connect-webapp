@@ -102,6 +102,13 @@ describe('server env validation (X-02)', () => {
     );
   });
 
+  it('keeps design prototypes off unless ENABLE_PROTOTYPES is exactly 1', () => {
+    expect(parseEnv(serverEnvSchema, base).ENABLE_PROTOTYPES).toBe(false);
+    expect(parseEnv(serverEnvSchema, { ...base, ENABLE_PROTOTYPES: '0' }).ENABLE_PROTOTYPES).toBe(false);
+    expect(parseEnv(serverEnvSchema, { ...base, ENABLE_PROTOTYPES: '1' }).ENABLE_PROTOTYPES).toBe(true);
+    expect(problems({ ...base, ENABLE_PROTOTYPES: 'true' })).toContain('ENABLE_PROTOTYPES must be 0 or 1');
+  });
+
   it('client schema exposes only NEXT_PUBLIC_ values', () => {
     const env = parseEnv(clientEnvSchema, { ...base, SUPABASE_SECRET_KEY: 'sb_secret_should_be_dropped_entirely' });
     expect(Object.keys(env).sort()).toEqual(Object.keys(base).sort());

@@ -40,6 +40,6 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
-    env: { NEXT_PUBLIC_SITE_URL: baseURL },
+    env: { NEXT_PUBLIC_SITE_URL: baseURL, ENABLE_PROTOTYPES: '1' },
   },
 });

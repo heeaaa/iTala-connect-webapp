@@ -1,0 +1,138 @@
+/*
+ * Public event page frame. Only --ev-* organiser tokens (PRD P-02); the
+ * iTala Connect --brand-* tokens never apply in here.
+ * Painted Lines: the page ground is the gym floor, lines are flat paint.
+ */
+.root {
+  --paint: var(--ev-accent);
+  --line: 2px;
+  --gutter: 1rem;
+  --measure: 85rem;
+  --floor-tint: color-mix(in srgb, var(--ev-accent) 5%, var(--ev-bg));
+  --rule: color-mix(in srgb, var(--ev-muted) 38%, var(--ev-bg));
+
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--ev-bg);
+  color: var(--ev-text);
+  font-family: var(--font-ev-body), system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  accent-color: var(--ev-accent);
+  caret-color: var(--ev-accent);
+  scrollbar-color: color-mix(in srgb, var(--ev-accent) 55%, var(--ev-bg)) transparent;
+}
+
+.root ::selection {
+  background: var(--ev-accent);
+  color: var(--ev-on-accent);
+}
+
+.root :focus-visible {
+  outline: 3px solid var(--ev-accent);
+  outline-offset: 3px;
+  border-radius: 1px;
+}
+
+@media (min-width: 48rem) {
+  .root {
+    --gutter: 2rem;
+  }
+}
+
+.header {
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: 1.75rem var(--gutter) 1rem;
+}
+
+.name {
+  margin: 0;
+  color: var(--ev-heading);
+  font-family: var(--font-ev-display), system-ui, sans-serif;
+  font-weight: 800;
+  font-size: clamp(2.5rem, 9vw, 5rem);
+  line-height: 0.92;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.dates {
+  margin: 0.5rem 0 0;
+  color: var(--ev-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tabs: a painted sideline under the whole row, the chosen tab over-painted. */
+.tabs {
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.tabs ul {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-bottom: var(--line) solid var(--rule);
+  overflow-x: auto;
+}
+
+.tabs a {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.875rem;
+  margin-bottom: calc(var(--line) * -1);
+  border-bottom: 4px solid transparent;
+  color: var(--ev-muted);
+  font-family: var(--font-ev-display), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 1.125rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: color 160ms ease-out;
+}
+
+.tabs li:first-child a {
+  padding-left: 0;
+}
+
+.tabs a:hover {
+  color: var(--ev-text);
+}
+
+.tabs a[aria-current='page'] {
+  color: var(--ev-heading);
+  border-bottom-color: var(--paint);
+}
+
+.content {
+  flex: 1;
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: 0 var(--gutter) 3rem;
+}
+
+.footer {
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: 1.5rem var(--gutter) 2rem;
+  color: var(--ev-muted);
+  font-size: 0.8125rem;
+}
+
+.footer p {
+  margin: 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+}

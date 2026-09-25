@@ -11,3 +11,4 @@ package-lock.json
 *.md
 .agents
 .claude
+.impeccable

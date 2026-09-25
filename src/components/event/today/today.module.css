@@ -1,0 +1,1005 @@
+/*
+ * Schedule tab, Painted Lines direction (Today surface brief).
+ * Reads --ev-* organiser tokens and --div / --on-div division colours only.
+ * Lines are flat paint at a constant 2 px; space separates sections.
+ */
+
+.today {
+  --display: var(--font-ev-display), system-ui, sans-serif;
+  --stencil: var(--font-ev-stencil), var(--font-ev-display), system-ui, sans-serif;
+  --paint: var(--ev-accent);
+  --line: 2px;
+  /* --rule and --floor-tint come from the event shell root. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sectionTitle {
+  margin: 0 0 0.875rem;
+  color: var(--ev-heading);
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 1.5rem;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+/* Day strip ------------------------------------------------------------- */
+
+.dayStrip ul {
+  display: flex;
+  gap: 1.25rem;
+  margin: 0;
+  padding: 1rem 0 0.25rem;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.dayStrip a {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 2.75rem;
+  padding-bottom: 0.25rem;
+  border-bottom: var(--line) solid transparent;
+  color: var(--ev-muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.dayStrip a:hover {
+  color: var(--ev-text);
+}
+
+.dayStrip a[aria-current='page'] {
+  color: var(--ev-heading);
+  border-bottom-color: var(--paint);
+  font-weight: 600;
+}
+
+.dayWord {
+  color: var(--paint);
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 0.9375rem;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+/* Feed status ----------------------------------------------------------- */
+
+.feed,
+.dayNote {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  color: var(--ev-muted);
+  font-size: 0.875rem;
+}
+
+.feedMark {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background: var(--paint);
+}
+
+.feed[data-feed='reconnecting'] {
+  color: var(--ev-text);
+}
+
+.feed[data-feed='reconnecting'] .feedMark {
+  background: transparent;
+  border: var(--line) dashed var(--ev-text);
+}
+
+/* Layout ---------------------------------------------------------------- */
+
+.layout {
+  display: grid;
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+
+.main {
+  display: grid;
+  gap: 2.5rem;
+  min-width: 0;
+}
+
+@media (min-width: 68rem) {
+  .layout {
+    grid-template-columns: 19rem minmax(0, 1fr);
+    gap: 3rem;
+    align-items: start;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 1.5rem;
+  }
+}
+
+/* Team finder ------------------------------------------------------------ */
+
+.finder {
+  display: grid;
+  gap: 1rem;
+}
+
+.answer {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0.25rem 0 1rem;
+  border-bottom: var(--line) solid var(--paint);
+}
+
+.answerTeam {
+  margin: 0;
+  color: var(--ev-heading);
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 2rem;
+  line-height: 1;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.answerLine {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.35;
+}
+
+.answerLine strong {
+  display: block;
+  color: var(--paint);
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 1.625rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.answerActions {
+  display: flex;
+  gap: 1.25rem;
+  margin-top: 0.25rem;
+}
+
+.textButton {
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ev-text);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: var(--line);
+  text-decoration-color: var(--paint);
+  text-underline-offset: 0.3em;
+  cursor: pointer;
+}
+
+.textButton:hover {
+  color: var(--ev-heading);
+}
+
+.chipGroups {
+  display: grid;
+  gap: 1rem;
+}
+
+.finderToggle {
+  display: none;
+}
+
+@media (max-width: 67.99rem) {
+  .finderTitle {
+    display: none;
+  }
+
+  .finderToggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 3rem;
+    padding: 0 1rem;
+    border: var(--line) solid var(--paint);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--ev-heading);
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: 1.25rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  /* A drawn chevron, turned up while open. */
+  .finderToggle::after {
+    content: '';
+    width: 0.55rem;
+    height: 0.55rem;
+    border-right: var(--line) solid var(--paint);
+    border-bottom: var(--line) solid var(--paint);
+    rotate: 45deg;
+    translate: 0 -0.15rem;
+    transition: rotate 200ms var(--ease-out);
+  }
+
+  .finderToggle[aria-expanded='true']::after {
+    rotate: 225deg;
+    translate: 0 0.15rem;
+  }
+
+  .chipGroups[data-phone-collapsed] {
+    display: none;
+  }
+}
+
+.chipGroup {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.chipLegend {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0;
+  color: var(--ev-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chip {
+  min-height: 2.75rem;
+  padding: 0 0.875rem;
+  border: var(--line) solid color-mix(in srgb, var(--div) 70%, var(--ev-bg));
+  border-radius: 2px;
+  background: transparent;
+  color: var(--ev-text);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 160ms var(--ease-out),
+    color 160ms var(--ease-out);
+}
+
+.chip:hover {
+  background: color-mix(in srgb, var(--div) 16%, var(--ev-bg));
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--div);
+  border-color: var(--div);
+  color: var(--on-div);
+  font-weight: 700;
+}
+
+.swatch {
+  flex: none;
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  background: var(--div, var(--paint));
+}
+
+.swatch[data-playoff] {
+  --div: var(--paint);
+}
+
+.filterNote {
+  margin: 1rem 0 0;
+  color: var(--ev-text);
+}
+
+/* Court panels ----------------------------------------------------------- */
+
+.courts {
+  display: grid;
+  gap: 2rem;
+}
+
+@media (min-width: 40rem) {
+  .courts {
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 2rem 2.5rem;
+  }
+}
+
+@media (max-width: 39.99rem) {
+  /* Three or more courts: a swipeable rail instead of a long stack. */
+  .courts[data-count='many'] {
+    grid-auto-flow: column;
+    grid-auto-columns: 88%;
+    gap: 1rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 0.5rem;
+  }
+
+  .courts[data-count='many'] > * {
+    scroll-snap-align: start;
+  }
+}
+
+.courtPanel {
+  min-width: 0;
+}
+
+.courtHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.courtName {
+  margin: 0;
+  color: var(--ev-heading);
+  font-family: var(--stencil);
+  font-weight: 800;
+  font-size: 1.75rem;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.courtStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+  color: var(--ev-muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.courtStatus strong {
+  color: var(--ev-text);
+  font-weight: 700;
+}
+
+.courtPanel[data-state='on-court'] .courtStatus strong {
+  color: var(--paint);
+}
+
+.liveMark {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--paint);
+}
+
+/* The court itself: FIBA proportions, painted lines, keys in division paint. */
+.court {
+  position: relative;
+  aspect-ratio: 28 / 15;
+  container-type: inline-size;
+  color: var(--ev-text);
+}
+
+.courtLines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+  stroke: var(--paint);
+  stroke-width: var(--line);
+}
+
+.courtLines * {
+  vector-effect: non-scaling-stroke;
+}
+
+.floor {
+  fill: var(--floor-tint);
+}
+
+.key {
+  fill: color-mix(in srgb, var(--div, var(--paint)) 34%, var(--ev-bg));
+}
+
+.centreDot {
+  fill: var(--paint);
+  stroke: none;
+  opacity: 0;
+}
+
+.court[data-state='on-court'] .centreDot {
+  opacity: 1;
+}
+
+.baselineTick {
+  stroke-width: 6px;
+  opacity: 0;
+}
+
+/* The final state closes both baselines in full-strength paint. */
+.court[data-state='final'] .baselineTick {
+  opacity: 1;
+  stroke: var(--paint);
+}
+
+/* Waiting for the next game: dashed paint. */
+.court[data-state='upcoming'] .courtLines {
+  stroke-dasharray: 7 5;
+}
+
+.court[data-state='final'] .courtLines,
+.court[data-state='empty'] .courtLines {
+  stroke: color-mix(in srgb, var(--paint) 55%, var(--ev-bg));
+}
+
+.side {
+  position: absolute;
+  inset: 0 50% 0 0;
+}
+
+.side[data-side='2'] {
+  inset: 0 0 0 50%;
+}
+
+.sideName {
+  position: absolute;
+  top: 8%;
+  left: 7%;
+  right: 5%;
+  margin: 0;
+  color: var(--ev-heading);
+  font-weight: 700;
+  font-size: clamp(0.875rem, 4.3cqi, 1.3rem);
+  line-height: 1.15;
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+/* Lettering sits on a patch of floor so painted lines never cross it. */
+.sideName > span:first-child,
+.sideScore > span:last-child {
+  padding: 0 0.15em;
+  background: var(--floor-tint);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.side[data-side='2'] .sideName {
+  left: 5%;
+  right: 7%;
+}
+
+.side[data-mine] .sideName {
+  text-decoration: underline;
+  text-decoration-color: var(--paint);
+  text-decoration-thickness: 3px;
+  text-underline-offset: 0.28em;
+}
+
+/* Scores sit between the key and the half-court line. */
+.sideScore {
+  position: absolute;
+  top: 38%;
+  left: 42%;
+  right: 2%;
+  margin: 0;
+  color: var(--ev-heading);
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: min(15cqi, 5.5rem);
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.side[data-side='2'] .sideScore {
+  left: 2%;
+  right: 42%;
+}
+
+.centreMark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  margin: 0;
+  padding: 0.125em 0.4em;
+  background: var(--floor-tint);
+  color: var(--paint);
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: min(7.5cqi, 2.25rem);
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.courtEmpty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--ev-muted);
+}
+
+.stations {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.75rem 0 0;
+}
+
+.station {
+  display: grid;
+  grid-template-columns: 4.25rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.375rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.station dt {
+  color: var(--ev-muted);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.875rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.station dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.stationTime {
+  color: var(--ev-heading);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.station .swatch {
+  width: 0.625rem;
+  height: 0.625rem;
+  align-self: center;
+}
+
+.stationTeam b {
+  margin-left: 0.3em;
+  color: var(--ev-heading);
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 1.0625rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stationTeam[data-mine] {
+  text-decoration: underline;
+  text-decoration-color: var(--paint);
+  text-decoration-thickness: var(--line);
+  text-underline-offset: 0.25em;
+}
+
+.stationVs {
+  color: var(--ev-muted);
+}
+
+.stationQuiet {
+  color: var(--ev-muted);
+}
+
+/* Day grid --------------------------------------------------------------- */
+
+.daySection {
+  min-width: 0;
+}
+
+/* Key: the day's division colours, plus Semis / Finals when the day has them (PRD P-04). */
+.gridKey {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 1.25rem;
+  margin: -0.25rem 0 1rem;
+  padding: 0;
+  list-style: none;
+  color: var(--ev-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.gridKey li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.gridScroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 0.25rem;
+}
+
+/*
+ * Rows are 5-minute steps with a time-proportional minimum; a row grows
+ * when a cell's wrapped names need more room, so nothing is cut off.
+ */
+.grid {
+  --hour: 6.75rem;
+  --gutter-w: 4.5rem;
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--gutter-w) repeat(var(--courts), minmax(10.5rem, 1fr));
+  grid-template-rows: auto repeat(var(--rows), minmax(calc(var(--hour) / 12), auto));
+  column-gap: 0.5rem;
+  min-width: min-content;
+}
+
+@media (max-width: 39.99rem) {
+  /* Two courts fit a phone without scrolling the grid sideways. */
+  .grid {
+    --gutter-w: 3.5rem;
+    grid-template-columns: var(--gutter-w) repeat(var(--courts), minmax(8.25rem, 1fr));
+    column-gap: 0.375rem;
+  }
+}
+
+.gridCorner,
+.gridHour {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--ev-bg);
+}
+
+.gridCourt {
+  grid-row: 1;
+  padding: 0 0 0.5rem;
+  border-bottom: var(--line) solid var(--paint);
+  color: var(--ev-heading);
+  font-family: var(--stencil);
+  font-weight: 800;
+  font-size: 1.125rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.gridCorner {
+  grid-row: 1;
+  grid-column: 1;
+  border-bottom: var(--line) solid var(--paint);
+}
+
+.gridHour {
+  grid-column: 1;
+  padding-top: 0.375rem;
+  border-top: 1px solid var(--rule);
+  color: var(--ev-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The hour in progress: banded across the gutter and every court. */
+.hourBand {
+  grid-column: 1 / -1;
+  z-index: 0;
+  background: color-mix(in srgb, var(--paint) 13%, var(--ev-bg));
+}
+
+.gridHour[data-current] {
+  background: transparent;
+  color: var(--ev-heading);
+}
+
+/* Cells are painted outlines on the floor; stroke carries the state. */
+.cell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  margin: 0.375rem 0;
+  padding: 0.5rem 0.625rem 0.75rem;
+  background: var(--ev-bg);
+  border: var(--line) dashed color-mix(in srgb, var(--paint) 55%, var(--ev-bg));
+  border-radius: 2px;
+  color: var(--ev-text);
+}
+
+.cell[data-status='on-court'] {
+  border-style: solid;
+  border-color: var(--paint);
+  background: color-mix(in srgb, var(--paint) 13%, var(--ev-bg));
+}
+
+.cell[data-status='final'],
+.cell[data-status='awaiting-score'] {
+  border-style: solid;
+  border-width: 1px;
+  border-color: var(--rule);
+}
+
+/* Final: the closed baseline tick. Awaiting score has none. */
+.cell[data-status='final']::after {
+  content: '';
+  position: absolute;
+  left: -1px;
+  bottom: -1px;
+  width: 2.25rem;
+  height: 4px;
+  background: var(--paint);
+}
+
+/* Semis and finals wear the key's "Semis / Finals" paint. */
+.cell[data-playoff] .swatch {
+  background: var(--paint);
+}
+
+/* Team filter (PRD P-04): the chosen team's games are outlined in paint;
+   the rest step back by tone, keeping their own stroke. */
+/* Heavier paint in the cell's own pattern: dashed stays dashed, solid stays solid. */
+.grid[data-filtered] .cell[data-match='true'] {
+  border-width: 3px;
+  border-color: var(--paint);
+  background: color-mix(in srgb, var(--paint) 9%, var(--ev-bg));
+}
+
+.cell[data-match='false'] {
+  border-color: var(--rule);
+  background: var(--ev-bg);
+  color: var(--ev-muted);
+}
+
+.cell[data-match='false']::after {
+  background: var(--rule);
+}
+
+.cell[data-match='false'] .cellTeam > span:last-child,
+.cell[data-match='false'] .cellLabel,
+.cell[data-match='false'] .cellStatus {
+  color: var(--ev-muted);
+}
+
+.cell[data-match='false'] .swatch {
+  opacity: 0.6;
+}
+
+.cellHead {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.cellHead .swatch {
+  width: 0.625rem;
+  height: 0.625rem;
+  align-self: center;
+}
+
+.cellLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+}
+
+.cellStatus {
+  justify-self: start;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.cell[data-status='on-court'] .cellStatus {
+  padding: 0 0.375rem;
+  background: var(--paint);
+  color: var(--ev-on-accent);
+}
+
+.cell[data-match='false'][data-status='on-court'] .cellStatus {
+  background: transparent;
+  padding: 0;
+  color: var(--ev-muted);
+}
+
+.cellTeam {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.cellTeamName {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.25;
+  /* Break between words, hyphenating (lang en-NZ) only when one word cannot fit. */
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+@media (max-width: 23.99rem) {
+  .cell {
+    padding-inline: 0.5rem;
+  }
+
+  .cellTeamName {
+    font-size: 0.875rem;
+  }
+
+  .cellTeam > span:last-child:not(.cellTeamName) {
+    font-size: 1.125rem;
+  }
+}
+
+.cellTeam[data-mine] .cellTeamName {
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--paint);
+  text-decoration-thickness: var(--line);
+  text-underline-offset: 0.22em;
+}
+
+.cellTeam > span:last-child:not(.cellTeamName) {
+  flex: none;
+  color: var(--ev-heading);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.cellTeam[data-won] > span {
+  font-weight: 800;
+}
+
+.scoreInput {
+  flex: none;
+  width: 3.75rem;
+  min-height: 2.75rem;
+  padding: 0 0.375rem;
+  border: 1px solid var(--ev-muted);
+  border-radius: 2px;
+  background: var(--ev-bg);
+  color: var(--ev-heading);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreInput:invalid {
+  border-color: var(--ev-text);
+  border-style: dashed;
+}
+
+/*
+ * The one moving mark: the "now" line. It sits in the 5-minute row that
+ * holds "now" and runs under the cells, so it shows in the gutter and the
+ * gaps between courts and never crosses a name or a score.
+ */
+.nowLine {
+  grid-column: 1 / -1;
+  position: relative;
+  pointer-events: none;
+}
+
+.nowLine::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: calc(var(--within) * 100%);
+  left: var(--gutter-w);
+  right: 0;
+  height: var(--line);
+  translate: 0 -50%;
+  background: var(--paint);
+  transition: top 900ms var(--ease-out);
+}
+
+.nowTag {
+  position: absolute;
+  z-index: 4;
+  top: calc(var(--within) * 100%);
+  left: 0;
+  display: grid;
+  width: calc(var(--gutter-w) - 0.25rem);
+  translate: 0 -50%;
+  padding: 0.125rem 0.25rem;
+  background: var(--paint);
+  color: var(--ev-on-accent);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  transition: top 900ms var(--ease-out);
+}
+
+.unscheduled {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.unscheduled li {
+  display: grid;
+  gap: 0.125rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.emptyState {
+  margin: 1.5rem 0;
+  color: var(--ev-muted);
+  font-size: 1.0625rem;
+}
+
+/* A score that just changed paints in from the floor up. */
+.paintIn {
+  display: inline-block;
+  animation: paint-in 520ms var(--ease-out) both;
+}
+
+@keyframes paint-in {
+  from {
+    clip-path: inset(100% 0 0 0);
+    translate: 0 0.12em;
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+    translate: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paintIn {
+    animation: none;
+  }
+
+  .nowLine::before,
+  .nowTag,
+  .chip,
+  .finderToggle::after {
+    transition: none;
+  }
+}

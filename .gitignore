@@ -49,3 +49,6 @@ next-env.d.ts
 # supabase local
 supabase/.branches
 supabase/.temp
+
+# impeccable review screenshots (regenerate with node .impeccable/review/capture.mjs)
+.impeccable/review/

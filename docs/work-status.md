@@ -50,12 +50,21 @@ Rebuild the iTala Platform scheduler as iTala Connect (Next.js + Supabase) with 
 ## Blockers
 
 - Phase 2 needs read access to the old code folder `..\iTala-platform` (golden parity fixtures). Not yet connected to the Cowork session.
-- Phase 3 (design) needs `impeccable init` run in Claude CLI on your computer, then your choice between two directions.
 - Phase 6 needs access details for the mobile Supabase project. Phase 7 needs a Firebase service account or JSON export.
 
 ## Next action
 
-1. You: run `/impeccable init` in Claude CLI in this folder (writes PRODUCT.md). Phase 3 can then start.
+1. Done 25/09/2026: `/impeccable init` wrote `PRODUCT.md`. Open: copy locale (user asked for Canadian English; org rule and CLAUDE.md say NZ English, DD/MM/YYYY) and the default event time zone (most organisers are in BC). Phase 3 next: `/impeccable shape` for the Today screen.
+   Done 25/09/2026: shape confirmed for the Today screen (public event page, Schedule tab). Direction **Painted Lines** chosen on the Impeccable decision page (seed b7ecb8d8, assigned, code-led): organiser colours as gym floor paint; per-court panels with fixed stations Final / On court / Up next above tonight's court x time grid with a single moving "now" line; team filter remembered per device. Accepted defaults for open points: On court = scheduled slot in progress in the event time zone, Final = slot passed and both scores in; remembered team and time-proportional rows need PRD rows (P-04, P-05 Improve). Next: record the direction contract in the surface brief, then build the 390 px and 1440 px prototype with mock data.
+   Done 25/09/2026: Today prototype built at `/prototype/today` (sample data, 404 unless `ENABLE_PROTOTYPES=1`; controls for clock, courts, colours, feed, owner view, simulated basket).
+   - Code: `src/domain/game-day.ts` (pure game-day rules), `src/lib/event-time.ts`, `src/lib/color.ts`, `src/components/event/` (EventShell with `--ev-*` tokens, Today components, `today.module.css`), `src/app/event-fonts.ts` (Big Shoulders, Big Shoulders Stencil, Archivo via next/font), `src/prototype/league-night.ts`.
+   - Contract: `.impeccable/surfaces/src-app-public-events-eventid-page-tsx.md`.
+   - PRD: P-04 and P-05 Improve, new P-13.
+   - Checks: 115 unit/component tests pass with coverage gates; lint and typecheck clean except the pre-existing Prettier warning on `skills-lock.json` (unchanged from HEAD); build and check:secrets pass.
+   - E2E: `tests/e2e/today-prototype.spec.ts` 8/8 at 390 and 1440 with axe. Run with a scratch config because Docker and local Supabase were not available; the full suite is NOT RUN here, but CI runs it.
+   - Finish review: disposition fix, 8 material fixes applied.
+   Finish review re-scored: ship (8 fixes plus 2 regressions resolved). DESIGN.md and `.impeccable/design.json` written from the built world (event pages only; platform navy/teal/lime screens not designed yet).
+   Next: phase 4 wires `/events/[eventId]` to real data using these components; design the platform screens (home, login, admin) in the iTala logo palette.
 2. You: phase 0, rotate the two old admin passwords and check the live Firebase rules.
 3. You: save the CI workflow from the chat as `.github/workflows/ci.yml` (Cowork cannot write inside `.github`). Then (optional now) `git init`, commit, push to GitHub so CI runs; set branch protection with the five CI checks as required.
 4. Next session: phase 2 domain port and golden parity suite, once the iTala-platform folder is connected.

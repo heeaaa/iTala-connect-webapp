@@ -13,6 +13,15 @@ export function formatDate(isoDate: string): string {
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+/** "Thu 25/09/2026". The weekday is calendar maths, not a time zone lookup. */
+export function formatDayLabel(isoDate: string): string {
+  const formatted = formatDate(isoDate);
+  const [y, m, d] = isoDate.split('-').map(Number) as [number, number, number];
+  return `${WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]} ${formatted}`;
+}
+
 export function formatTime(isoTime: string): string {
   const m = ISO_TIME.exec(isoTime);
   if (!m) throw new RangeError(`Not an ISO time: ${isoTime}`);

@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-25T23:22:11+12:00",
+  "title": "Design System: iTala Connect",
+  "scope": "Public event pages (/events/[eventId]) only. Colour values are the default event theme; organisers replace them through the --ev-* tokens. Platform screens (home, login, admin) are not yet decided.",
+  "extensions": {
+    "colorMeta": {
+      "ev-accent": { "role": "primary", "displayName": "Line Paint (default Court Yellow)", "canonical": "var(--ev-accent)", "tonalRamp": ["oklch(15% 0.03 91)", "oklch(27% 0.06 91)", "oklch(39% 0.09 91)", "oklch(51% 0.12 91)", "oklch(63% 0.14 91)", "oklch(75% 0.16 91)", "oklch(86.6% 0.177 91)", "oklch(95% 0.08 91)"] },
+      "ev-on-accent": { "role": "primary", "displayName": "Paint Contrast", "canonical": "var(--ev-on-accent)", "note": "Computed black or white by readableOn(accent); never hand-picked.", "tonalRamp": ["#000000", "#000000", "#000000", "#000000", "#FFFFFF", "#FFFFFF", "#FFFFFF", "#FFFFFF"] },
+      "ev-bg": { "role": "neutral", "displayName": "Floor (default Night Floor)", "canonical": "var(--ev-bg)", "tonalRamp": ["oklch(15% 0 0)", "oklch(27% 0 0)", "oklch(39% 0 0)", "oklch(51% 0 0)", "oklch(63% 0 0)", "oklch(75% 0 0)", "oklch(86% 0 0)", "oklch(95% 0 0)"] },
+      "ev-text": { "role": "neutral", "displayName": "Body Ink (default Chalk Grey)", "canonical": "var(--ev-text)", "tonalRamp": ["oklch(15% 0 0)", "oklch(27% 0 0)", "oklch(39% 0 0)", "oklch(51% 0 0)", "oklch(63% 0 0)", "oklch(75% 0 0)", "oklch(90.6% 0 0)", "oklch(95% 0 0)"] },
+      "ev-muted": { "role": "neutral", "displayName": "Muted Ink (default Bench Grey)", "canonical": "var(--ev-muted)", "tonalRamp": ["oklch(15% 0 0)", "oklch(27% 0 0)", "oklch(39% 0 0)", "oklch(51% 0 0)", "oklch(62.2% 0 0)", "oklch(75% 0 0)", "oklch(86% 0 0)", "oklch(95% 0 0)"] },
+      "ev-heading": { "role": "neutral", "displayName": "Heading Ink (default White)", "canonical": "var(--ev-heading)", "tonalRamp": ["oklch(15% 0 0)", "oklch(27% 0 0)", "oklch(39% 0 0)", "oklch(51% 0 0)", "oklch(63% 0 0)", "oklch(75% 0 0)", "oklch(86% 0 0)", "oklch(100% 0 0)"] },
+      "rule": { "role": "neutral", "displayName": "Quiet Rule", "canonical": "color-mix(in srgb, var(--ev-muted) 38%, var(--ev-bg))", "note": "About #3C3C3C with the default theme." },
+      "floor-tint": { "role": "neutral", "displayName": "Floor Tint", "canonical": "color-mix(in srgb, var(--ev-accent) 5%, var(--ev-bg))", "note": "About #19170C with the default theme." },
+      "paint-band": { "role": "primary", "displayName": "Paint Band", "canonical": "color-mix(in srgb, var(--ev-accent) 13%, var(--ev-bg))" },
+      "paint-faded": { "role": "primary", "displayName": "Faded Paint", "canonical": "color-mix(in srgb, var(--ev-accent) 55%, var(--ev-bg))" }
+    },
+    "divisionTokens": {
+      "--div": "Organiser-chosen division colour, set per element by divisionVars(); invalid values fall back to the default accent.",
+      "--on-div": "Computed black or white text for solid --div fills.",
+      "mixes": {
+        "court key fill": "color-mix(in srgb, var(--div) 34%, var(--ev-bg))",
+        "chip border": "color-mix(in srgb, var(--div) 70%, var(--ev-bg))",
+        "chip hover": "color-mix(in srgb, var(--div) 16%, var(--ev-bg))"
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The event name, once per page. Uppercase, balanced." },
+      "score": { "displayName": "Score", "purpose": "Score numerals on a drawn court, sized by container query." },
+      "headline": { "displayName": "Headline", "purpose": "Section titles. Uppercase." },
+      "court-name": { "displayName": "Court Stencil", "purpose": "Court numbers only, like a floor stencil. Uppercase." },
+      "title": { "displayName": "Title", "purpose": "Event tabs. Uppercase." },
+      "body": { "displayName": "Body", "purpose": "Running text and empty states." },
+      "team-name": { "displayName": "Team Name", "purpose": "Team names in grid cells and stations." },
+      "label": { "displayName": "Label", "purpose": "Station terms such as Final and Up next. Uppercase." },
+      "small": { "displayName": "Small", "purpose": "Legends, grid hours, footer." }
+    },
+    "strokes": [
+      { "name": "line", "value": "2px", "purpose": "All structural paint: court lines, outlines, over-paint, now line." },
+      { "name": "rule", "value": "1px", "purpose": "Quiet separation: stations, grid hours, footer, final and awaiting cells." },
+      { "name": "emphasis", "value": "3px", "purpose": "Chosen team's cells and underline on the court; focus outline." },
+      { "name": "over-paint", "value": "4px", "purpose": "Active tab; final tick on grid cells." },
+      { "name": "baseline-tick", "value": "6px", "purpose": "Final state closing both baselines of a drawn court." },
+      { "name": "dash", "value": "stroke-dasharray: 7 5", "purpose": "Up next on a drawn court." }
+    ],
+    "shadows": [],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "The only easing." },
+      { "name": "colour", "value": "160ms", "purpose": "Tab and chip colour changes." },
+      { "name": "chevron", "value": "200ms", "purpose": "Finder toggle chevron rotation." },
+      { "name": "paint-in", "value": "520ms", "purpose": "A changed score clips up from the floor." },
+      { "name": "now-line", "value": "900ms", "purpose": "The now line easing to its new position." },
+      { "name": "reduced-motion", "value": "prefers-reduced-motion: reduce", "purpose": "Disables paint-in and all transitions." }
+    ],
+    "breakpoints": [
+      { "name": "small-phone", "value": "max-width: 23.99rem" },
+      { "name": "courts-side-by-side", "value": "40rem" },
+      { "name": "wide-gutter", "value": "48rem" },
+      { "name": "sidebar", "value": "68rem" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Drawn Court",
+      "kind": "custom",
+      "refersTo": "court-panel",
+      "description": "Signature: a court drawn in paint carrying its live game, names on each half, big numerals, division-tinted keys.",
+      "html": "<section class=\"ds-court-panel\" style=\"--div:#E06040\"><header class=\"ds-court-head\"><h3 class=\"ds-court-name\">Court 1</h3><p class=\"ds-court-status\"><span class=\"ds-live\"></span><strong>On court</strong> started 7:00 pm</p></header><div class=\"ds-court\"><svg class=\"ds-lines\" viewBox=\"0 0 280 150\" aria-hidden=\"true\"><rect class=\"ds-floor\" x=\"1\" y=\"1\" width=\"278\" height=\"148\"/><path d=\"M140 1 V149\"/><circle cx=\"140\" cy=\"75\" r=\"18\"/><circle class=\"ds-dot\" cx=\"140\" cy=\"75\" r=\"6\"/><rect class=\"ds-key\" x=\"1\" y=\"50.5\" width=\"57\" height=\"49\"/><path d=\"M58 57 A18 18 0 0 1 58 93\"/><path d=\"M1 9 H29.9 A67.5 67.5 0 0 1 29.9 141 H1\"/><rect class=\"ds-key\" x=\"222\" y=\"50.5\" width=\"57\" height=\"49\"/><path d=\"M222 57 A18 18 0 0 0 222 93\"/><path d=\"M279 9 H250.1 A67.5 67.5 0 0 0 250.1 141 H279\"/></svg><p class=\"ds-name ds-l\"><span>Commercial Drive Owls</span></p><p class=\"ds-name ds-r\"><span>Granville Gulls</span></p><p class=\"ds-score ds-l\"><span>26</span></p><p class=\"ds-score ds-r\"><span>23</span></p></div></section>",
+      "css": ".ds-court-panel { --paint: var(--ev-accent, #FFCC00); --floor-tint: color-mix(in srgb, var(--paint) 5%, var(--ev-bg, #0D0D0D)); background: var(--ev-bg, #0D0D0D); color: var(--ev-text, #E0E0E0); padding: 1rem; font-family: Archivo, system-ui, sans-serif; max-width: 24rem; } .ds-court-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 0.5rem; } .ds-court-name { margin: 0; color: var(--ev-heading, #FFFFFF); font-family: 'Big Shoulders Stencil', 'Big Shoulders', system-ui, sans-serif; font-weight: 800; font-size: 1.75rem; line-height: 1; letter-spacing: 0.04em; text-transform: uppercase; } .ds-court-status { display: flex; align-items: center; gap: 0.375rem; margin: 0; color: var(--ev-muted, #888888); font-size: 0.875rem; white-space: nowrap; } .ds-court-status strong { color: var(--paint); } .ds-live { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--paint); } .ds-court { position: relative; aspect-ratio: 28 / 15; container-type: inline-size; } .ds-lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: none; stroke: var(--paint); stroke-width: 2px; } .ds-lines * { vector-effect: non-scaling-stroke; } .ds-floor { fill: var(--floor-tint); } .ds-key { fill: color-mix(in srgb, var(--div) 34%, var(--ev-bg, #0D0D0D)); } .ds-dot { fill: var(--paint); stroke: none; } .ds-name { position: absolute; top: 8%; width: 45%; margin: 0; color: var(--ev-heading, #FFFFFF); font-weight: 700; font-size: clamp(0.875rem, 4.3cqi, 1.3rem); line-height: 1.15; text-align: center; text-wrap: balance; } .ds-name.ds-l { left: 3%; } .ds-name.ds-r { right: 3%; } .ds-name span, .ds-score span { padding: 0 0.15em; background: var(--floor-tint); box-decoration-break: clone; } .ds-score { position: absolute; top: 38%; margin: 0; color: var(--ev-heading, #FFFFFF); font-family: 'Big Shoulders', system-ui, sans-serif; font-weight: 800; font-size: min(15cqi, 5.5rem); line-height: 1; font-variant-numeric: tabular-nums; } .ds-score.ds-l { left: 21%; right: 52%; text-align: center; } .ds-score.ds-r { left: 52%; right: 21%; text-align: center; }"
+    },
+    {
+      "name": "Day Grid Cells",
+      "kind": "card",
+      "refersTo": "grid-cell",
+      "description": "Games on the time grid as painted outlines: dashed up next, solid on court, 1 px with a baseline tick when final.",
+      "html": "<div class=\"ds-cells\"><div class=\"ds-cell\" data-status=\"up-next\"><span class=\"ds-cell-label\"><i class=\"ds-sw\"></i>Men's Open - Group A</span><span class=\"ds-team\">Harbour Hawks</span><span class=\"ds-team\">Main St Mambas</span></div><div class=\"ds-cell\" data-status=\"on-court\"><span class=\"ds-cell-label\"><i class=\"ds-sw\"></i>Co-ed - Group A</span><span class=\"ds-tag\">On court</span><span class=\"ds-team\">Fraser Lynx <b>23</b></span><span class=\"ds-team\">Trout Lake Otters <b>18</b></span></div><div class=\"ds-cell\" data-status=\"final\"><span class=\"ds-cell-label\"><i class=\"ds-sw\"></i>Men's Open - Group A</span><span class=\"ds-status\">Final</span><span class=\"ds-team\">Harbour Hawks <b>66</b></span><span class=\"ds-team\">Burnaby Bolts <b>49</b></span></div></div>",
+      "css": ".ds-cells { --paint: var(--ev-accent, #FFCC00); --bg: var(--ev-bg, #0D0D0D); --rule: color-mix(in srgb, var(--ev-muted, #888888) 38%, var(--bg)); display: grid; grid-template-columns: repeat(3, 11rem); gap: 0.5rem; padding: 1rem; background: var(--bg); color: var(--ev-text, #E0E0E0); font-family: Archivo, system-ui, sans-serif; } .ds-cell { position: relative; display: grid; align-content: start; gap: 0.25rem; padding: 0.5rem 0.625rem 0.75rem; background: var(--bg); border: 2px dashed color-mix(in srgb, var(--paint) 55%, var(--bg)); border-radius: 2px; } .ds-cell[data-status='on-court'] { border-style: solid; border-color: var(--paint); background: color-mix(in srgb, var(--paint) 13%, var(--bg)); } .ds-cell[data-status='final'] { border: 1px solid var(--rule); } .ds-cell[data-status='final']::after { content: ''; position: absolute; left: -1px; bottom: -1px; width: 2.25rem; height: 4px; background: var(--paint); } .ds-cell-label { display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem; font-weight: 600; } .ds-sw { width: 0.625rem; height: 0.625rem; background: #E06040; } .ds-tag { justify-self: start; padding: 0 0.375rem; background: var(--paint); color: var(--ev-on-accent, #000000); font-size: 0.75rem; font-weight: 700; } .ds-status { font-size: 0.75rem; font-weight: 700; } .ds-team { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.9375rem; font-weight: 500; line-height: 1.25; } .ds-team b { color: var(--ev-heading, #FFFFFF); font-family: 'Big Shoulders', system-ui, sans-serif; font-weight: 700; font-size: 1.25rem; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Event Tabs",
+      "kind": "nav",
+      "refersTo": "tab",
+      "description": "Uppercase Big Shoulders tabs over a quiet sideline; the current tab is over-painted in 4 px paint.",
+      "html": "<nav class=\"ds-tabs\" aria-label=\"Event\"><ul><li><a href=\"#\" aria-current=\"page\">Schedule</a></li><li><a href=\"#\">Standings</a></li><li><a href=\"#\">Teams</a></li><li><a href=\"#\">Rules</a></li></ul></nav>",
+      "css": ".ds-tabs { background: var(--ev-bg, #0D0D0D); padding: 1rem; } .ds-tabs ul { display: flex; gap: 0.25rem; margin: 0; padding: 0; list-style: none; border-bottom: 2px solid color-mix(in srgb, var(--ev-muted, #888888) 38%, var(--ev-bg, #0D0D0D)); } .ds-tabs a { display: flex; align-items: center; min-height: 2.75rem; padding: 0 0.875rem; margin-bottom: -2px; border-bottom: 4px solid transparent; color: var(--ev-muted, #888888); font-family: 'Big Shoulders', system-ui, sans-serif; font-weight: 700; font-size: 1.125rem; letter-spacing: 0.03em; text-transform: uppercase; text-decoration: none; transition: color 160ms ease-out; } .ds-tabs li:first-child a { padding-left: 0; } .ds-tabs a:hover { color: var(--ev-text, #E0E0E0); } .ds-tabs a[aria-current='page'] { color: var(--ev-heading, #FFFFFF); border-bottom-color: var(--ev-accent, #FFCC00); } .ds-tabs a:focus-visible { outline: 3px solid var(--ev-accent, #FFCC00); outline-offset: 3px; }"
+    },
+    {
+      "name": "Team Chips",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Team picker chips outlined in division colour; selected fills with the division colour.",
+      "html": "<div class=\"ds-chips\" style=\"--div:#3BACDF;--on-div:#000000\"><button class=\"ds-chip\" type=\"button\" aria-pressed=\"true\">Fraser Lynx</button><button class=\"ds-chip\" type=\"button\" aria-pressed=\"false\">Trout Lake Otters</button><button class=\"ds-chip\" type=\"button\" aria-pressed=\"false\">Granville Gulls</button></div>",
+      "css": ".ds-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 1rem; background: var(--ev-bg, #0D0D0D); } .ds-chip { min-height: 2.75rem; padding: 0 0.875rem; border: 2px solid color-mix(in srgb, var(--div) 70%, var(--ev-bg, #0D0D0D)); border-radius: 2px; background: transparent; color: var(--ev-text, #E0E0E0); font-family: Archivo, system-ui, sans-serif; font-size: 0.9375rem; font-weight: 500; cursor: pointer; transition: background-color 160ms cubic-bezier(0.16, 1, 0.3, 1), color 160ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-chip:hover { background: color-mix(in srgb, var(--div) 16%, var(--ev-bg, #0D0D0D)); } .ds-chip[aria-pressed='true'] { background: var(--div); border-color: var(--div); color: var(--on-div); font-weight: 700; } .ds-chip:focus-visible { outline: 3px solid var(--ev-accent, #FFCC00); outline-offset: 3px; }"
+    },
+    {
+      "name": "Finder Toggle",
+      "kind": "button",
+      "refersTo": "finder-toggle",
+      "description": "Phone-only outlined toggle with a drawn chevron that opens the team finder.",
+      "html": "<div class=\"ds-wrap\"><button class=\"ds-toggle\" type=\"button\" aria-expanded=\"false\">Find your team</button></div>",
+      "css": ".ds-wrap { padding: 1rem; background: var(--ev-bg, #0D0D0D); max-width: 24rem; } .ds-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 3rem; padding: 0 1rem; border: 2px solid var(--ev-accent, #FFCC00); border-radius: 2px; background: transparent; color: var(--ev-heading, #FFFFFF); font-family: 'Big Shoulders', system-ui, sans-serif; font-weight: 800; font-size: 1.25rem; letter-spacing: 0.02em; text-transform: uppercase; cursor: pointer; } .ds-toggle::after { content: ''; width: 0.55rem; height: 0.55rem; border-right: 2px solid var(--ev-accent, #FFCC00); border-bottom: 2px solid var(--ev-accent, #FFCC00); rotate: 45deg; translate: 0 -0.15rem; transition: rotate 200ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-toggle:hover::after, .ds-toggle[aria-expanded='true']::after { rotate: 225deg; translate: 0 0.15rem; } .ds-toggle:focus-visible { outline: 3px solid var(--ev-accent, #FFCC00); outline-offset: 3px; }"
+    },
+    {
+      "name": "Text Button",
+      "kind": "button",
+      "refersTo": "text-button",
+      "description": "Boxless action with a 2 px paint underline, such as Change team and Clear.",
+      "html": "<div class=\"ds-actions\"><button class=\"ds-text-btn\" type=\"button\">Change team</button><button class=\"ds-text-btn\" type=\"button\">Clear</button></div>",
+      "css": ".ds-actions { display: flex; gap: 1.25rem; padding: 1rem; background: var(--ev-bg, #0D0D0D); } .ds-text-btn { min-height: 2.75rem; padding: 0; border: 0; background: none; color: var(--ev-text, #E0E0E0); font-family: Archivo, system-ui, sans-serif; font-size: 0.9375rem; font-weight: 600; text-decoration: underline; text-decoration-thickness: 2px; text-decoration-color: var(--ev-accent, #FFCC00); text-underline-offset: 0.3em; cursor: pointer; } .ds-text-btn:hover { color: var(--ev-heading, #FFFFFF); } .ds-text-btn:focus-visible { outline: 3px solid var(--ev-accent, #FFCC00); outline-offset: 3px; }"
+    },
+    {
+      "name": "Score Input",
+      "kind": "input",
+      "refersTo": "score-input",
+      "description": "Owner-only score entry; invalid switches to a dashed body-ink outline.",
+      "html": "<div class=\"ds-scores\"><input class=\"ds-score-in\" type=\"number\" min=\"0\" value=\"26\" aria-label=\"Commercial Drive Owls score\"><input class=\"ds-score-in\" type=\"number\" min=\"0\" value=\"-1\" aria-label=\"Granville Gulls score\"></div>",
+      "css": ".ds-scores { display: flex; gap: 0.5rem; padding: 1rem; background: var(--ev-bg, #0D0D0D); } .ds-score-in { width: 3.75rem; min-height: 2.75rem; padding: 0 0.375rem; border: 1px solid var(--ev-muted, #888888); border-radius: 2px; background: var(--ev-bg, #0D0D0D); color: var(--ev-heading, #FFFFFF); font-family: 'Big Shoulders', system-ui, sans-serif; font-weight: 700; font-size: 1.25rem; text-align: right; font-variant-numeric: tabular-nums; } .ds-score-in:invalid { border-color: var(--ev-text, #E0E0E0); border-style: dashed; } .ds-score-in:focus-visible { outline: 3px solid var(--ev-accent, #FFCC00); outline-offset: 3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Painted Lines",
+    "overview": "The public event page is the organiser's gym floor. The organiser's background colour is the floor, and their accent colour is the line paint. Every structure on the page is a flat painted line at court weight (2 px), and each court is drawn as a real court (FIBA proportions, centre line, centre circle, keys filled with a division-colour tint) carrying its live game: team names on each half, big score numerals, the court number stencilled above it. Space separates sections, not boxes. There is no glow, no gradient, no shadow and no wood-grain costume.\n\nThis document governs public event pages only (/events/[eventId]). Inside that route every colour comes from the organiser's five event colours (--ev-accent, --ev-bg, --ev-text, --ev-muted, --ev-heading), the derived --ev-on-accent, and per-element division colours (--div, --on-div). The hex values in the frontmatter are the default event theme a new event starts with, not a brand palette. The only iTala element on an event page is the small \"Powered by iTala Connect\" footer.\n\niTala Connect platform screens (home, login, admin): not yet decided. They will use the iTala logo palette (navy, teal, lime) in a later design round.\n\nThe page is dense but calm: answer first (time, court, teams, score), readable at a glance in a bright gym on a mid-range phone, working from 360 px wide with 44 px touch targets. Copy is NZ English, dates DD/MM/YYYY, times \"7:00 pm\", in the event's time zone.",
+    "keyCharacteristics": [
+      "Organiser colours only, applied as paint on the organiser's floor.",
+      "Constant 2 px paint lines; quiet 1 px rules for secondary separation.",
+      "State carried by stroke and by words: solid is on court, dashed is up next, a closed baseline tick is final.",
+      "Tall condensed athletic lettering (Big Shoulders) for numerals and headings, stencil cut for court numbers, Archivo for names and body.",
+      "One moving mark (the \"now\" line) plus a brief paint-in when a score changes."
+    ],
+    "rules": [
+      { "name": "The Organiser's Paint Rule", "body": "Inside /events/[eventId] every colour is an --ev-* token, a division token, or a color-mix of them. No hex literals, no Tailwind colour utilities, and no --brand-* token ever applies there.", "section": "colors" },
+      { "name": "The Never Colour Alone Rule", "body": "Every state that has a colour also has words and a stroke pattern (\"On court\", \"Final\", \"Awaiting score\", \"Up next\"). A division is named next to its swatch. An organiser palette with poor contrast must still read.", "section": "colors" },
+      { "name": "The Tabular Numerals Rule", "body": "Every score, time and date uses font-variant-numeric: tabular-nums so live changes never shift the layout.", "section": "typography" },
+      { "name": "The Stencil Is For Courts Rule", "body": "Big Shoulders Stencil marks court numbers only, like a floor stencil. It is never used for headings, scores or body.", "section": "typography" },
+      { "name": "The Flat Paint Rule", "body": "No box-shadow, no glow, no gradient, no texture. If something needs emphasis, give it heavier paint or a tint, not a lift.", "section": "elevation" },
+      { "name": "The Floor Patch Rule", "body": "Lettering that sits on a drawn court sits on a patch of Floor Tint, so painted lines never cross a name or a score.", "section": "elevation" },
+      { "name": "The Two Pixel Rule", "body": "Paint is 2 px. Anything thicker is a deliberate state signal from the list above, never decoration.", "section": "shapes" },
+      { "name": "The Stroke Carries State Rule", "body": "Solid paint is on court. Dashed paint (7 on, 5 off on the court; CSS dashed on cells) is up next. A closed baseline tick is final. Faded paint is a court that has finished or has no more games. Awaiting score is a quiet 1 px outline with no tick.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do read every colour on an event page from --ev-*, --div or --on-div, deriving tints with color-mix(in srgb, ... , var(--ev-bg)).",
+      "Do draw structure with 2 px paint lines and separate sections with space.",
+      "Do pair every state with words and a stroke pattern: solid on court, dashed up next, baseline tick for final.",
+      "Do use Big Shoulders for numerals and headings, the stencil cut for court numbers only, Archivo for names and body, all with tabular numerals for scores and times.",
+      "Do put lettering that crosses court lines on a Floor Tint patch.",
+      "Do keep touch targets at least 2.75rem, make wide grids scroll inside themselves, and check the layout at 360 px.",
+      "Do check a new surface against a second organiser palette, including a light floor, before calling it done.",
+      "Do write dates as DD/MM/YYYY and times as \"7:00 pm\", in NZ English, with \"-\" as the only dash."
+    ],
+    "donts": [
+      "Don't use --brand-* tokens, iTala logo colours or hard-coded hex values inside /events/[eventId]; the only iTala element is the \"Powered by iTala Connect\" footer.",
+      "Don't add shadows, glows, gradients, wood grain or other textures.",
+      "Don't put games or sections in filled cards or panels; a game is an outline on the floor.",
+      "Don't add another moving mark beyond the now line and the score paint-in.",
+      "Don't show a game clock, period or quarter; the mobile app owns those.",
+      "Don't round corners beyond 2px, except the circles a court actually has.",
+      "Don't treat this document as the platform screen system; that palette and type are not yet decided."
+    ]
+  }
+}

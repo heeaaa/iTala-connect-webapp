@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDate, formatTime } from '@/lib/format';
+import { formatDate, formatDayLabel, formatTime } from '@/lib/format';
+
+describe('formatDayLabel', () => {
+  it.each([
+    ['2026-09-25', 'Fri 25/09/2026'],
+    ['2026-09-27', 'Sun 27/09/2026'],
+    ['2027-01-02', 'Sat 02/01/2027'],
+  ])('%s -> %s', (input, expected) => {
+    expect(formatDayLabel(input)).toBe(expected);
+  });
+
+  it('rejects non-ISO input', () => {
+    expect(() => formatDayLabel('25/09/2026')).toThrow(RangeError);
+  });
+});
 
 describe('formatDate (X-07: DD/MM/YYYY)', () => {
   it.each([
