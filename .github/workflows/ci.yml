@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  lint:
+    name: Lint and format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
+  unit:
+    name: Unit and component tests (coverage)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 14
+
+  backend:
+    name: Database, integration, build and E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      - name: Start local Supabase (migrations applied)
+        run: npx supabase start -x studio,imgproxy,edge-runtime,logflare,vector,mailpit,supavisor,postgres-meta
+
+      - name: Export local stack env
+        # Well-known local development values from `supabase status`, not
+        # repository secrets. No secrets are used anywhere in this workflow.
+        run: npx tsx scripts/local-env.ts --stdout >> "$GITHUB_ENV"
+
+      - name: pgTAP (RLS, functions, storage)
+        run: npm run test:db
+
+      - name: Integration tests (Auth, PostgREST, Storage)
+        run: npm run test:integration
+
+      - name: Build
+        run: npm run build
+
+      - name: Secret scan of build output
+        run: npm run check:secrets
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E journeys
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: playwright
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  gitleaks:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          # Personal-account repositories need no licence. If the repository
+          # moves to a GitHub organisation, add a free GITLEAKS_LICENSE secret.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
