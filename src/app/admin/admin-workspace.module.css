@@ -654,3 +654,24 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.resultControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+/* Closed, the picker only says "Attach to a fixture…"; it need not be as wide as its longest fixture. */
+.resultControls select {
+  width: 16rem;
+  max-width: 100%;
+  min-height: 2.75rem;
+}
+@media (max-width: 39.99rem) {
+  .resultControls {
+    justify-content: flex-start;
+  }
+  .resultControls select {
+    width: 100%;
+  }
+}

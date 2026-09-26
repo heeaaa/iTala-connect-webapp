@@ -30,9 +30,14 @@ const server = createServer(async (req, res) => {
   if (req.method !== 'GET' || !['leagues', 'teams', 'players', 'final_game_scores'].includes(table))
     return send(405, { message: 'Mobile writes are forbidden' });
   // Finished-game times are relative to now, so settling and today behave the same on every run.
-  const ago = { 'NOW-2H': 2 * 3600e3, 'NOW-2M': 2 * 60e3, 'NOW-1M': 60e3 };
+  const ago = { 'NOW-2H': 2 * 3600e3, 'NOW-1H': 3600e3, 'NOW-2M': 2 * 60e3, 'NOW-1M': 60e3 };
   const at = (v, iso) => (v in ago ? (iso ? new Date(Date.now() - ago[v]).toISOString() : Date.now() - ago[v]) : v);
-  let rows = (mode === 'empty' ? [] : (fixture[table] ?? [])).map((r) =>
+  // 'changed': the ready result gained points and stats after it was approved (the drift case, M-05).
+  const changed = (r) =>
+    mode === 'changed' && r.game_id === 'fin-result'
+      ? { ...r, home_pts: 60, event_count: 50, last_event_at: 'NOW-1H' }
+      : r;
+  let rows = (mode === 'empty' ? [] : (fixture[table] ?? [])).map(changed).map((r) =>
     table === 'final_game_scores'
       ? {
           ...r,

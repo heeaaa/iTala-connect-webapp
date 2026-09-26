@@ -1,5 +1,5 @@
 import 'server-only';
-import { matchFinals, scoredGameIds, type ApprovedSource, type MatchResult } from '@/domain/mobile-matching';
+import { matchFinals, scoredGameIds, toMs, type ApprovedSource, type MatchResult } from '@/domain/mobile-matching';
 import { resolveAllPlayoffs } from '@/domain/playoffs';
 import type { Game } from '@/domain/types';
 import type { InboxFinal } from '@/lib/mobile-results';
@@ -106,7 +106,9 @@ export async function loadInbox(eventId: string, nowMs = Date.now()): Promise<In
       homePts: s.home_pts,
       awayPts: s.away_pts,
       eventCount: s.event_count,
-      lastEventAt: s.last_event_at,
+      // As epoch ms, like the finals below: Postgres and the mobile app write the same time differently,
+      // and the ported drift check compares the values as they come.
+      lastEventAt: toMs(s.last_event_at),
     };
     published[s.game_id] = { s1: s.s1, s2: s.s2, eventCount: s.event_count };
   }
@@ -121,7 +123,10 @@ export async function loadInbox(eventId: string, nowMs = Date.now()): Promise<In
     const link = d.division_mobile_links!;
     let finals: InboxFinal[];
     try {
-      finals = (await mobileReader().finals(link.league_id)) as InboxFinal[];
+      finals = ((await mobileReader().finals(link.league_id)) as InboxFinal[]).map((f) => ({
+        ...f,
+        last_event_at: toMs(f.last_event_at),
+      }));
     } catch {
       errors.push(`Could not read ${d.name}'s finished games from the mobile app. Refresh to try again.`);
       continue;

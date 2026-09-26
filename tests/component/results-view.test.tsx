@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const fake = vi.hoisted(() => ({ refresh: vi.fn() }));
+const fake = vi.hoisted(() => ({ refresh: vi.fn(), approve: vi.fn(), keep: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: fake.refresh }) }));
+vi.mock('@/server/actions/mobile-results', () => ({ approveResult: fake.approve, keepPublishedScore: fake.keep }));
 import { ResultsView, fixtureLabel } from '@/app/admin/events/[eventId]/results/results-view';
 import type { Inbox, InboxGame, InboxItem } from '@/server/mobile/results';
 import type { InboxFinal } from '@/lib/mobile-results';
@@ -66,7 +67,19 @@ const inbox = (o: Partial<Inbox> = {}): Inbox => ({
   ...o,
 });
 
-beforeEach(() => vi.clearAllMocks());
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute('open', '');
+  };
+  HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute('open');
+  };
+});
+beforeEach(() => {
+  vi.clearAllMocks();
+  fake.approve.mockResolvedValue({ ok: true, data: { gameId: 'g1' } });
+  fake.keep.mockResolvedValue({ ok: true, data: undefined });
+});
 
 describe('Results inbox (M-04, M-05)', () => {
   it('groups results in the old order with counts, and words each card', () => {
@@ -142,5 +155,100 @@ describe('Results inbox (M-04, M-05)', () => {
       'Harbour Hawks vs Night Owls · Sun 27/09/2026 7:00 pm · Court 2',
     );
     expect(fixtureLabel(base, game({ day: null, court: null, team2Id: null }))).toBe('Harbour Hawks vs TBD · TBD');
+  });
+});
+
+describe('Results inbox actions (M-06)', () => {
+  const g1 = game();
+  const g2 = game({ id: 'g2', day: '2026-09-28', time: '10:00' });
+  const g3 = game({ id: 'g3', team1Id: 't-owls', team2Id: 't-hawks', day: '2026-09-29' });
+  const withGames = (items: InboxItem[], scored: string[] = []) => inbox({ games: [g1, g2, g3], scored, items });
+  const status = () => screen.getByText((_, el) => el?.getAttribute('aria-live') === 'polite');
+
+  it('approves the proposed fixture with ids only, says so and moves focus to the message', async () => {
+    const user = userEvent.setup();
+    render(<ResultsView inbox={withGames([item('proposed', { pick: { gameId: 'g1', game: g1, sameDay: true } })])} />);
+    await user.click(screen.getByRole('button', { name: 'Approve Harbour Hawks 58 - 51 Night Owls' }));
+    expect(fake.approve).toHaveBeenCalledWith({ eventId: 'e1', mobileGameId: 'fin-1', gameId: 'g1', mode: 'approve' });
+    expect(status()).toHaveTextContent(
+      'Approved: Harbour Hawks 58 - 51 Night Owls on Harbour Hawks vs Night Owls · Sun 27/09/2026 7:00 pm · Centre Court.',
+    );
+    expect(status()).toHaveFocus();
+  });
+
+  it('re-approves or keeps the published score of a changed result', async () => {
+    const user = userEvent.setup();
+    const drifted = {
+      ...item('drifted', { existing: { gameId: 'g1', source: {} as never } }),
+      published: { s1: 58, s2: 51, eventCount: 48 },
+    };
+    render(<ResultsView inbox={withGames([drifted], ['g1'])} />);
+    await user.click(screen.getByRole('button', { name: 'Re-approve Harbour Hawks 58 - 51 Night Owls' }));
+    expect(fake.approve).toHaveBeenCalledWith({
+      eventId: 'e1',
+      mobileGameId: 'fin-1',
+      gameId: 'g1',
+      mode: 'reapprove',
+    });
+    await user.click(screen.getByRole('button', { name: 'Keep published score for Harbour Hawks 58 - 51 Night Owls' }));
+    expect(fake.keep).toHaveBeenCalledWith({ eventId: 'e1', mobileGameId: 'fin-1' });
+    expect(status()).toHaveTextContent('Kept the published score.');
+    // A changed result is not offered for attaching.
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  it('attaches to an unscored fixture only after asking, and Cancel changes nothing', async () => {
+    const user = userEvent.setup();
+    render(<ResultsView inbox={withGames([item('ambiguous')], ['g2'])} />);
+    const picker = screen.getByRole('combobox', { name: 'Attach Harbour Hawks 58 - 51 Night Owls to a fixture' });
+    // g2 already holds a score, so it is not offered.
+    expect(
+      within(picker)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual([
+      'Attach to a fixture…',
+      'Harbour Hawks vs Night Owls · Sun 27/09/2026 7:00 pm · Centre Court',
+      'Night Owls vs Harbour Hawks · Tue 29/09/2026 7:00 pm · Centre Court',
+    ]);
+    await user.selectOptions(picker, 'g3');
+    const ask = screen.getByRole('dialog', { name: 'Attach this result to the chosen fixture?' });
+    expect(ask).toHaveTextContent('Harbour Hawks 58 - 51 Night Owls onto Night Owls vs Harbour Hawks');
+    await user.click(within(ask).getByRole('button', { name: 'Cancel' }));
+    expect(fake.approve).not.toHaveBeenCalled();
+    expect(picker).toHaveValue('');
+    await user.selectOptions(picker, 'g3');
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Attach' }));
+    expect(fake.approve).toHaveBeenCalledWith({ eventId: 'e1', mobileGameId: 'fin-1', gameId: 'g3', mode: 'attach' });
+  });
+
+  it('offers nothing to press on a result that needs a look or is still settling', () => {
+    render(
+      <ResultsView
+        inbox={withGames([
+          item('review', { reason: 'no stats were recorded for this game' }, final({ game_id: 'r', event_count: 0 })),
+          item('settling', { reason: 'the last stat arrived less than 5 minutes ago' }, final({ game_id: 's' })),
+        ])}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /^Approve/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  it('shows a refusal and leaves focus on the button', async () => {
+    const user = userEvent.setup();
+    fake.approve.mockResolvedValueOnce({
+      ok: false,
+      error: 'Link both teams for this division before approving this result.',
+    });
+    render(<ResultsView inbox={withGames([item('proposed', { pick: { gameId: 'g1', game: g1, sameDay: true } })])} />);
+    const button = screen.getByRole('button', { name: /^Approve/ });
+    await user.click(button);
+    expect(status()).toHaveTextContent('Link both teams for this division before approving this result.');
+    expect(status()).toHaveAttribute('data-tone', 'error');
+    expect(button).toHaveFocus();
+    fake.approve.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await user.click(button);
+    expect(status()).toHaveTextContent('Could not reach the server. Check your connection.');
   });
 });

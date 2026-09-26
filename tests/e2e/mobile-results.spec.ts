@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { signInAndWait } from './fixtures';
-import { createUser, deleteUsers, type TestUser } from '../support/supabase';
+import { adminClient, createUser, deleteUsers, type TestUser } from '../support/supabase';
 
 const mobile = 'http://127.0.0.1:3211';
 let organiser: TestUser;
@@ -14,8 +14,9 @@ test.afterEach(async ({ request }) => {
   if (organiser) await deleteUsers([organiser]);
 });
 
-// PRD D-02, M-04, M-05, M-07 with the mocked mobile API: an imported, published league night's
-// finished games, matched to its one fixture and grouped as the old inbox grouped them.
+// Journey 5 (MIGRATION_PLAN.md section 10) and PRD D-02, M-04 to M-07 with the mocked mobile API: an
+// imported, published league night's finished games, matched to its one fixture and grouped as the old
+// inbox grouped them; approved onto the fixture by team; then changed in the mobile app and kept.
 test('shows the linked league’s finished games grouped, read from the mobile app without writing to it', async ({
   page,
   request,
@@ -77,6 +78,40 @@ test('shows the linked league’s finished games grouped, read from the mobile a
   await expect(main.getByRole('alert')).toHaveText(
     "Could not read Harbour League's finished games from the mobile app. Refresh to try again.",
   );
+
+  // Approve (M-06): the score lands on each team's side, whatever order the fixture lists them in.
+  await request.post(`${mobile}/__control`, { data: { mode: 'normal' } });
+  await main.getByRole('button', { name: 'Refresh' }).click();
+  await expect(main.getByRole('alert')).toHaveCount(0);
+  await main.getByRole('button', { name: 'Approve Harbour Hawks 58 - 51 Night Owls' }).click();
+  const status = main.locator('p[aria-live="polite"][tabindex="-1"]');
+  await expect(status).toContainText('Approved: Harbour Hawks 58 - 51 Night Owls on Harbour Hawks vs Night Owls');
+  await expect(status).toBeFocused();
+  await expect(main.getByRole('heading', { name: 'Approved (1)' })).toBeVisible();
+  await expect(main.getByRole('heading', { name: /^Ready to approve/ })).toHaveCount(0);
+  const db = adminClient();
+  const { data: stored } = await db
+    .from('games')
+    .select('id, team1:teams!games_team1_id_fkey(name), game_scores(s1, s2), score_sources(mobile_game_id, method)')
+    .eq('event_id', eventId)
+    .single();
+  const hawksFirst = (stored!.team1 as { name: string } | null)?.name === 'Harbour Hawks';
+  expect(stored!.game_scores).toMatchObject(hawksFirst ? { s1: 58, s2: 51 } : { s1: 51, s2: 58 });
+  expect(stored!.score_sources).toMatchObject({ mobile_game_id: 'fin-result', method: 'mobile' });
+
+  // The mobile app then changes the result: it is raised, and keeping the published score settles it.
+  await request.post(`${mobile}/__control`, { data: { mode: 'changed' } });
+  await main.getByRole('button', { name: 'Refresh' }).click();
+  const changed = main.getByRole('region', { name: 'Changed since you approved them (1)' });
+  await expect(changed).toContainText('Published ');
+  await expect(changed).toContainText('the mobile app now says 60-51 (48 to 50 stats)');
+  await changed.getByRole('button', { name: 'Keep published score for Harbour Hawks 60 - 51 Night Owls' }).click();
+  await expect(status).toContainText('Kept the published score.');
+  await main.getByRole('button', { name: 'Refresh' }).click();
+  await expect(main.getByRole('heading', { name: 'Approved (1)' })).toBeVisible();
+  await expect(main.getByRole('heading', { name: /^Changed since/ })).toHaveCount(0);
+  const { data: kept } = await db.from('game_scores').select('s1, s2').eq('game_id', stored!.id).single();
+  expect(kept).toMatchObject(hawksFirst ? { s1: 58, s2: 51 } : { s1: 51, s2: 58 });
 
   // Zero writes to the mobile project, and the browser never talks to it (M-02).
   const requests = (await (await request.get(`${mobile}/__requests`)).json()) as { method: string; path: string }[];

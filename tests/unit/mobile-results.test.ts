@@ -300,6 +300,31 @@ describe('loadInbox (M-04 to M-09)', () => {
     expect(item!.published).toEqual({ s1: 58, s2: 51, eventCount: 48 });
   });
 
+  it('treats an approved result as unchanged when only the time format differs (Postgres vs the mobile app)', async () => {
+    // The approval stores last_event_at as timestamptz; PostgREST returns it in its own format.
+    fake.results.game_scores = { data: [{ game_id: 'g1', s1: 58, s2: 51 }], error: null };
+    fake.results.score_sources = {
+      data: [
+        {
+          game_id: 'g1',
+          mobile_game_id: 'fin-1',
+          s1: 58,
+          s2: 51,
+          home_pts: 58,
+          away_pts: 51,
+          event_count: 48,
+          last_event_at: '2026-09-27T07:05:00+00:00',
+        },
+      ],
+      error: null,
+    };
+    fake.finals.mockResolvedValue([final({ last_event_at: '2026-09-27T07:05:00.000Z' })]);
+    expect((await loadInbox(EVENT, NOW))!.items[0]!.result.state).toBe('approved');
+    // A real later stat is still a change.
+    fake.finals.mockResolvedValue([final({ last_event_at: '2026-09-27T07:06:00.000Z' })]);
+    expect((await loadInbox(EVENT, NOW))!.items[0]!.result.state).toBe('drifted');
+  });
+
   it('reports a division the mobile app could not answer for, without the other divisions failing', async () => {
     fake.finals.mockRejectedValue(new Error('Mobile data unavailable'));
     const inbox = (await loadInbox(EVENT, NOW))!;

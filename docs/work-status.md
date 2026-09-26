@@ -27,7 +27,7 @@ npm run lint && npm run typecheck && npm run test:coverage
 npm run build && npm run check:secrets && npm run test:e2e
 ```
 
-- Expected: **78 E2E tests** (76 green at `3a46ce9` plus the 6a results inbox journey at two viewports) and **238 pgTAP assertions** (220 plus 18 in `011_admin_accounts.sql`, green in CI at `6c627e6`). Run `npm run db:reset` for the new migration; `npm run db:types` must show no diff.
+- Expected: **78 E2E tests** (76 green at `3a46ce9` plus the 6a results inbox journey at two viewports) and **246 pgTAP assertions** (238 green in CI plus 8 in `012_keep_published_score.sql`). Run `npm run db:reset` for the new migration; `npm run db:types` must show no diff.
 - Expected: **29 integration tests** (22 plus 7 in `admin-accounts.test.ts`).
 - Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
 
@@ -420,6 +420,19 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 - **Found for 6b (parity bug from Phase 1):** `dismiss_mobile_result` (Keep published score) only stamps `dismissed_at`. The old app also recorded the mobile app's current points, stat count and last stat time, so the same change was not raised again; without that the Changed card would come back on every refresh. 6b fixes it with a test.
 - **Evidence (work laptop):** lint and typecheck pass; `test:coverage` 52 files, **767 tests pass** (new: `mobile-results` 11 with the reader and loader, `results-view` 4, `dashboard-view` 2); `mobile-results.ts` 97% lines and 82% branches, the loader 100% and 84%; a clean build and `check:secrets` pass. Harness (sample inbox, every group) at 390 and 1440 px: axe clean, no sideways scroll; capture `.impeccable/review/phase6/{mobile,desktop}/results.png`.
 - Not run on the laptop: the new E2E `mobile-results.spec.ts` (import, publish, Results from the dashboard, the four groups from the fixtures, the unreachable case, zero mobile writes and no browser calls to mobile). CI runs it.
+
+### Phase 6b: approving mobile results (27/09/2026)
+
+- **CI run 36276672558 on `8b9e1d2` (6a): green**, 78/78 E2E with no retries (the inbox journey at both viewports), 238/238 pgTAP, gitleaks clean.
+- **M-06 actions** (`src/server/actions/mobile-results.ts`): **Approve** (the proposed fixture), **Re-approve** and **Keep published score** (a changed result), and **Attach to a fixture** (any unscored fixture in the division, for proposed, ambiguous and unmatched results only, never review or settling, after "Attach this result to the chosen fixture?"). No auto-approve.
+  - The browser sends ids only. Each action reads the inbox again on the server (the mobile app and Connect as they are now), checks that the fixture is still the right one for that result, needs both teams linked ("Link both teams for this division before approving this result."), and decides the orientation by team with the ported `orient`, never position. The score and its provenance are written together by `approve_mobile_result`; the version approved (points, stats, times) comes from the mobile app now.
+  - The status line reports the outcome ("Approved: Hawks 58 - 51 Owls on Hawks vs Owls · …") and takes focus, because the card moves to another group; a refusal is shown and focus stays on the button.
+- **Bug fixed (parity, from Phase 1):** Keep published score only stamped `dismissed_at`, so the change came back on every refresh. Migration `20260927000300_keep_published_score.sql` now records the mobile app's points, stat count and last stat time (as the old `mobileDismissDrift` did), keeping the published score and who approved it. pgTAP `012_keep_published_score.sql` (8 assertions): approve, keep (version recorded, score and approver kept, game score untouched), re-approve clears the dismissal, another admin refused. The journey 5 E2E proves it end to end (changed, kept, back to Approved).
+- **Bug fixed (port, found writing 6b):** the ported drift check compares the last stat time as it comes. The approval stores it as `timestamptz`, which PostgREST returns as "2026-09-27T07:05:00+00:00" while the mobile app sends "...07:05:00.000Z", so every approved result would have shown as changed straight away. The loader now passes both as epoch milliseconds (the domain module stays identical to the old code). Red first: a new loader test saw "drifted" for an unchanged result, then passed.
+- **Tests:** `mobile-result-actions` (9: orientation by team, stale or wrong fixtures refused, attach limits, unlinked teams, sign-in, integration and ownership checks, failed saves, keep), `results-view` (9, with the controls, the attach question, Cancel, no controls for review or settling, a refusal with focus kept), `mobile-results` (12). The fixture server gains a `changed` mode. E2E `mobile-results.spec.ts` is now journey 5: import, publish, Results, the groups, unreachable, approve (score stored by team), changed, kept, zero mobile writes.
+- **Evidence (work laptop):** lint and typecheck pass; `test:coverage` 53 files, **782 tests pass**; a clean build and `check:secrets` pass; harness **78/78** at 390 and 1440 px (the inbox with every group and control: 44 px targets, the attach question and Cancel, a refusal with focus kept, axe clean, no sideways scroll). The attach picker is capped at 16rem on wider screens so the result text keeps its room.
+- Not run on the laptop: pgTAP `012` and the extended E2E. CI runs them.
+- **You, after CI passes:** push migration `20260927000300_keep_published_score.sql` to the hosted project with the other 27/09 migrations.
 
 ### Phase 5 plan (remaining slices)
 
