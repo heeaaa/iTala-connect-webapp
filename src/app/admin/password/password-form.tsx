@@ -23,7 +23,16 @@ export function PasswordForm({ email, welcome }: { email: string; welcome: boole
   }
   const invalid = state.error ? true : undefined;
   return (
-    <form action={formAction} className={s.formPanel} noValidate>
+    <form
+      action={formAction}
+      className={s.formPanel}
+      noValidate
+      // The button stays focusable while it runs (a disabled one drops keyboard focus to the page,
+      // so after a refusal the person would start again from the top); a second press is ignored.
+      onSubmit={(e) => {
+        if (pending) e.preventDefault();
+      }}
+    >
       {welcome ? (
         <p>Choose a password to sign in with from now on. You can also sign in with Google if it is offered.</p>
       ) : null}
@@ -66,7 +75,7 @@ export function PasswordForm({ email, welcome }: { email: string; welcome: boole
       <p id="password-error" role="alert" className={s.formError}>
         {state.error ?? ''}
       </p>
-      <button type="submit" disabled={pending} className={`${s.button} ${s.buttonLive}`}>
+      <button type="submit" aria-disabled={pending} className={`${s.button} ${s.buttonLive}`}>
         {pending ? 'Saving…' : 'Save password'}
       </button>
     </form>

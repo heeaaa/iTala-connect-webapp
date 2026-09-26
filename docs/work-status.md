@@ -14,7 +14,7 @@ Last updated: 26/09/2026 (Claude, work laptop)
 - This is the first real-Supabase proof of the Phase 3b guard (signed-in Sign out and Back), publish and published editing.
 - The first run failed only on my new publish E2E: `getByRole('alert')` also matched Next's route announcer. That was fixed by scoping to `main`.
 
-Latest green run: **36246633926 on `562592f` (5e-1 platform settings): 72/72 E2E with no retries, 220/220 pgTAP**, with integration, unit coverage, lint, typecheck, build, `check:secrets` and gitleaks all passing. Before it: 36240866715 on `b2315e2` (5d): 70/70 E2E, 207/207 pgTAP, 22/22 integration. The run before that (36239532684 on `8919912`) had one flaky retry in the Phase 3b guard test, a timing bug in the test that `b2315e2` fixed (see the 5d section). Before 5d: 36234713687 on `167c8e7` (5c-3) was 68/68 E2E with 180 pgTAP. Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
+Latest green run: **36275201647 on `3a46ce9` (5e done, journey 4 added): 76/76 E2E with no retries, 238/238 pgTAP**, with integration, unit coverage, lint, typecheck, build, `check:secrets` and gitleaks all passing. Earlier: 36246633926 on `562592f` (5e-1): 72/72 E2E, 220/220 pgTAP. Before that: 36240866715 on `b2315e2` (5d): 70/70 E2E, 207/207 pgTAP, 22/22 integration. The run before that (36239532684 on `8919912`) had one flaky retry in the Phase 3b guard test, a timing bug in the test that `b2315e2` fixed (see the 5d section). Before 5d: 36234713687 on `167c8e7` (5c-3) was 68/68 E2E with 180 pgTAP. Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
 
 **Important for the Docker PC:** 5b adds migration `20260926000500_event_editor.sql` (replaces `save_draft_editor` with `save_event_editor`). Apply it (`npm run db:reset` on the local stack), then run `npm run db:types`. `src/lib/supabase/database.types.ts` was hand-edited for the new function and must come out with **no diff**; if it differs, keep the generated file.
 
@@ -396,13 +396,24 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 - **Journeys now covered in E2E:** 1 (`admin-publish`), 2 including the keyboard move (`admin-publish`), 3 and 6 (`public-event`), 4 (`admin-republish`, new), 7 (`mobile-import`, another organiser's editor), 8 (`public-event`), 9 (`mobile-import`). Journey 5 is Phase 6.
 - **Evidence (work laptop):** lint and typecheck pass; `test:coverage` 48 files, **748 tests pass**; a clean build and `check:secrets` pass; harness **64/64** at 390 and 1440 px. Not run here: the new and changed E2E (CI runs them).
 
+### Phase 5e finish review: Impeccable audit (27/09/2026)
+
+- **Scope:** Settings, Admins, `/auth/confirm` and `/admin/password`, rendered in the Chromium harness at 390 and 1440 px, with the bundled detector and a code read.
+- **Score 18/20 (Excellent):** accessibility 3, performance 4, responsive 4, theming 4, implementation integrity 3. The detector found 0 anti-patterns, with 2 advisory notes on older font sizes off the DESIGN.md ramp (the matchup report heading 1.2rem, the rules editor heading 1.25rem).
+- **Measured:** no control under 44 px on any of the four pages; no sideways scroll at 390 px or with text at 200%; every control reached by Tab shows a focus ring; axe clean; the site's CSP blocked even injected test styles.
+- **Findings:**
+  - P2, fixed: after a refused Continue or Save password, focus dropped to the page (the submit was disabled while it ran). Confirmed in Chromium at both viewports, then fixed on those two forms and the sign-in form: the button stays focusable (`aria-disabled`, styled busy) and a second submit is stopped in `onSubmit`. The harness now shows focus back on the button; a new component test (`confirm-form.test.tsx`) proves the one-time token is sent once, and failed with the guard removed.
+  - P3, open: the Accounts table's Actions column wraps its two buttons on desktop; the Admins phone cards have extra space under the actions; the Settings thumbnails are not lazy-loaded; the New account fields are all required but not marked. Suggested next: `/impeccable layout`, then `/impeccable clarify`, then `/impeccable polish`.
+- **CI run 36275201647 on `3a46ce9`: green.** 76/76 E2E with no retries (including the accounts journey and journey 4, and the drag test without a retry), 238/238 pgTAP, integration, and gitleaks "no leaks found".
+- **Evidence for the fix (work laptop):** lint and typecheck pass; `test:coverage` 49 files, **750 tests pass**; a clean build and `check:secrets` pass; harness **74/74**.
+
 ### Phase 5 plan (remaining slices)
 
 1. Done: 5b. The Phase 2 handovers still open move to 5c: pass stored resolved playoff teams to round robin; add a distinct-days rule on `events.schedule_days` in the database (zod and the save RPC already de-duplicate).
 2. **5c, schedule editor.** Done: 5c-1, 5c-2 (drag and drop, E-45) and 5c-3: "+ Round robin" and "+ Playoff" dialogs (E-63, E-64), with stored resolved playoff teams passed to round robin (Phase 2 handover).
 3. Done: **5d, rules and images.** Tiptap rules editor (E-70, E-71), logo and sponsor uploads with resizing and removal (E-15 to E-18).
 4. Done: **5e, platform admin.** 5e-1 Settings sponsors and the default rules template (S-01, S-02), and 5e-2 the Admins screen (A-09) with set-up links. The dashboard Results action (D-02) moves to Phase 6 with the results inbox; View was already done.
-5. Done: E2E journeys 2, 4, 7 and 8 (4 added 27/09/2026; the others were already covered). **Next:** a finish review (Impeccable audit) per new surface, then Phase 6.
+5. Done: E2E journeys 2, 4, 7 and 8 (4 added 27/09/2026; the others were already covered), and the 5e finish review (audit 18/20, its P2 fixed). **Next:** the audit's P3 layout and copy items, the same audit for the earlier Phase 5 editor surfaces if wanted, then Phase 6 (mobile results inbox).
 
 ## Objective
 
