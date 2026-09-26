@@ -4,7 +4,7 @@ Last updated: 26/09/2026 (Claude, work laptop)
 
 ## Current handoff (26/09/2026, Claude on the work laptop)
 
-**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish, matchup report), 5b (published-event editing), 5c-1 (schedule grid and game dialog), 5c-2 (drag and drop), 5c-3 (round robin and playoff dialogs) and 5d (rules editor and event images) are done and pushed on branch `handoff/codex`, and so is Google sign-in (A-11, user decision 26/09/2026). Next: **5e** (platform admin). **5d adds migration `20260926000700_rules_and_images.sql`** (see its section); push it to the hosted project after CI passes. The 5c-3 migration is already on the hosted project.
+**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish, matchup report), 5b (published-event editing), 5c-1 (schedule grid and game dialog), 5c-2 (drag and drop), 5c-3 (round robin and playoff dialogs) 5d (rules editor and event images) and 5e-1 (platform settings) are done and pushed on branch `handoff/codex`, and so is Google sign-in (A-11, user decision 26/09/2026). Next: **5e-2** (the Admins screen with set-up links). **5e-1 adds migration `20260927000100_platform_sponsor_paths.sql`**; push it to the hosted project after CI passes, together with 5d's `20260926000700_rules_and_images.sql` if that is not pushed yet.
 
 **CI now runs the Docker suites.** Draft PR https://github.com/heeaaa/iTala-connect-webapp/pull/1 (`handoff/codex` into `main`, not for merging yet) runs the full workflow on every push. **Run 36214770961 on `cd75ff2` was fully green:**
 - 60/60 E2E (390 and 1440 px), 154/154 pgTAP and 22/22 integration.
@@ -25,7 +25,7 @@ npm run lint && npm run typecheck && npm run test:coverage
 npm run build && npm run check:secrets && npm run test:e2e
 ```
 
-- Expected: **70 E2E tests** (68 green at `167c8e7` plus the 5d images and rules journey at two viewports) and **207 pgTAP assertions** (180 plus 27 in `009_rules_and_images.sql`). Run `npm run db:reset` for the new migration; `npm run db:types` must show no diff.
+- Expected: **72 E2E tests** (70 green at `b2315e2` plus the 5e-1 settings journey at two viewports) and **220 pgTAP assertions** (207 plus 13 in `010_platform_sponsors.sql`). Run `npm run db:reset` for the new migration; `npm run db:types` must show no diff.
 - Expected: **22 integration tests**, unchanged since 5b.
 - Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
 
@@ -331,12 +331,32 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 - **Docker PC:** `npm run db:types` must show no diff for `database.types.ts` (hand-edited for `set_event_logo` and `set_major_sponsor`); CI has no such step.
 - **For the finish review:** `.impeccable/design.json` is not updated; DESIGN.md is ("Rules editor", "Event images").
 
+### Phase 5e-1: platform settings (27/09/2026)
+
+- **Decisions (user, 27/09/2026):** 5e is built in two slices: 5e-1 Settings (S-01, S-02), then 5e-2 Admins (A-09). New admins get into their account through a **set-up link** the superadmin copies and sends (Supabase's built-in email only reaches the project's own team, at 2 an hour, so invite emails are not used). The dashboard's **Results** action (D-02) opens the Phase 6 results inbox, so it arrives with Phase 6; View was already done.
+- **S-01, platform sponsors** (`/admin/settings`, `platform-sponsors.tsx`): Primary sponsors ("Full size on every event page.") and Secondary sponsors ("Half size…"), each with several uploads at once, thumbnails and Remove.
+  - The browser resizes as for event images (5d). `uploadPlatformSponsor` checks the superadmin, works out the type from the bytes, stores `platform/{tier}-{uuid}.{ext}` with the user's session (storage RLS), and adds one row per sponsor after the last of its tier. So two uploads at once never lose each other, unlike the old shared list. If the row cannot be added, the file is removed again.
+  - `removePlatformSponsor` removes the row, then the file (the old app left files behind). Focus moves to that tier's Add control. Every event page is revalidated (`/(public)/events/[eventId]`, page).
+- **S-02, default rules** (`default-rules.tsx`): the rules editor, starting from the stored template or, when it is empty, the built-in iTala rules. `saveDefaultRules` cleans to the rules allow-list; no text is stored empty, which means the built-in rules (`create_draft_event` already read the template). Unsaved changes are shown, and leaving asks first. Save stays focusable while it runs.
+- **Shared:** `authorizeSuperadmin()` in `src/server/auth.ts`; the file picker is now `src/app/admin/_components/image-pick.tsx`, used by event images and settings.
+- **Migration `20260927000100_platform_sponsor_paths.sql`:** a CHECK keeps platform sponsor paths to one plain file name in `platform/` (.png, .jpg or .webp). pgTAP `010_platform_sponsors.sql` (13 assertions): the path rule (including the old nested `platform/sponsors/` layout), anyone reads, an admin or a disabled superadmin cannot add, change or remove, a superadmin can. No new functions, so `database.types.ts` is unchanged.
+- **Bug fixed (rules toolbar, from 5d):** clicking a tool moved focus to the button, and the editor only took it back a frame later, so a key pressed straight after (End, Enter) went to the toolbar: End jumped to Numbered list and Enter turned it on. Found by the harness on desktop. Red first: a new component test ("clicking a tool leaves the cursor in the text") failed on the old code, then passed once the tools stopped taking focus on mouse down. The harness rules tests then passed 30/30 over five repeats. Keyboard users still reach the tools with Tab.
+- **Checked and ruled out:** in one coverage run, four event editor Publish tests timed out at 1 s. I tested whether the lazily loaded rules editor could hold up Publish (a 3 s delay on its chunk): Publish still showed its result in 41 ms, so there is no product issue. Two reruns passed 723/723. One of those tests read the always-present alert before publish finished; it now waits for the message.
+- **For the Firebase importer (Phase 7):** platform sponsors were stored under `platform/sponsors/…` in the old app; the importer must write them as single files in `platform/`, or the new CHECK refuses them.
+- **Evidence (work laptop):**
+  - Lint and typecheck pass. `test:coverage`: 45 files, **723 tests pass** (two consecutive runs), thresholds met. New: `platform-actions` (9), `auth-helpers` (2), `platform-sponsors` (4), `default-rules` (5), and the toolbar focus test.
+  - A clean build without the harness passes; `check:secrets` passes (values not printed).
+  - Harness in Chromium at 390 and 1440 px, **54/54** (every harness spec), including Settings: a 2000 by 1000 PNG sent as a 1600 by 800 WebP with its tier, SVG refused before sending, success and refusal messages, named Remove buttons at least 44 px, focus after Remove with a visible ring, the default rules edit, guard, save payload and focus, axe with no serious or critical issues, no sideways scroll, no CSP violations beyond zod's probe.
+  - Captures (gitignored): `.impeccable/review/phase5e/{mobile,desktop}/` (settings-empty, settings-sample, settings-rules).
+  - Not run on the laptop (no Docker): pgTAP `010` and the new E2E `admin-settings.spec.ts` (sponsors to storage and back, removal deletes the file, default rules saved, a new event starts with them, its page shows the platform sponsors, axe, CSP; it restores the sponsors and template it changed). CI runs them.
+- **You, after CI passes:** push migration `20260927000100_platform_sponsor_paths.sql` to the hosted project (`npx supabase db push`).
+
 ### Phase 5 plan (remaining slices)
 
 1. Done: 5b. The Phase 2 handovers still open move to 5c: pass stored resolved playoff teams to round robin; add a distinct-days rule on `events.schedule_days` in the database (zod and the save RPC already de-duplicate).
 2. **5c, schedule editor.** Done: 5c-1, 5c-2 (drag and drop, E-45) and 5c-3: "+ Round robin" and "+ Playoff" dialogs (E-63, E-64), with stored resolved playoff teams passed to round robin (Phase 2 handover).
 3. Done: **5d, rules and images.** Tiptap rules editor (E-70, E-71), logo and sponsor uploads with resizing and removal (E-15 to E-18).
-4. **5e, platform admin.** Settings sponsors and the default rules template (S-01, S-02), the Admins screen (A-09), dashboard View and Results actions (D-02).
+4. **5e, platform admin.** Done: 5e-1 Settings sponsors and the default rules template (S-01, S-02). Next: 5e-2 the Admins screen (A-09) with set-up links. The dashboard Results action (D-02) moves to Phase 6 with the results inbox; View was already done.
 5. **Then** E2E journeys 2, 4, 7 and 8, and a finish review per new surface.
 
 ## Objective

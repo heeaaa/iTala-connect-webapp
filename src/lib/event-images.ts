@@ -64,3 +64,10 @@ export const extensionFor = (type: StoredType) =>
 /** Where an event's image is stored: its own folder, a fresh name each time so caches never show an old one. */
 export const imagePath = (eventId: string, kind: ImageKind, type: StoredType, id: string) =>
   `events/${eventId}/${kind}-${id}.${extensionFor(type)}`;
+
+/** Platform sponsors (PRD S-01): primary show full size on every event, secondary half size. */
+export type PlatformTier = 'primary' | 'secondary';
+
+/** Where a platform sponsor is stored: the platform folder, a fresh name each time. */
+export const platformImagePath = (tier: PlatformTier, type: StoredType, id: string) =>
+  `platform/${tier}-${id}.${extensionFor(type)}`;

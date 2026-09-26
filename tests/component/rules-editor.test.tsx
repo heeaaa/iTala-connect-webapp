@@ -67,6 +67,16 @@ describe('Rules editor (E-70)', () => {
     expect(tool('Bold')).toHaveFocus();
   });
 
+  it('clicking a tool leaves the cursor in the text, so the next key types there', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    const text = await screen.findByRole('textbox', { name: 'Event rules' });
+    await user.click(text);
+    await user.click(screen.getByRole('button', { name: 'Heading 2' }));
+    // Straight away, not on the next frame: a key pressed now must not reach the toolbar.
+    expect(text).toHaveFocus();
+  });
+
   it('focuses the text when its label is clicked', async () => {
     const user = userEvent.setup();
     renderEditor();

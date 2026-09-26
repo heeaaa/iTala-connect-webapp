@@ -1,9 +1,9 @@
 'use client';
-import { useId, useRef, useState, type RefObject } from 'react';
+import { useId, useRef, useState } from 'react';
 import { ImageProblem, compressImage } from '@/lib/compress-image';
 import { uploadFailed, type ImageKind } from '@/lib/event-images';
 import { removeEventImage, uploadEventImage, type ImageOutcome, type RemoveImageInput } from '@/server/actions/images';
-import { platformStyles as s } from '@/components/platform/platform-frame';
+import { ImagePick as Pick } from '../../_components/image-pick';
 import w from '../../admin-workspace.module.css';
 
 export interface EventImagesData {
@@ -22,38 +22,6 @@ export type RunImageTask = (task: (version: string) => Promise<Result>) => Promi
 type Status = { tone: 'busy' | 'done' | 'error'; text: string } | null;
 
 const NAMES: Record<ImageKind, string> = { logo: 'Logo', major: 'Major sponsor', minor: 'Minor sponsor' };
-
-/** A button that opens the file picker: the real input stays focusable and takes the label as its name. */
-function Pick({
-  label,
-  multiple,
-  inputRef,
-  onPick,
-}: {
-  label: string;
-  multiple?: boolean;
-  inputRef: RefObject<HTMLInputElement | null>;
-  onPick: (files: File[]) => void;
-}) {
-  return (
-    <label className={`${s.button} ${s.buttonQuiet} ${w.pick}`}>
-      {label}
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/webp,image/*"
-        multiple={multiple}
-        className="sr-only"
-        onChange={(e) => {
-          const files = Array.from(e.target.files ?? []);
-          // Cleared, so choosing the same file again still counts as a change.
-          e.target.value = '';
-          if (files.length) onPick(files);
-        }}
-      />
-    </label>
-  );
-}
 
 /**
  * Event logo, major sponsor and minor sponsors (PRD E-15 to E-18). Each

@@ -684,7 +684,7 @@ Inside the admin workspace a notice is a 1 px teal outline with no fill, 1rem pa
 
 #### Rules editor
 The Rules section (E-70) holds the old toolbar and nothing more: **Bold**, **Italic**, **Underline**, **Heading 2**, **Heading 3**, **Bullet list** and **Numbered list**.
-- **Toolbar:** a labelled toolbar ("Rules formatting") of toggle buttons (`aria-pressed`), 2.75rem tall, on Raised Plate. A pressed tool is solid teal with On Teal text, and stays teal on hover (the teal hover step). The toolbar is one tab stop: arrow keys, Home and End move between the tools, and Tab returns to the last one used. Bold, Italic and Underline also answer Control+B, I and U (Command on a Mac).
+- **Toolbar:** a labelled toolbar ("Rules formatting") of toggle buttons (`aria-pressed`), 2.75rem tall, on Raised Plate. A pressed tool is solid teal with On Teal text, and stays teal on hover (the teal hover step). The toolbar is one tab stop: arrow keys, Home and End move between the tools, and Tab returns to the last one used. Clicking a tool with the mouse leaves the cursor in the text, so the next key types there. Bold, Italic and Underline also answer Control+B, I and U (Command on a Mac).
 - **Writing area:** a multi-line text box labelled "Event rules" (clicking the label puts the cursor in it), on Network Ground with a 1 px Seam, at least 12rem tall. Focus draws the 2 px teal outline. A numbered list keeps its starting number ("3. " starts at 3) on the event page too.
 - **Saving:** rules save with the rest of the event (Save or Save draft), cleaned to the allow-list on the way in and again on the event page (E-71). Rules with no text are stored as none, so the page says "No rules."
 - Tiptap's own style injection is off (CSP), so its few layout rules live in the workspace stylesheet.
@@ -695,6 +695,11 @@ The Images section (E-15 to E-18) comes before Rules.
 - **Behaviour:** images save as soon as they upload, unlike the rest of the editor, and the section says so. The browser checks the file (PNG, JPEG or WebP up to 5 MB) and resizes it to at most 1600 px before sending.
 - **Focus:** Remove takes the image and its button away, so focus moves to that slot's upload control.
 - **Status:** one polite status line under the section reads "Uploading logo…", "Uploading 2 of 3…", "Logo saved.", "2 minor sponsors added." or "Upload failed: {reason}" (in Alert Red).
+
+#### Platform settings
+Superadmin only (S-01, S-02). Two sections under the title plate, each a Seam-topped section with a section heading.
+- **Platform sponsors:** **Primary sponsors** ("Full size on every event page.") and **Secondary sponsors** ("Half size on every event page."), each a thumbnail grid like minor sponsors, with **Add primary sponsors** or **Add secondary sponsors** (several at once, the same picker plate as event images). Each Remove is named "Remove primary sponsor 2" and so on, starting with its visible word. After a removal, focus moves to that tier's Add control. One polite status line reads "Uploading 1 of 2…", "2 secondary sponsors added.", "Primary sponsor removed." or the reason in Alert Red.
+- **Default rules:** the rules editor labelled "Default rules", starting from the stored template or, when there is none, the built-in iTala rules (the note then adds "These are the built-in rules."). **Save default rules** is the live button; it stays focusable while it saves. "Unsaved changes" sits beside it, and leaving with unsaved edits asks first, as in the event editor.
 
 #### Round robin and playoff dialogs
 Once an event is published, each division's action row reads **+ Add team**, **+ Round robin**, **+ Playoff** (quiet plates, each carrying the division name in screen-reader text), then the danger **Remove division**. The pre-publish **Custom games/team** setting leaves the card and lives in the round robin dialog (E-21).

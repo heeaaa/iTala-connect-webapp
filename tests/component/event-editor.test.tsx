@@ -154,7 +154,8 @@ describe('Publish (E-02, E-60 to E-62)', () => {
     fake.publish.mockResolvedValueOnce({ ok: false, error: 'Please add at least one division.' });
     editor();
     await user.click(screen.getByRole('button', { name: 'Publish' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Please add at least one division.');
+    // The alert region is always there; wait for its message, not for the region.
+    expect(await screen.findByText('Please add at least one division.')).toHaveAttribute('role', 'alert');
     expect(fake.refresh).not.toHaveBeenCalled();
   });
   it('asks before clearing recorded scores, and only clears on Continue', async () => {

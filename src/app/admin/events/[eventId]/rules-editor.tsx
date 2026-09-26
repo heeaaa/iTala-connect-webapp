@@ -124,6 +124,9 @@ export function RulesEditor({
             aria-pressed={active?.[i] ?? false}
             aria-keyshortcuts={t.shortcut}
             disabled={!editor}
+            // A mouse click leaves the cursor in the text, so the next key types there
+            // (the editor only takes focus back a frame later). Tab still reaches the tools.
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor && t.run(editor.chain().focus()).run()}
           >
             {t.label}
