@@ -1,26 +1,31 @@
 import { platformStyles as s, TitlePlate } from '@/components/platform/platform-frame';
 import { formatDate } from '@/lib/format';
+import Link from 'next/link';
+import { EventActions } from './_components/dashboard-actions';
+import w from './admin-workspace.module.css';
 
 export interface DashboardEvent {
   id: string;
   name: string;
   status: string;
   schedule_days: string[];
+  divisions?: { count: number }[];
 }
 
 /**
  * Dashboard body (PRD D-01): the organiser's events as a rundown, with
- * table semantics kept for screen readers. Rows link to the editor once it
- * exists (phase 5); until then they are not links.
+ * table semantics kept for screen readers, with draft editing and event actions.
  */
 export function DashboardView({
   events,
   error,
   superadmin,
+  mobileEnabled = false,
 }: {
   events: DashboardEvent[] | null;
   error: boolean;
   superadmin: boolean;
+  mobileEnabled?: boolean;
 }) {
   return (
     <section aria-labelledby="events-title">
@@ -29,6 +34,16 @@ export function DashboardView({
         title="My events"
         sub={superadmin ? 'Every event on the platform' : 'Events you run'}
       />
+      <div className={w.actions}>
+        <Link href="/admin/events/new" className={`${s.button} ${s.buttonLive}`}>
+          + New event
+        </Link>
+        {mobileEnabled && (
+          <Link href="/admin/import" className={`${s.button} ${s.buttonQuiet}`}>
+            Import from <span className={s.brandName}>iTala</span> mobile
+          </Link>
+        )}
+      </div>
       {error ? (
         <p role="alert" className={s.error}>
           Could not load events. Please refresh the page.
@@ -43,6 +58,8 @@ export function DashboardView({
                 <th scope="col">Date</th>
                 <th scope="col">Name</th>
                 <th scope="col">Status</th>
+                <th scope="col">Divisions</th>
+                <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -72,6 +89,10 @@ export function DashboardView({
                       <span className={s.statusBug} data-status={published ? 'published' : 'draft'}>
                         {published ? 'Published' : 'Draft'}
                       </span>
+                    </td>
+                    <td>{event.divisions?.[0]?.count ?? 0}</td>
+                    <td>
+                      <EventActions id={event.id} name={event.name} published={published} />
                     </td>
                   </tr>
                 );

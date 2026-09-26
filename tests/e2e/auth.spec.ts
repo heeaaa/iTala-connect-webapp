@@ -31,9 +31,9 @@ test.describe('Sign in and roles (PRD A-01 to A-08)', () => {
     await signInAndWait(page, users.adminA);
     await expect(page.getByTestId('signed-in-as')).toContainText('Aroha Admin');
     await expect(page.getByTestId('signed-in-as')).toContainText('(Admin)');
-    await expect(page.getByRole('cell', { name: events.aDraft })).toBeVisible();
+    await expect(page.getByRole('cell', { name: events.aDraft, exact: true })).toBeVisible();
     // B's event is published (RLS lets A read it) but it is not A's to manage.
-    await expect(page.getByRole('cell', { name: events.bPublished })).toHaveCount(0);
+    await expect(page.getByRole('cell', { name: events.bPublished, exact: true })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Settings' })).toHaveCount(0);
 
     await page.goto('/admin/settings');
@@ -43,8 +43,8 @@ test.describe('Sign in and roles (PRD A-01 to A-08)', () => {
   test('a superadmin sees every event and the superadmin screens', async ({ page }) => {
     const { users, events } = fixtures();
     await signInAndWait(page, users.superadmin);
-    await expect(page.getByRole('cell', { name: events.aDraft })).toBeVisible();
-    await expect(page.getByRole('cell', { name: events.bPublished })).toBeVisible();
+    await expect(page.getByRole('cell', { name: events.aDraft, exact: true })).toBeVisible();
+    await expect(page.getByRole('cell', { name: events.bPublished, exact: true })).toBeVisible();
 
     await page.getByRole('link', { name: 'Admins' }).click();
     await expect(page.getByRole('heading', { name: 'Admins' })).toBeVisible();

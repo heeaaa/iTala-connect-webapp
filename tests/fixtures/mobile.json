@@ -1,0 +1,46 @@
+{
+  "leagues": [
+    {
+      "id": "league-open",
+      "name": "Harbour League",
+      "season": "2026",
+      "kind": "league",
+      "is_closed": false,
+      "is_archived": false
+    },
+    {
+      "id": "league-closed",
+      "name": "Autumn League",
+      "season": "2025",
+      "kind": "league",
+      "is_closed": true,
+      "is_archived": true
+    },
+    { "id": "league-dropin", "name": "Friday Drop-in", "season": "", "kind": "recreational", "is_shared": true },
+    { "id": "league-small", "name": "New League", "season": "2026", "kind": "league" }
+  ],
+  "teams": [
+    {
+      "id": "team-hawks",
+      "league_id": "league-open",
+      "name": "Harbour Hawks",
+      "coach": "Sam",
+      "player_ids": ["player-bea", "player-ari"],
+      "team_only": false
+    },
+    {
+      "id": "team-owls",
+      "league_id": "league-open",
+      "name": "Night Owls",
+      "coach": "Alex",
+      "player_ids": ["player-unlisted"],
+      "team_only": true
+    },
+    { "id": "team-new", "league_id": "league-small", "name": "Newcomers", "player_ids": [], "team_only": false }
+  ],
+  "players": [
+    { "id": "player-ari", "league_id": "league-open", "name": "Ari", "number": "04" },
+    { "id": "player-bea", "league_id": "league-open", "name": "Bea", "number": "7" },
+    { "id": "player-unlisted", "league_id": "league-open", "name": "Unlisted", "number": "99" }
+  ]
+}

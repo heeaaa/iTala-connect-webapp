@@ -157,4 +157,4 @@ Everything above still applies. Where this section is more specific, it wins for
 
 ### Status
 
-- Phase 1 (Foundations) built and verified locally on 25/09/2026. Phase 3 Today prototype (Painted Lines, DESIGN.md) and Phase 2 domain port (golden parity) done 25/09/2026; Phase 4 public pages code complete 26/09/2026; database checks await a machine with Docker. Next action and checkpoint: docs/work-status.md.
+- Foundations, domain port, design and Phase 4 public pages are complete; Docker verification passed on 26/09/2026. Phase 3b mobile league import is IN PROGRESS, with database/unit checks passing but its new E2E and finish reviews not yet run. Before continuing, read docs/PHASE_3B_HANDOFF.md and docs/work-status.md. The working tree contains uncommitted implementation files and earlier Docker test fixes; preserve them.

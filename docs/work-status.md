@@ -1,6 +1,19 @@
 # Work status
 
-Last updated: 25/09/2026
+Last updated: 26/09/2026
+
+## Current handoff: Phase 3b in progress
+
+**Live checkpoint (26/09, 13:00 NZ):** Full 56-test browser suite passed before review fixes. Reviewer required 44px secondary action targets (fixed) and unsaved Back/Sign out protection. Sign out guard works; new browser Back regression still fails on both viewports (no confirmation). Latest focused run:6 pass/2 fail. Latest unit/component total546, coverage96.27% lines/93.36% branches. Build and secret scan pass; Prettier needs auth.spec.ts formatted. See handoff for exact reproduction and next steps. Do not call latest tree complete.
+
+Read [PHASE_3B_HANDOFF.md](PHASE_3B_HANDOFF.md) first when resuming on the other laptop. The user authorised implementing Phase 3b and testing thoroughly, then requested a written checkpoint because this session's token budget was running low.
+
+- Phase 4 Docker verification is complete. Phase 3b (mobile league import) was skipped in the old next-action list and is now the active implementation, before the remainder of phase 5.
+- Written: server-only anonymous mobile reader; league list and preview; atomic import RPC and audit; new/delete dashboard actions; draft editor for dates, courts, hours, time zone, colours, divisions, teams and players; local mock mobile HTTP server and tests.
+- Latest local Docker evidence: **145 pgTAP assertions**, **21 integration tests** (including concurrent duplicate imports), **539 unit/component tests**, 96.17% line / 93.36% branch coverage. Production build, TypeScript, lint and environment-aware client secret scan passed.
+- Six focused Phase 3b browser journeys passed. Full 56-test suite now running on the rebuilt application, including actual nested Storage image deletion and remembered editor collapse state. Existing dashboard tests currently have selector failures under investigation; completion is not claimed.
+- Added durable image cleanup migration: delete the database event first, queue cleanup atomically, retain/retry failed Storage removal. Added schema and cleanup failure tests, contrast warnings and remembered collapse state. Design detector returned no findings; visual finish review remains pending.
+- All changes are **uncommitted**, including new/untracked files. They must be transferred with the working tree or committed before the other laptop can see them. No push, hosted migration, deployment, or real mobile connection was performed.
 
 ## Objective
 
@@ -49,7 +62,7 @@ Rebuild the iTala Platform scheduler as iTala Connect (Next.js + Supabase) with 
 
 ## Blockers
 
-- **Docker / local Supabase not available on this machine (25/09/2026).** Everything that needs the database is NOT RUN here: pgTAP, integration tests, the full Playwright suite. See "Docker verification plan" below; run it on the PC with Docker before starting phase 4.
+- Docker verification completed on 26/09/2026; results are recorded below. The hosted project and GitHub CI remain untested.
 - Phase 6 needs access details for the mobile Supabase project. Phase 7 needs a Firebase service account or JSON export.
 
 ## Next action
@@ -68,7 +81,7 @@ Rebuild the iTala Platform scheduler as iTala Connect (Next.js + Supabase) with 
 2. You: phase 0, rotate the two old admin passwords and check the live Firebase rules.
 3. Done: `.github/workflows/ci.yml` is committed (commit "Add ci"). Still open for you: push to GitHub so CI runs, then set branch protection with the CI checks as required.
 4. Done 25/09/2026: phase 2 domain port and golden parity suite (details below).
-5. Done 26/09/2026: phase 4 public pages, code complete (details below). Next: run the Docker verification plan on the PC with Docker, then phase 5 (admin dashboard and editor).
+5. Done 26/09/2026: phase 4 public pages, code complete and verified against local Docker-backed Supabase (details below). Active next step: finish Phase 3b using PHASE_3B_HANDOFF.md, then the remaining phase 5 admin/editor work.
 
 ## Phase 2: domain port (25/09/2026)
 
@@ -116,7 +129,7 @@ Rebuild the iTala Platform scheduler as iTala Connect (Next.js + Supabase) with 
     - Order teams by their Firebase key (RTDB returns key-sorted objects), not by `created_at`.
 - Not yet wired into the app: publish and editor actions (phase 5) and the public standings (phase 4) will call these modules.
 
-## Phase 4: public pages (26/09/2026, code complete, database checks NOT RUN)
+## Phase 4: public pages (26/09/2026, code complete, local database checks passed)
 
 - Built:
   - Home `/` (H-01 to H-05): published only, current and upcoming first, today judged in each event time zone. Functional styling on placeholder tokens; the platform look is a later Impeccable round (user decision 26/09/2026).
@@ -131,12 +144,7 @@ Rebuild the iTala Platform scheduler as iTala Connect (Next.js + Supabase) with 
   - Lint, typecheck, build and check:secrets pass.
   - Visual and axe pass: the new tabs in the prototype, the 404s and the Home error state at 390 and 1440 px, all clean after two fixes (Standings overflowed the page at 390 px, and rules list markers were missing). Screenshots are in `.impeccable/review/phase4/` (gitignored).
   - A malformed id returned HTTP 200 because of `loading.tsx` streaming. The file was removed; it now returns 404 (PRD N-04 note).
-- NOT RUN (needs Docker):
-  - the real Realtime delivery under RLS;
-  - `set_score` through the action;
-  - the nested PostgREST select shape against a real database;
-  - draft visibility and the legacy lookup against real rows;
-  - `tests/e2e/public-event.spec.ts` (journeys 3, 6 and 8, axe on every tab, Home).
+- Verified with Docker Desktop on 26/09/2026: Realtime delivery under RLS, `set_score` through the action, nested PostgREST selects, draft visibility, legacy lookup and `tests/e2e/public-event.spec.ts` (journeys 3, 6 and 8, axe on every tab, Home). See the full command results below.
 - Follow-ups:
   - Realtime DELETE payloads carry only the key and are not filtered by event; the island ignores ids that are not in the event.
   - Platform look for Home, login and admin.
@@ -154,11 +162,19 @@ Rebuild the iTala Platform scheduler as iTala Connect (Next.js + Supabase) with 
   - Finish review: fix (8), then a second verdict: fix (1 unresolved plus 2 regressions), then a third: ship.
   - Not captured: the Admins screen, and the hover, focus and loading states.
   - Tests pass, including new platform-frame component tests; lint, types, build and check:secrets pass.
-- Still to check with Docker: the real signed-in admin screens and Home with real data (`auth.spec.ts`, `public-event.spec.ts`).
+- Verified with Docker Desktop on 26/09/2026: signed-in admin screens and Home with real local data (`auth.spec.ts`, `public-event.spec.ts`).
 
-## Docker verification plan (for the PC with Docker, e.g. a Codex session)
+## Docker verification (26/09/2026, Windows PC with Docker Desktop)
 
-Nothing below has run yet. Run it in order and record each result (command, pass/fail counts) in this file.
+- `npm ci`: initially failed because two `@emnapi` entries were missing from `package-lock.json`; repaired the lockfile and the clean install passed (503 packages).
+- `npx playwright install chromium`: passed. `npm run db:start`: passed; all four migrations applied. `npm run env:local`: passed after using a Windows-compatible shell invocation for `npx`.
+- `npm run test:db`: 4 files, 130 assertions passed. `npm run test:integration`: 1 file, 15 tests passed.
+- `npm run typecheck`: passed. `npm run test:coverage`: 19 files, 511 tests passed; 97.18% lines and 94.55% branches overall.
+- `npm run build`: passed with font network access. `npm run check:secrets`: passed.
+- `npm run test:e2e`: initial setup exposed two seed inserts that incorrectly expected returned rows and a mixed-shape games insert missing non-null fields. The first full run passed 45/50; its failures identified an outdated 404 heading assertion, shared score state between viewport projects, and orphaned users from aborted setup attempts. After fixing the tests and resetting only the local test database, the full suite passed 50/50 (390 px and 1440 px), including the live score Realtime journey.
+- `npm run lint`: ESLint passed; Prettier initially flagged 119 files because this Windows checkout uses CRLF. `prettier --check . --end-of-line auto` passed. `.prettierrc.json` now sets that option for the standard lint command.
+
+The commands below remain the repeatable procedure for another local verification run.
 
 1. Install Docker Desktop and Node 24 LTS (`.nvmrc`). Then:
    ```bash

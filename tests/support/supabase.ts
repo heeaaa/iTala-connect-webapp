@@ -60,6 +60,10 @@ export async function deleteUsers(users: TestUser[]) {
   const admin = adminClient();
   // Events reference owners with ON DELETE RESTRICT; remove them first.
   const ids = users.map((u) => u.id);
-  if (ids.length) await admin.from('events').delete().in('owner_id', ids);
+  if (ids.length) {
+    await admin.from('events').delete().in('owner_id', ids);
+    // Test fixtures have no retained images; remove their durable cleanup jobs.
+    await admin.from('event_image_cleanup').delete().in('requested_by', ids);
+  }
   for (const u of users) await admin.auth.admin.deleteUser(u.id);
 }
