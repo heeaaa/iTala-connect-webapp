@@ -23,7 +23,9 @@ test('creates an event, refuses an incomplete publish, then publishes and shows 
   const eventId = new URL(page.url()).pathname.split('/').pop()!;
 
   await page.getByRole('button', { name: 'Publish', exact: true }).click();
-  await expect(page.getByRole('alert')).toHaveText('Please select at least one event date on the calendar.');
+  await expect(page.getByRole('main').getByRole('alert')).toHaveText(
+    'Please select at least one event date on the calendar.',
+  );
 
   await page.getByRole('group', { name: 'Choose event dates' }).getByRole('button').first().click();
   await page.getByRole('button', { name: '+ Add division', exact: true }).click();
@@ -31,7 +33,9 @@ test('creates an event, refuses an incomplete publish, then publishes and shows 
   await page.getByRole('button', { name: '+ Add team', exact: true }).click();
   await page.getByLabel('Team 1 name', { exact: true }).fill('Hawks');
   await page.getByRole('button', { name: 'Publish', exact: true }).click();
-  await expect(page.getByRole('alert')).toHaveText('Each division needs at least 2 teams. Add teams to: Open.');
+  await expect(page.getByRole('main').getByRole('alert')).toHaveText(
+    'Each division needs at least 2 teams. Add teams to: Open.',
+  );
 
   await page.getByRole('button', { name: '+ Add team', exact: true }).click();
   await page.getByLabel('Team 2 name', { exact: true }).fill('Rats');
