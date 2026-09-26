@@ -43,14 +43,14 @@ export function MatchupReport({ divisions, games }: { divisions: readonly Editor
         const title = d.name || 'Untitled division';
         if (d.teams.length < 2)
           return (
-            <section key={d.id} className={w.matchup} style={{ borderInlineStartColor: d.color }}>
+            <section key={d.id} className={w.matchup} style={{ ['--division' as string]: d.color }}>
               <h3>{title}</h3>
               <p className={w.note}>This division needs at least 2 teams.</p>
             </section>
           );
         const r = divisionReport(d, games);
         return (
-          <section key={d.id} className={w.matchup} style={{ borderInlineStartColor: d.color }}>
+          <section key={d.id} className={w.matchup} style={{ ['--division' as string]: d.color }}>
             <h3>{title}</h3>
             <ul className={w.tags} aria-label={`${title} summary`}>
               <li className={w.chip}>{plural(r.totalGames, 'game')}</li>
