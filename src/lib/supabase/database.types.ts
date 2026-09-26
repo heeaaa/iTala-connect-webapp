@@ -765,6 +765,17 @@ export type Database = {
       is_event_published: { Args: { p_event_id: string }; Returns: boolean }
       is_privileged_role: { Args: never; Returns: boolean }
       is_superadmin: { Args: never; Returns: boolean }
+      list_admin_accounts: {
+        Args: never
+        Returns: {
+          disabled_at: string
+          display_name: string
+          email: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          signed_in: boolean
+        }[]
+      }
       move_game: {
         Args: {
           p_court: number
@@ -777,6 +788,10 @@ export type Database = {
       publish_event: {
         Args: { p_clear_scores?: boolean; p_event_id: string; p_games: Json }
         Returns: number
+      }
+      record_account_link: {
+        Args: { p_account: string; p_kind: string }
+        Returns: undefined
       }
       save_event_editor: {
         Args: {

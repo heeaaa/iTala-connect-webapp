@@ -4,7 +4,9 @@ Last updated: 26/09/2026 (Claude, work laptop)
 
 ## Current handoff (26/09/2026, Claude on the work laptop)
 
-**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish, matchup report), 5b (published-event editing), 5c-1 (schedule grid and game dialog), 5c-2 (drag and drop), 5c-3 (round robin and playoff dialogs) 5d (rules editor and event images) and 5e-1 (platform settings) are done and pushed on branch `handoff/codex`, and so is Google sign-in (A-11, user decision 26/09/2026). Next: **5e-2** (the Admins screen with set-up links). **5e-1 adds migration `20260927000100_platform_sponsor_paths.sql`**; push it to the hosted project after CI passes, together with 5d's `20260926000700_rules_and_images.sql` if that is not pushed yet.
+**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish, matchup report), 5b (published-event editing), 5c-1 (schedule grid and game dialog), 5c-2 (drag and drop), 5c-3 (round robin and playoff dialogs), 5d (rules editor and event images), 5e-1 (platform settings) and 5e-2 (Admins screen with set-up links) are done and pushed on branch `handoff/codex`, and so is Google sign-in (A-11, user decision 26/09/2026). Next: the remaining Phase 5 E2E journeys and finish reviews, then Phase 6. **Migrations to push to the hosted project after CI passes:** `20260927000100_platform_sponsor_paths.sql` and `20260927000200_admin_accounts.sql` (and 5d's `20260926000700_rules_and_images.sql` if that is not pushed yet).
+
+**Old app down (27/09/2026):** connect.itala.fyi shows `permission_denied at /events` because the old Firebase database's "test mode" rules expired at 00:00 today (Auckland). Nothing in this project changed them; the data is still there. The fix is yours in the Firebase console (Realtime Database, Rules): move the expiry date forward and Publish, knowing the rules stay open to anyone with the address. For Phase 7, the importer should read with proper credentials rather than rely on open rules.
 
 **CI now runs the Docker suites.** Draft PR https://github.com/heeaaa/iTala-connect-webapp/pull/1 (`handoff/codex` into `main`, not for merging yet) runs the full workflow on every push. **Run 36214770961 on `cd75ff2` was fully green:**
 - 60/60 E2E (390 and 1440 px), 154/154 pgTAP and 22/22 integration.
@@ -12,7 +14,7 @@ Last updated: 26/09/2026 (Claude, work laptop)
 - This is the first real-Supabase proof of the Phase 3b guard (signed-in Sign out and Back), publish and published editing.
 - The first run failed only on my new publish E2E: `getByRole('alert')` also matched Next's route announcer. That was fixed by scoping to `main`.
 
-Latest green run: **36240866715 on `b2315e2` (5d rules and images): 70/70 E2E with no retries, 207/207 pgTAP, 22/22 integration**, with unit coverage, lint, typecheck, build, `check:secrets` and gitleaks all passing. The run before it (36239532684 on `8919912`) had one flaky retry in the Phase 3b guard test, a timing bug in the test that `b2315e2` fixed (see the 5d section). Before 5d: 36234713687 on `167c8e7` (5c-3) was 68/68 E2E with 180 pgTAP. Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
+Latest green run: **36246633926 on `562592f` (5e-1 platform settings): 72/72 E2E with no retries, 220/220 pgTAP**, with integration, unit coverage, lint, typecheck, build, `check:secrets` and gitleaks all passing. Before it: 36240866715 on `b2315e2` (5d): 70/70 E2E, 207/207 pgTAP, 22/22 integration. The run before that (36239532684 on `8919912`) had one flaky retry in the Phase 3b guard test, a timing bug in the test that `b2315e2` fixed (see the 5d section). Before 5d: 36234713687 on `167c8e7` (5c-3) was 68/68 E2E with 180 pgTAP. Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
 
 **Important for the Docker PC:** 5b adds migration `20260926000500_event_editor.sql` (replaces `save_draft_editor` with `save_event_editor`). Apply it (`npm run db:reset` on the local stack), then run `npm run db:types`. `src/lib/supabase/database.types.ts` was hand-edited for the new function and must come out with **no diff**; if it differs, keep the generated file.
 
@@ -25,8 +27,8 @@ npm run lint && npm run typecheck && npm run test:coverage
 npm run build && npm run check:secrets && npm run test:e2e
 ```
 
-- Expected: **72 E2E tests** (70 green at `b2315e2` plus the 5e-1 settings journey at two viewports) and **220 pgTAP assertions** (207 plus 13 in `010_platform_sponsors.sql`). Run `npm run db:reset` for the new migration; `npm run db:types` must show no diff.
-- Expected: **22 integration tests**, unchanged since 5b.
+- Expected: **74 E2E tests** (72 green at `562592f` plus the 5e-2 accounts journey at two viewports) and **238 pgTAP assertions** (220 plus 18 in `011_admin_accounts.sql`). Run `npm run db:reset` for the new migration; `npm run db:types` must show no diff.
+- Expected: **29 integration tests** (22 plus 7 in `admin-accounts.test.ts`).
 - Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
 
 ### Phase 3b close-out (26/09/2026)
@@ -349,14 +351,45 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
   - Harness in Chromium at 390 and 1440 px, **54/54** (every harness spec), including Settings: a 2000 by 1000 PNG sent as a 1600 by 800 WebP with its tier, SVG refused before sending, success and refusal messages, named Remove buttons at least 44 px, focus after Remove with a visible ring, the default rules edit, guard, save payload and focus, axe with no serious or critical issues, no sideways scroll, no CSP violations beyond zod's probe.
   - Captures (gitignored): `.impeccable/review/phase5e/{mobile,desktop}/` (settings-empty, settings-sample, settings-rules).
   - Not run on the laptop (no Docker): pgTAP `010` and the new E2E `admin-settings.spec.ts` (sponsors to storage and back, removal deletes the file, default rules saved, a new event starts with them, its page shows the platform sponsors, axe, CSP; it restores the sponsors and template it changed). CI runs them.
+- **CI run 36246633926 on `562592f`: green**, 220/220 pgTAP (including `010`), 72/72 E2E with no retries (including the settings journey at both viewports).
 - **You, after CI passes:** push migration `20260927000100_platform_sponsor_paths.sql` to the hosted project (`npx supabase db push`).
+
+### Phase 5e-2: Admins screen with set-up links (27/09/2026)
+
+- **A-09** (`/admin/admins`, superadmin only):
+  - **New account:** Name, Email, Role. `createAdminAccount` refuses an email already on the list, then asks Auth (secret key, server only) for an invite token with no email sent, sets the role and name through the superadmin's session (RLS and `profiles_guard` apply), records the link, and shows it: `/auth/confirm?token_hash=…&type=invite` built from `NEXT_PUBLIC_SITE_URL`. If the role cannot be set, the user it just created is removed.
+  - **Set-up link panel:** takes focus, Copy link, Done (focus back to where it was opened). It says the link works once and expires in 1 hour, and that Google sign-in also works when it is on.
+  - **Accounts:** `list_admin_accounts()` (security definer, superadmin only) gives name, email, role, status and whether they have signed in. Role changes ask first (the select alone changed at once on arrow keys on Windows); Disable asks first; Enable does not. **New set-up link** gives the invite again to someone who never finished, otherwise a password link. Your own row only offers Change password. Phones get stacked cards.
+- **`/auth/confirm`:** opening the link does nothing; **Continue** calls `verifyOtp` (so email and chat link scanners cannot use it up), then the same access rules as sign-in apply (disabled, role-less or profile-less accounts are signed out with the reason). Only Auth's 56-character hex token is accepted. The page sends no referrer and is not indexed.
+- **`/admin/password`:** choose or change your own password (at least 10 characters, typed twice). Auth's refusals are explained in plain words.
+- **Audit (X-09):** a new `audit_profiles` trigger records role changes, disabling and enabling with who did it, and `record_account_link` records every link made (who, for whom, invite or password). A link is only handed over once it is on record.
+- **Migration `20260927000200_admin_accounts.sql`:** `list_admin_accounts`, `audit_profiles` and its trigger, `record_account_link`. pgTAP `011_admin_accounts.sql` (18 assertions): who may list and record links, anonymous users never listed, the audit rows, a name change not audited, the functions' definer settings and grants. `database.types.ts` is hand-edited for both callable functions (the Docker PC's `db:types` must show no diff; keep the generated file if it differs).
+- **Integration test `tests/integration/admin-accounts.test.ts` (7, CI only):** pins the Auth behaviour the code relies on: an invite makes the user and a 56-character token with no email, the profile takes the name, the link signs in once, then a password works; an address already set up is refused; a new invite replaces an unused token; a password link works; the list and role changes through the API follow RLS.
+- **Independent review** (fresh read-only reviewer, both 5e slices). No High findings. What happened:
+  - Medium, fixed: Create account reused an account that was never set up (Auth hands back an unconfirmed user with a new token), could change its role and name, and on a failed role update could delete it. Now refused up front; a mutation check proves the test catches it.
+  - Medium, fixed: the role select saved on every change, with no question. It now asks, says what the role can do, and restores the stored role on Cancel or refusal (the component test was strengthened after a mutation survived the first version).
+  - Medium, fixed: no audit of account changes, and a password link lets a superadmin sign in as that account. Both are now audited as above.
+  - Low, accepted: two superadmins demoting or disabling each other at the same moment could leave none, since the guard only blocks changing your own row. It needs two requests racing; recovery is `npm run admin:create`. Not fixed, as it cannot be tested here and the guard sits on every profile update.
+  - Low, partly fixed: junk requests to `/auth/confirm` share Auth's per-IP limit for link checks (the server's IP). Tokens not in Auth's format are now refused before Auth is asked; an app-level throttle is not added (sign-in has the same exposure). The "1 hour" text must match the hosted Email OTP expiry (README says where).
+  - Low, fixed (accessibility): phone card labels are visible only (`content: attr(data-label) / ''`), the two new alerts drop the conflicting `aria-live`, and the New account error is tied to its fields.
+  - Test gaps closed: existing email, record failure, no-role and no-profile links, the token format, pgTAP definer checks, and axe and CSP on the person's own pages in the E2E.
+- **Evidence (work laptop):**
+  - Lint and typecheck pass. `test:coverage`: 48 files, **747 tests pass**, thresholds met. New: `admin-actions` (12), `account-actions` (6), `admins-view` (8).
+  - A clean build without the harness passes; `check:secrets` passes (values not printed).
+  - Harness in Chromium at 390 and 1440 px: **62/62** earlier in the slice, and the Admins specs again after the review fixes (8/8): the link panel focused, copy to the clipboard, Done focus, the role question (Cancel restores and refocuses, arrow keys only ask), disable asks, enable, the confirm page (no action until Continue, no-referrer, a bad token refused), the password form's description and saved view, axe with no serious or critical issues, no sideways scroll.
+  - Captures (gitignored): `.impeccable/review/phase5e/{mobile,desktop}/` (admins, admins-link, confirm, password).
+  - Not run on the laptop (no Docker): pgTAP `011`, the integration test and the E2E `admin-accounts.spec.ts` (create, the person's own browser sets a password and signs in, the link works once, role changes, disabled loses access, re-enabled gets a password link). CI runs them.
+- **You, after CI passes:**
+  - Push migrations `20260927000100_platform_sponsor_paths.sql` and `20260927000200_admin_accounts.sql` to the hosted project (`npx supabase db push`).
+  - On the hosted project, check that sign-ups stay off (Authentication settings) and that the Email OTP expiry is 1 hour, or update the text in `admins-view.tsx`. Netlify needs `SUPABASE_SECRET_KEY` set for Create account to work (it says so when it is missing).
+- **Follow-up:** admins who are not superadmins have no link to `/admin/password` yet (a superadmin can send them a set-up link). Consider a small "Password" link in the header in the Phase 8 polish.
 
 ### Phase 5 plan (remaining slices)
 
 1. Done: 5b. The Phase 2 handovers still open move to 5c: pass stored resolved playoff teams to round robin; add a distinct-days rule on `events.schedule_days` in the database (zod and the save RPC already de-duplicate).
 2. **5c, schedule editor.** Done: 5c-1, 5c-2 (drag and drop, E-45) and 5c-3: "+ Round robin" and "+ Playoff" dialogs (E-63, E-64), with stored resolved playoff teams passed to round robin (Phase 2 handover).
 3. Done: **5d, rules and images.** Tiptap rules editor (E-70, E-71), logo and sponsor uploads with resizing and removal (E-15 to E-18).
-4. **5e, platform admin.** Done: 5e-1 Settings sponsors and the default rules template (S-01, S-02). Next: 5e-2 the Admins screen (A-09) with set-up links. The dashboard Results action (D-02) moves to Phase 6 with the results inbox; View was already done.
+4. Done: **5e, platform admin.** 5e-1 Settings sponsors and the default rules template (S-01, S-02), and 5e-2 the Admins screen (A-09) with set-up links. The dashboard Results action (D-02) moves to Phase 6 with the results inbox; View was already done.
 5. **Then** E2E journeys 2, 4, 7 and 8, and a finish review per new surface.
 
 ## Objective

@@ -20,7 +20,9 @@ npm run admin:create -- --email you@example.com --name "Your Name" --role supera
 npm run dev                   # http://localhost:3000
 ```
 
-`admin:create` prompts for the password (or reads `ADMIN_PASSWORD`). Run it again with `--role admin` for other organisers. Public sign-up is turned off; accounts only exist when a superadmin creates them.
+`admin:create` prompts for the password (or reads `ADMIN_PASSWORD`). Use it for the first superadmin. After that, a superadmin adds organisers on the **Admins** screen: it creates the account and shows a one-time set-up link to send to the person (no email is sent), and it changes roles, disables accounts and makes a fresh link for a forgotten password. Public sign-up is turned off; accounts only exist when a superadmin creates them.
+
+Set-up links expire after Supabase Auth's email link lifetime (1 hour by default; the local stack's `otp_expiry` in `supabase/config.toml`). If you change it on the hosted project, update the "expires in 1 hour" text in `src/app/admin/admins/admins-view.tsx`.
 
 ## Commands
 
@@ -42,7 +44,7 @@ npm run dev                   # http://localhost:3000
 | `npm run db:reset` | Recreate the local database from migrations |
 | `npm run db:types` | Regenerate `src/lib/supabase/database.types.ts` |
 | `npm run env:local` | Write `.env.local` for the local stack (`-- --force` to replace) |
-| `npm run admin:create` | Create an admin or change an account's role (reads `.env.local`) |
+| `npm run admin:create` | Create the first superadmin, or change an account's role, from the command line (reads `.env.local`) |
 
 Integration and E2E tests refuse to run unless `NEXT_PUBLIC_SUPABASE_URL` is a local address.
 

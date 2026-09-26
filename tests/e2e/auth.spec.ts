@@ -48,7 +48,7 @@ test.describe('Sign in and roles (PRD A-01 to A-08)', () => {
 
     await page.getByRole('link', { name: 'Admins' }).click();
     await expect(page.getByRole('heading', { name: 'Admins' })).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'Nora Norole' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'Nora Norole', exact: true })).toBeVisible();
     await page.getByRole('link', { name: 'Settings' }).click();
     await expect(page.getByRole('heading', { name: 'Platform settings' })).toBeVisible();
   });
