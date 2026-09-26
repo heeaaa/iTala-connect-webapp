@@ -4,7 +4,7 @@ Last updated: 26/09/2026 (Claude, work laptop)
 
 ## Current handoff (26/09/2026, Claude on the work laptop)
 
-**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish, matchup report), 5b (published-event editing), 5c-1 (schedule grid and game dialog) and 5c-2 (drag and drop) are done and pushed on branch `handoff/codex`, and so is Google sign-in (A-11, user decision 26/09/2026). Next: **5c-3** (round robin and playoff dialogs).
+**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish, matchup report), 5b (published-event editing), 5c-1 (schedule grid and game dialog), 5c-2 (drag and drop) and 5c-3 (round robin and playoff dialogs) are done and pushed on branch `handoff/codex`, and so is Google sign-in (A-11, user decision 26/09/2026). Next: **5d** (rules editor and images). **5c-3 adds a migration** (see its section); push it to the hosted project after CI passes.
 
 **CI now runs the Docker suites.** Draft PR https://github.com/heeaaa/iTala-connect-webapp/pull/1 (`handoff/codex` into `main`, not for merging yet) runs the full workflow on every push. **Run 36214770961 on `cd75ff2` was fully green:**
 - 60/60 E2E (390 and 1440 px), 154/154 pgTAP and 22/22 integration.
@@ -25,8 +25,8 @@ npm run lint && npm run typecheck && npm run test:coverage
 npm run build && npm run check:secrets && npm run test:e2e
 ```
 
-- Expected: **66 E2E tests**: the 64 green at `68abdaf` plus the 5c-2 drag and drop journey at two viewports. 5c-2 adds no migration, so the pgTAP and integration counts below are unchanged.
-- Expected: **154 pgTAP assertions** (145 plus 9 in the new `supabase/tests/007_event_editor.sql`) and **22 integration tests** (21 plus `tests/integration/event-editor.test.ts`). Both new files are written but NOT RUN.
+- Expected: **68 E2E tests** (66 green at `ffedad2` plus the 5c-3 additions journey at two viewports) and **180 pgTAP assertions** (154 plus 26 in `008_schedule_additions.sql`). Run `npm run db:reset` for the new migration; `npm run db:types` must show no diff.
+- Expected: **22 integration tests**, unchanged since 5b.
 - Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
 
 ### Phase 3b close-out (26/09/2026)
@@ -210,10 +210,74 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
   - `.impeccable/design.json` is not updated; DESIGN.md is ("Schedule drag and drop").
   - dnd-kit sets `aria-pressed` and `aria-grabbed` on the Move button (library default), so screen readers may announce it as a toggle.
 
+### Phase 5c-3: round robin and playoff dialogs (26/09/2026)
+
+- **E-21:** once published, a division's action row shows **+ Round robin** and **+ Playoff**. The pre-publish **Custom games/team** setting leaves the card and lives in the round robin dialog, as in the old `renderDivCard`.
+- **E-63, "+ Round robin"** (`schedule-additions.tsx`):
+  - The old sentence ("{n} teams. A full round robin is {games} games ({max} per team)..."), the Custom games/team check and a Games per team field (1 to max). The field starts at the division's saved number, else min(3, max).
+  - The same messages: at least 2 teams, a date first, how many games, and "at most N games without a repeat matchup".
+  - It adds the missing matchups into free slots only. The result reads "{n} games added." plus how many went to Unscheduled, or "No new games to add. Every matchup for this division is already on the schedule."
+- **E-64, "+ Playoff":** "How many teams advance to the playoff bracket? (max N)", starting at min(N, 4), from 2 to N; "Need at least 2 teams." for smaller divisions.
+  - It adds a seeded bracket from 1 hour after the latest game, in 60-minute steps on court 1, rolling to the next day.
+  - Games that do not fit go to Unscheduled (the old code overflowed onto the last day), and the result says how many.
+  - A second playoff reuses bracket ids, as before (the first match wins).
+- **Both dialogs** save unsaved edits first (as Publish does), then show the outcome in place with **Done**, the old editor's alert. A division with too few teams, or an event with no dates, gets the reason and only Close.
+- **Actions** (`src/server/actions/schedule-additions.ts`): auth, zod and ownership checks, then they re-read the saved event. The shared text and checks are in `src/lib/schedule-additions.ts`, so the dialog and the action agree.
+  - **Parity (Phase 2 handover):** games go to the scheduler with their **stored** teams, as the old editor loaded them straight from the database. A playoff game counts with whatever teams are saved on it (usually TBD), never the teams its bracket would resolve to now.
+  - **Parity:** the dialog's choice is applied to the division **before** generating, as the old code did, so a full round robin never falls back to an earlier custom number. A mutation check proves the test catches this.
+  - The round robin writes through the new `add_round_robin` function. It keeps the choice on the division, adds the games and re-sorts the schedule (the old `sortSchedule(schedule.concat(added))`) in one transaction. The playoff appends through the new `add_playoff` without a re-sort, as the old code pushed.
+  - The editor adopts the stored choice into its saved snapshot, so a later Save does not overwrite it.
+- **Migration `20260926000600_schedule_additions.sql`:**
+  - `add_round_robin` and `add_playoff` (security invoker; editor check, published event locked, the division must belong to the event), sharing `begin_schedule_addition`.
+  - The distinct-days rule from the Phase 2 review: `dates_are_distinct` plus a CHECK on `events.schedule_days`, after normalising any existing duplicates.
+  - pgTAP test `supabase/tests/008_schedule_additions.sql` (12 assertions).
+  - `database.types.ts` is hand-edited for both functions. The Docker PC's `npm run db:types` must show **no diff**; if it differs, keep the generated file.
+- **Bug fixed (accessibility, pre-existing):** closing any admin dialog (confirmation, players, game, and the new ones) dropped keyboard focus to the page body.
+  - Root cause: each dialog is removed from the page while still open, so the browser never hands focus back.
+  - Fix: a shared `useModal` hook records the opener and gives it focus back on close. The control to start on is marked `data-autofocus` instead of React's `autoFocus`, which moved focus before the opener was known.
+  - Red, then green: `tests/component/dialog-focus.test.tsx` failed for both shared dialogs before the fix. A harness regression checks all four dialogs in Chromium.
+- The other Phase 2 handovers were already done: the one-to-one team map (primary key plus unique mobile team per division), integer games per team, and the time zone check.
+- **Independent review** (fresh read-only reviewer). Security found nothing material. The stored-teams parity, the SQL order against `sortSchedule(concat)`, the playoff append, the defaults and messages, and the editor integration were all confirmed. Findings and what happened:
+  - Medium, fixed (parity): the old `collectEditorFields` ran `reconcileSchedule` before either addition, so games outside the event's days, hours or courts went to Unscheduled first. For example, a game added at 20:30 in a 20:00 event would otherwise push a whole playoff to Unscheduled.
+    - Both actions now reconcile first and unschedule those games in the same transaction (`begin_schedule_addition`). The result says how many moved, as E-14 does on Save.
+    - Action tests cover both paths, and are red with the reconcile removed.
+  - Medium, fixed (accessibility): the result appeared as a new status just as focus moved to Done, which screen readers announce unreliably. Done is now described by the result, as the component and harness tests check.
+  - Low, fixed: both functions now lock the event row and refuse a draft event, like `publish_event`, and the playoff has its own `add_playoff` instead of `append_games`.
+  - Low, fixed: no re-sort when nothing was added, as the old code returned before sorting. Null day elements are dropped when the migration normalises existing days. The custom number is capped at the stored limit of 20 for divisions of 22 or more teams, with its own message.
+  - Low, fixed (accessibility): a confirmation that removes its own opener (Remove team or division, Continue) now focuses the first control of the nearest part of the page still there. After a server refusal, focus goes back to the go-ahead button that was disabled while it ran.
+  - Deliberate differences, recorded here: "2.5" teams or games is refused with the dialog's message, where the old `parseInt` quietly read 2.
+  - The review's test gaps were closed:
+    - pgTAP now covers two days (so ordering by day is really tested), atomicity (a slot clash rolls back the division change and the unscheduling), no re-sort on an empty add, the playoff append, a draft event, and anon's missing EXECUTE rights; 26 assertions in all.
+    - The component tests unmount properly, and check focus back to "+ Round robin" and that a full round robin after a saved custom number stores 0.
+    - The CI E2E checks axe with the dialog open, focus return, and that positions follow day and time after the re-sort.
+- **Evidence (work laptop):**
+  - Lint and typecheck pass. `test:coverage`: 36 files, **667 tests pass**. `src/lib/schedule-additions.ts` is at 100%; `src/domain` is unchanged and still 100%.
+  - Mutation checks each failed their test:
+    - the stale custom value;
+    - the reconcile (both actions);
+    - saving first;
+    - keeping the stored choice;
+    - Done's description;
+    - the focus fallback;
+    - the refocus after a refusal. jsdom keeps focus on a disabled button, so that test moves focus to the page the way a browser does.
+  - A clean build without the harness passes, and `check:secrets` passes against the real server values (not printed).
+  - Harness in Chromium at 390 and 1440 px, **26/26** (with the 5c-2 drag specs):
+    - the division actions at 44 px;
+    - both dialogs: text, defaults, range checks, the exact action payload, the refusal with focus back on the go-ahead, and the success view with Done focused and described;
+    - the stored choice as the next starting point, with nothing unsaved;
+    - focus back to the opener for all four dialog kinds, and into the division after Remove team;
+    - axe with no serious or critical issues, and no sideways scroll.
+  - Captures: `.impeccable/review/phase5c3/{mobile,desktop}/` (division actions, both dialogs, both results).
+- **Runs in CI on push, NOT RUN here (Docker):**
+  - pgTAP `008_schedule_additions.sql` (26).
+  - The E2E "adds a round robin and a playoff to a published schedule", at two viewports.
+- **You, after CI passes:** push migration `20260926000600_schedule_additions.sql` to the hosted project (`supabase db push`), as with the earlier migrations.
+- **For the finish review:** `.impeccable/design.json` is not updated; DESIGN.md is ("Round robin and playoff dialogs", and the dialog focus rule).
+
 ### Phase 5 plan (remaining slices)
 
 1. Done: 5b. The Phase 2 handovers still open move to 5c: pass stored resolved playoff teams to round robin; add a distinct-days rule on `events.schedule_days` in the database (zod and the save RPC already de-duplicate).
-2. **5c, schedule editor.** 5c-1 and 5c-2 (drag and drop, E-45) are done. 5c-3: "+ Round robin" and "+ Playoff" dialogs (E-63, E-64), with stored resolved playoff teams passed to round robin (Phase 2 handover).
+2. **5c, schedule editor.** Done: 5c-1, 5c-2 (drag and drop, E-45) and 5c-3: "+ Round robin" and "+ Playoff" dialogs (E-63, E-64), with stored resolved playoff teams passed to round robin (Phase 2 handover).
 3. **5d, rules and images.** Tiptap rules editor (E-70, E-71), logo and sponsor uploads with compression and removal (E-15 to E-18).
 4. **5e, platform admin.** Settings sponsors and the default rules template (S-01, S-02), the Admins screen (A-09), dashboard View and Results actions (D-02).
 5. **Then** E2E journeys 2, 4, 7 and 8, and a finish review per new surface.

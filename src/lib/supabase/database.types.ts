@@ -703,6 +703,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_playoff: {
+        Args: { p_event_id: string; p_games: Json; p_unschedule: string[] }
+        Returns: number
+      }
+      add_round_robin: {
+        Args: {
+          p_custom: boolean
+          p_division_id: string
+          p_event_id: string
+          p_games: Json
+          p_games_per_team: number
+          p_unschedule: string[]
+        }
+        Returns: number
+      }
       append_games: {
         Args: { p_event_id: string; p_games: Json }
         Returns: number
@@ -712,12 +727,17 @@ export type Database = {
         Returns: undefined
       }
       assert_event_editor: { Args: { p_event_id: string }; Returns: undefined }
+      begin_schedule_addition: {
+        Args: { p_event_id: string; p_unschedule: string[] }
+        Returns: undefined
+      }
       can_read_event: { Args: { p_event_id: string }; Returns: boolean }
       can_write_image_path: { Args: { p_name: string }; Returns: boolean }
       create_draft_event: {
         Args: { p_name: string; p_rules: string; p_timezone: string }
         Returns: string
       }
+      dates_are_distinct: { Args: { p_days: string[] }; Returns: boolean }
       dismiss_mobile_result: {
         Args: { p_game_id: string; p_source: Json }
         Returns: undefined

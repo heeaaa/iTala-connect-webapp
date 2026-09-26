@@ -39,6 +39,7 @@ import {
 import { deleteGame, dropGame, saveGame, type DropInput } from '@/server/actions/games';
 import { platformStyles as s } from '@/components/platform/platform-frame';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
+import { useModal } from '../../_components/use-modal';
 import w from '../../admin-workspace.module.css';
 
 export type ScheduleGame = Game & { id: string };
@@ -230,11 +231,7 @@ function GameDialog({
     type: game?.type ?? 'group',
     detach: false,
   }));
-  useEffect(() => {
-    const dialog = ref.current!;
-    dialog.showModal();
-    return () => dialog.close();
-  }, []);
+  useModal(ref);
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }));
   const teams = divisions.flatMap((d) => d.teams.map((t) => ({ id: t.id, label: `${t.name} (${d.name})` })));
   const inBracket = Boolean(game?.playoff);

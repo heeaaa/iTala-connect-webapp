@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { formatTime } from '@/lib/format';
 import { signInAndWait } from './fixtures';
@@ -250,4 +251,99 @@ test('moves, swaps and unschedules games by drag and drop, warning about short r
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     page.viewportSize()!.width,
   );
+});
+
+// E-63, E-64: "+ Round robin" and "+ Playoff" on a published event, with the stored result checked.
+test('adds a round robin and a playoff to a published schedule', async ({ page }, info) => {
+  await signInAndWait(page, organiser);
+  await page.getByRole('link', { name: '+ New event', exact: true }).click();
+  await page.getByLabel('Event name', { exact: true }).fill(`Additions ${info.project.name}`);
+  await page.getByRole('button', { name: 'Create event', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/events\/[a-f0-9-]+\?created=1/);
+  const eventId = new URL(page.url()).pathname.split('/').pop()!;
+  await page.getByRole('group', { name: 'Choose event dates' }).getByRole('button').first().click();
+  await page.getByRole('button', { name: '+ Add division', exact: true }).click();
+  await page.getByLabel('Division 1 name', { exact: true }).fill('Open');
+  for (const [i, team] of ['Hawks', 'Owls', 'Kea', 'Tui'].entries()) {
+    await page.getByRole('button', { name: '+ Add team', exact: true }).click();
+    await page.getByLabel(`Team ${i + 1} name`, { exact: true }).fill(team);
+  }
+  // One game per team before publishing: 2 games.
+  await page.getByLabel('Custom games/team').check();
+  await page.getByLabel('Games per team', { exact: true }).fill('1');
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  const main = page.getByRole('main');
+  await expect(main.getByRole('status')).toHaveText('Published with 2 games.');
+  // After publishing, the custom number lives in the round robin dialog (E-21).
+  await expect(page.getByLabel('Custom games/team')).toHaveCount(0);
+  const db = adminClient();
+  const games = async () =>
+    (await db.from('games').select('id, day, start_time, is_playoff, position, label').eq('event_id', eventId)).data!;
+
+  // Round robin: the dialog starts from the saved choice; unticked, it fills in the missing matchups.
+  await main.getByRole('button', { name: /^\+ Round robin/ }).click();
+  let dialog = page.getByRole('dialog', { name: 'Add round robin · Open' });
+  await expect(dialog).toContainText('4 teams. A full round robin is 6 games (3 per team).');
+  await expect(dialog.getByLabel('Custom games/team')).toBeChecked();
+  await expect(dialog.getByLabel('Games per team')).toHaveValue('1');
+  const axe = await new AxeBuilder({ page })
+    .include('dialog')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .analyze();
+  expect(axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([]);
+  await dialog.getByLabel('Custom games/team').uncheck();
+  await dialog.getByRole('button', { name: 'Add games', exact: true }).click();
+  await expect(dialog.getByRole('status')).toContainText('4 games added');
+  await expect(dialog.getByRole('button', { name: 'Done', exact: true })).toBeFocused();
+  await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+  // Closing the dialog gives focus back to the button that opened it.
+  await expect(main.getByRole('button', { name: /^\+ Round robin/ })).toBeFocused();
+  const afterRoundRobin = await games();
+  expect(afterRoundRobin).toHaveLength(6);
+  // The whole schedule was re-sorted: stored order follows day and time, unscheduled games last.
+  const inOrder = [...afterRoundRobin].sort((a, b) => a.position - b.position);
+  const byTime = [...afterRoundRobin].sort(
+    (a, b) => Number(!a.day) - Number(!b.day) || `${a.day} ${a.start_time}`.localeCompare(`${b.day} ${b.start_time}`),
+  );
+  expect(inOrder.filter((g) => g.day).map((g) => g.id)).toEqual(byTime.filter((g) => g.day).map((g) => g.id));
+  expect(inOrder.findIndex((g) => !g.day)).not.toBeLessThan(inOrder.filter((g) => g.day).length);
+  const { data: open } = await db
+    .from('divisions')
+    .select('custom_games_per_team, games_per_team')
+    .eq('event_id', eventId)
+    .single();
+  expect(open).toEqual({ custom_games_per_team: false, games_per_team: null });
+
+  // Asking again adds nothing: every matchup is on.
+  await main.getByRole('button', { name: /^\+ Round robin/ }).click();
+  dialog = page.getByRole('dialog', { name: 'Add round robin · Open' });
+  await dialog.getByRole('button', { name: 'Add games', exact: true }).click();
+  await expect(dialog.getByRole('status')).toHaveText(
+    'No new games to add. Every matchup for this division is already on the schedule.',
+  );
+  await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+
+  // Playoff: the top 4 by default, a seeded bracket after the last game.
+  await main.getByRole('button', { name: /^\+ Playoff/ }).click();
+  dialog = page.getByRole('dialog', { name: 'Add playoff · Open' });
+  await expect(dialog.getByLabel('How many teams advance to the playoff bracket? (max 4)')).toHaveValue('4');
+  await dialog.getByRole('button', { name: 'Add playoff', exact: true }).click();
+  await expect(dialog.getByRole('status')).toContainText('3 playoff games added!');
+  await dialog.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(main).toContainText('Open - Finals');
+
+  const all = await games();
+  expect(all).toHaveLength(9);
+  expect(
+    all
+      .filter((g) => g.is_playoff)
+      .map((g) => g.label)
+      .sort(),
+  ).toEqual(['Open - Finals', 'Open - Semi 1', 'Open - Semi 2']);
+  expect(all.map((g) => g.position).sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  const { count } = await db
+    .from('game_scores')
+    .select('game_id', { count: 'exact', head: true })
+    .eq('event_id', eventId);
+  expect(count).toBe(0);
 });

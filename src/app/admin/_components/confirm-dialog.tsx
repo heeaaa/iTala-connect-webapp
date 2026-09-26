@@ -1,7 +1,8 @@
 'use client';
-import { useEffect, useRef, useId } from 'react';
+import { useRef, useId } from 'react';
 import { platformStyles as s } from '@/components/platform/platform-frame';
 import w from '../admin-workspace.module.css';
+import { useModal } from './use-modal';
 export function ConfirmDialog({
   title,
   message,
@@ -19,11 +20,7 @@ export function ConfirmDialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
-  useEffect(() => {
-    const dialog = ref.current!;
-    dialog.showModal();
-    return () => dialog.close();
-  }, []);
+  useModal(ref);
   return (
     <dialog
       ref={ref}
@@ -38,7 +35,7 @@ export function ConfirmDialog({
       <p>{message}</p>
       <div className={w.actions}>
         <button
-          autoFocus
+          data-autofocus
           type="button"
           className={`${s.button} ${s.buttonQuiet}`}
           onClick={onCancel}

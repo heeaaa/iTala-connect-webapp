@@ -1,14 +1,15 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type Game } from '@/domain/types';
 import { type ScheduleGame } from '@/app/admin/events/[eventId]/schedule-editor';
 import { type EditorInput } from '@/lib/event-editor';
 
-const fake = vi.hoisted(() => ({ save: vi.fn(), publish: vi.fn(), refresh: vi.fn() }));
+const fake = vi.hoisted(() => ({ save: vi.fn(), publish: vi.fn(), refresh: vi.fn(), rr: vi.fn(), po: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: fake.refresh, push: vi.fn(), replace: vi.fn() }) }));
 vi.mock('@/server/actions/events', () => ({ saveEvent: fake.save }));
 vi.mock('@/server/actions/publish', () => ({ publishEvent: fake.publish }));
+vi.mock('@/server/actions/schedule-additions', () => ({ addRoundRobin: fake.rr, addPlayoff: fake.po }));
 import { EventEditor } from '@/app/admin/events/[eventId]/event-editor';
 import { MatchupReport } from '@/app/admin/events/[eventId]/matchup-report';
 
@@ -229,6 +230,176 @@ describe('Published editing (E-02, E-05, E-14, E-22, E-23)', () => {
     await user.click(screen.getByRole('button', { name: 'Remove division' }));
     expect(screen.getByRole('dialog')).toHaveTextContent(
       'Its 3 teams and their players will be removed when you save.',
+    );
+  });
+});
+
+describe('Round robin and playoff on a published event (E-21, E-63, E-64)', () => {
+  const publishedEditor = (value: EditorInput = initial) =>
+    render(<EventEditor initial={value} links={{}} games={[]} published notice="" />);
+  const dialog = (name: RegExp) => screen.getByRole('dialog', { name });
+
+  it('shows Custom games/team before publishing, and the two additions after', () => {
+    editor();
+    expect(screen.getByLabelText('Custom games/team')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^\+ Round robin/ })).not.toBeInTheDocument();
+    cleanup();
+    publishedEditor();
+    expect(screen.queryByLabelText('Custom games/team')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^\+ Round robin/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^\+ Playoff/ })).toBeInTheDocument();
+  });
+
+  it('saves unsaved edits first, adds the round robin, and reports it in the dialog', async () => {
+    const user = userEvent.setup();
+    fake.save.mockResolvedValueOnce({ ok: true, data: { version: 'v2', moved: 0 } });
+    fake.rr.mockResolvedValueOnce({ ok: true, data: { added: 3, unscheduled: 1, moved: 1 } });
+    publishedEditor();
+    await user.click(screen.getByRole('button', { name: '+ Add team' }));
+    await user.type(screen.getByLabelText('Team 4 name'), 'Kea');
+    await user.click(screen.getByRole('button', { name: /^\+ Round robin/ }));
+    const rr = dialog(/Add round robin · Open/);
+    expect(rr).toHaveTextContent('4 teams. A full round robin is 6 games (3 per team).');
+    expect(within(rr).getByLabelText('Custom games/team')).not.toBeChecked();
+    await user.click(within(rr).getByRole('button', { name: 'Add games' }));
+    expect(await within(rr).findByRole('status')).toHaveTextContent(
+      "3 games added. 1 could not fit and is in the Unscheduled row. 1 game moved to Unscheduled because it no longer fits the event's days, hours or courts.",
+    );
+    expect(fake.save).toHaveBeenCalledWith(expect.objectContaining({ version: 'v1' }));
+    expect(fake.save.mock.invocationCallOrder[0]).toBeLessThan(fake.rr.mock.invocationCallOrder[0]!);
+    expect(fake.rr).toHaveBeenCalledWith({ eventId: uuid(1), divisionId: uuid(10), custom: false, gamesPerTeam: 0 });
+    const done = within(rr).getByRole('button', { name: 'Done' });
+    expect(done).toHaveFocus();
+    // Focus lands on Done, so the result is its description too (read out even where a new status is not).
+    expect(done).toHaveAccessibleDescription(/^3 games added\./);
+    await user.click(done);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^\+ Round robin/ })).toHaveFocus();
+  });
+
+  it('checks the custom number, then keeps the stored choice so a later Save does not undo it', async () => {
+    const user = userEvent.setup();
+    fake.rr.mockResolvedValueOnce({ ok: true, data: { added: 2, unscheduled: 0, moved: 0 } });
+    publishedEditor();
+    await user.click(screen.getByRole('button', { name: /^\+ Round robin/ }));
+    const rr = dialog(/Add round robin/);
+    await user.click(within(rr).getByLabelText('Custom games/team'));
+    const count = within(rr).getByLabelText('Games per team');
+    expect(count).toHaveValue(3); // min(3, max) with max 3 for three teams
+    expect(rr).toHaveTextContent('Between 1 and 3. Leave the box unticked for a full round robin.');
+    fireEvent.change(count, { target: { value: '4' } });
+    await user.click(within(rr).getByRole('button', { name: 'Add games' }));
+    expect(within(rr).getByRole('alert')).toHaveTextContent(
+      'With 3 teams each team can play at most 3 games without a repeat matchup.',
+    );
+    expect(fake.rr).not.toHaveBeenCalled();
+    fireEvent.change(count, { target: { value: '2' } });
+    await user.click(within(rr).getByRole('button', { name: 'Add games' }));
+    expect(await within(rr).findByRole('status')).toHaveTextContent('2 games added.');
+    // Nothing unsaved: the editor was clean, and the division's new choice is part of what is stored.
+    expect(fake.save).not.toHaveBeenCalled();
+    await user.click(within(rr).getByRole('button', { name: 'Done' }));
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+    fake.save.mockResolvedValueOnce({ ok: true, data: { version: 'v2', moved: 0 } });
+    await user.type(screen.getByLabelText('Team 1 name'), ' B');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(fake.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        divisions: [expect.objectContaining({ custom_games_per_team: true, games_per_team: 2 })],
+      }),
+    );
+  });
+
+  it('a full round robin after a saved custom number stores 0, which a later Save keeps', async () => {
+    const user = userEvent.setup();
+    fake.rr.mockResolvedValueOnce({ ok: true, data: { added: 1, unscheduled: 0, moved: 0 } });
+    publishedEditor({ ...initial, divisions: [{ ...division, custom_games_per_team: true, games_per_team: 1 }] });
+    await user.click(screen.getByRole('button', { name: /^\+ Round robin/ }));
+    const rr = dialog(/Add round robin/);
+    expect(within(rr).getByLabelText('Custom games/team')).toBeChecked();
+    expect(within(rr).getByLabelText('Games per team')).toHaveValue(1);
+    await user.click(within(rr).getByLabelText('Custom games/team'));
+    await user.click(within(rr).getByRole('button', { name: 'Add games' }));
+    await within(rr).findByRole('status');
+    expect(fake.rr).toHaveBeenCalledWith(expect.objectContaining({ custom: false, gamesPerTeam: 0 }));
+    await user.click(within(rr).getByRole('button', { name: 'Done' }));
+    fake.save.mockResolvedValueOnce({ ok: true, data: { version: 'v2', moved: 0 } });
+    await user.type(screen.getByLabelText('Team 1 name'), ' B');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(fake.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        divisions: [expect.objectContaining({ custom_games_per_team: false, games_per_team: 0 })],
+      }),
+    );
+  });
+
+  it('gives focus back to Add playoff when the server refuses', async () => {
+    const user = userEvent.setup();
+    let refuse!: (v: unknown) => void;
+    fake.po.mockReturnValueOnce(new Promise((resolve) => (refuse = resolve)));
+    publishedEditor();
+    await user.click(screen.getByRole('button', { name: /^\+ Playoff/ }));
+    const po = dialog(/Add playoff/);
+    await user.click(within(po).getByRole('button', { name: 'Add playoff' }));
+    expect(within(po).getByRole('button', { name: 'Adding…' })).toBeDisabled();
+    // A browser drops focus to the page from a button that becomes disabled; jsdom keeps it
+    // there (and will not blur a disabled button), so move it to the page the same way.
+    document.body.tabIndex = -1;
+    act(() => document.body.focus());
+    expect(document.activeElement).toBe(document.body);
+    await act(async () => refuse({ ok: false, error: 'You can only edit your own events.' }));
+    expect(within(po).getByRole('alert')).toHaveTextContent('You can only edit your own events.');
+    expect(within(po).getByRole('button', { name: 'Add playoff' })).toHaveFocus();
+    document.body.removeAttribute('tabindex');
+  });
+
+  it('adds nothing when the other changes cannot be saved', async () => {
+    const user = userEvent.setup();
+    fake.save.mockResolvedValueOnce({ ok: false, error: 'This event changed in another window.' });
+    publishedEditor();
+    await user.type(screen.getByLabelText('Team 1 name'), ' B');
+    await user.click(screen.getByRole('button', { name: /^\+ Playoff/ }));
+    const po = dialog(/Add playoff · Open/);
+    await user.click(within(po).getByRole('button', { name: 'Add playoff' }));
+    expect(await within(po).findByRole('alert')).toHaveTextContent(
+      'Your other changes could not be saved, so nothing was added.',
+    );
+    expect(fake.po).not.toHaveBeenCalled();
+  });
+
+  it('asks how many teams advance, checks the range and reports the playoff', async () => {
+    const user = userEvent.setup();
+    fake.po.mockResolvedValueOnce({ ok: true, data: { added: 2, unscheduled: 0, moved: 0 } });
+    publishedEditor();
+    await user.click(screen.getByRole('button', { name: /^\+ Playoff/ }));
+    const po = dialog(/Add playoff/);
+    const count = within(po).getByLabelText('How many teams advance to the playoff bracket? (max 3)');
+    expect(count).toHaveValue(3);
+    fireEvent.change(count, { target: { value: '5' } });
+    await user.click(within(po).getByRole('button', { name: 'Add playoff' }));
+    expect(within(po).getByRole('alert')).toHaveTextContent('Choose between 2 and 3 teams.');
+    fireEvent.change(count, { target: { value: '3' } });
+    await user.click(within(po).getByRole('button', { name: 'Add playoff' }));
+    expect(await within(po).findByRole('status')).toHaveTextContent('2 playoff games added!');
+    expect(fake.po).toHaveBeenCalledWith({ eventId: uuid(1), divisionId: uuid(10), teams: 3 });
+  });
+
+  it('explains when a division has too few teams or the event has no dates, with only Close', async () => {
+    const user = userEvent.setup();
+    publishedEditor({ ...initial, schedule_days: [], divisions: [{ ...division, teams: [team(1, 'Hawks')] }] });
+    await user.click(screen.getByRole('button', { name: /^\+ Playoff/ }));
+    expect(within(dialog(/Add playoff/)).getByRole('alert')).toHaveTextContent('Need at least 2 teams.');
+    expect(within(dialog(/Add playoff/)).queryByRole('button', { name: 'Add playoff' })).not.toBeInTheDocument();
+    await user.click(within(dialog(/Add playoff/)).getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: /^\+ Round robin/ }));
+    expect(within(dialog(/Add round robin/)).getByRole('alert')).toHaveTextContent(
+      'This division needs at least 2 teams.',
+    );
+    cleanup();
+    publishedEditor({ ...initial, schedule_days: [] });
+    await user.click(screen.getByRole('button', { name: /^\+ Round robin/ }));
+    expect(within(dialog(/Add round robin/)).getByRole('alert')).toHaveTextContent(
+      'Select at least one event date first.',
     );
   });
 });

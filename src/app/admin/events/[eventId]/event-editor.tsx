@@ -15,6 +15,7 @@ import { DatePicker } from '../../_components/date-picker';
 import { useUnsavedGuard } from '../../_components/use-unsaved-guard';
 import w from '../../admin-workspace.module.css';
 import { MatchupReport, repeatedMatchups } from './matchup-report';
+import { PlayoffDialog, RoundRobinDialog } from './schedule-additions';
 import { ScheduleEditor, type ScheduleGame } from './schedule-editor';
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -42,6 +43,7 @@ export function EventEditor({
   const [error, setError] = useState('');
   const [pending, start] = useTransition();
   const [players, setPlayers] = useState<{ divisionId: string; team: EditorTeam } | null>(null);
+  const [addition, setAddition] = useState<{ kind: 'round-robin' | 'playoff'; divisionId: string } | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; message: string; run: () => void } | null>(null);
   const form = useRef<HTMLFormElement>(null);
   const dirty = JSON.stringify(data) !== saved;
@@ -135,6 +137,24 @@ export function EventEditor({
         router.refresh();
       }
     });
+  };
+  const addedDivision = addition ? data.divisions.find((d) => d.id === addition.divisionId) : undefined;
+  const added = addedDivision && {
+    id: addedDivision.id,
+    name: addedDivision.name,
+    teams: addedDivision.teams.length,
+    custom: addedDivision.custom_games_per_team,
+    gamesPerTeam: addedDivision.games_per_team,
+  };
+  // Like Publish, a round robin or playoff uses what is on screen, so unsaved edits are saved first.
+  const saveFirst = async () => !dirty || (await save());
+  const adoptDivision = (id: string, patch: Partial<EditorDivision>) => {
+    const apply = (v: EditorInput) => ({
+      ...v,
+      divisions: v.divisions.map((d) => (d.id === id ? { ...d, ...patch } : d)),
+    });
+    setData(apply);
+    setSaved((json) => JSON.stringify(apply(JSON.parse(json) as EditorInput)));
   };
   const divisionGames = (id: string) => games.filter((g) => g.divisionId === id).length;
   const teamGames = (id: string) => games.filter((g) => g.team1Id === id || g.team2Id === id).length;
@@ -355,15 +375,17 @@ export function EventEditor({
                     </select>
                   </label>
                 </div>
-                <label className={w.check}>
-                  <input
-                    type="checkbox"
-                    checked={d.custom_games_per_team}
-                    onChange={(e) => division(d.id, { custom_games_per_team: e.target.checked })}
-                  />
-                  Custom games/team
-                </label>
-                {d.custom_games_per_team && (
+                {!published && (
+                  <label className={w.check}>
+                    <input
+                      type="checkbox"
+                      checked={d.custom_games_per_team}
+                      onChange={(e) => division(d.id, { custom_games_per_team: e.target.checked })}
+                    />
+                    Custom games/team
+                  </label>
+                )}
+                {!published && d.custom_games_per_team && (
                   <label className={w.field}>
                     <span className={s.label}>Games per team</span>
                     <input
@@ -441,6 +463,24 @@ export function EventEditor({
                   >
                     + Add team
                   </button>
+                  {published && (
+                    <>
+                      <button
+                        type="button"
+                        className={`${s.button} ${s.buttonQuiet}`}
+                        onClick={() => setAddition({ kind: 'round-robin', divisionId: d.id })}
+                      >
+                        + Round robin<span className="sr-only"> · {d.name || `Division ${di + 1}`}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`${s.button} ${s.buttonQuiet}`}
+                        onClick={() => setAddition({ kind: 'playoff', divisionId: d.id })}
+                      >
+                        + Playoff<span className="sr-only"> · {d.name || `Division ${di + 1}`}</span>
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
                     className={w.danger}
@@ -523,6 +563,21 @@ export function EventEditor({
           )}
         </fieldset>
       </form>
+      {added && addition?.kind === 'round-robin' && (
+        <RoundRobinDialog
+          eventId={data.id}
+          division={added}
+          days={data.schedule_days.length}
+          saveFirst={saveFirst}
+          onAdded={({ custom, gamesPerTeam }) =>
+            adoptDivision(added.id, { custom_games_per_team: custom, games_per_team: custom ? gamesPerTeam : 0 })
+          }
+          onClose={() => setAddition(null)}
+        />
+      )}
+      {added && addition?.kind === 'playoff' && (
+        <PlayoffDialog eventId={data.id} division={added} saveFirst={saveFirst} onClose={() => setAddition(null)} />
+      )}
       {players && (
         <PlayersDialog
           team={players.team}

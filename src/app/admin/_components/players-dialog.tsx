@@ -1,8 +1,9 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import type { EditorTeam } from '@/lib/event-editor';
 import { platformStyles as s } from '@/components/platform/platform-frame';
 import w from '../admin-workspace.module.css';
+import { useModal } from './use-modal';
 export function PlayersDialog({
   team,
   onDone,
@@ -14,11 +15,7 @@ export function PlayersDialog({
 }) {
   const [players, setPlayers] = useState(team.players);
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const d = ref.current!;
-    d.showModal();
-    return () => d.close();
-  }, []);
+  useModal(ref);
   return (
     <dialog
       ref={ref}
@@ -51,7 +48,7 @@ export function PlayersDialog({
             <label className={w.field}>
               <span className={s.label}>Player {i + 1}</span>
               <input
-                autoFocus={i === 0}
+                data-autofocus={i === 0 || undefined}
                 className={s.input}
                 required
                 maxLength={120}
