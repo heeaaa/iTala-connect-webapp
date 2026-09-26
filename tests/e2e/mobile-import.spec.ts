@@ -190,6 +190,10 @@ test('guards unsaved edits on sign out and browser Back, but not in-page dialogs
   await page.evaluate(() => history.back());
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/events\/new$/);
+  // The URL changes first. Creating the event revalidated, so Next fetches this page again and
+  // keeps showing the editor until it arrives; Forward before then returns to that same editor.
+  const newEventPage = page.getByRole('button', { name: 'Create event', exact: true });
+  await expect(newEventPage).toBeVisible();
   await page.goForward();
   await expect(page.getByLabel('Event name', { exact: true })).toHaveValue('Navigation guard');
   // After saving, one Back leaves without asking.
@@ -198,6 +202,7 @@ test('guards unsaved edits on sign out and browser Back, but not in-page dialogs
   await expect(page.getByRole('status')).toHaveText('Saved');
   await page.evaluate(() => history.back());
   await expect(page).toHaveURL(/\/admin\/events\/new$/);
+  await expect(newEventPage).toBeVisible();
   await expect(discard).toHaveCount(0);
   await page.goForward();
   await page.getByLabel('Event name', { exact: true }).fill('Unsaved again');
