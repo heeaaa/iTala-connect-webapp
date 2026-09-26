@@ -216,10 +216,10 @@ select throws_ok(
   '23514', null, 'a linked team must belong to the division');
 
 insert into public.event_sponsors (event_id, tier, image_path) values
-  ('10000000-0000-0000-0000-0000000000a1', 'major', 'events/x/major.png');
+  ('10000000-0000-0000-0000-0000000000a1', 'major', 'events/10000000-0000-0000-0000-0000000000a1/major.png');
 select throws_ok(
   $$insert into public.event_sponsors (event_id, tier, image_path) values
-    ('10000000-0000-0000-0000-0000000000a1', 'major', 'events/x/major2.png')$$,
+    ('10000000-0000-0000-0000-0000000000a1', 'major', 'events/10000000-0000-0000-0000-0000000000a1/major2.png')$$,
   '23505', null, 'an event has at most one major sponsor');
 select throws_ok(
   $$update public.events set timezone = 'Mars/Olympus' where id = '10000000-0000-0000-0000-0000000000a1'$$,

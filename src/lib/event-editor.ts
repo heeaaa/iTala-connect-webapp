@@ -44,6 +44,8 @@ export const editorSchema = z
     theme_text: colour,
     theme_text_secondary: colour,
     theme_heading: colour,
+    /** Rules (E-70), sanitised by the Server Action before saving (E-71); absent keeps what is stored. */
+    rules_html: z.string().max(200_000).optional(),
     divisions: z.array(divisionEditSchema).max(30),
   })
   .refine((v) => v.time_end > v.time_start, 'End time must be after start time.')

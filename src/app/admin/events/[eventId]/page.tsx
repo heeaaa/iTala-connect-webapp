@@ -1,9 +1,11 @@
 import { notFound } from 'next/navigation';
+import { clientEnv } from '@/env.client';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { requireAdmin, canEditEvent } from '@/server/auth';
 import type { EditorInput } from '@/lib/event-editor';
-import { gamesFromRows } from '@/lib/public-event/model';
+import { gamesFromRows, imageUrl } from '@/lib/public-event/model';
+import { sanitizeRulesHtml } from '@/lib/rules-html';
 import { EventEditor } from './event-editor';
 export default async function EventEditorPage({ params, searchParams }: PageProps<'/admin/events/[eventId]'>) {
   const { eventId } = await params;
@@ -13,7 +15,7 @@ export default async function EventEditorPage({ params, searchParams }: PageProp
   const { data: event, error } = await db
     .from('events')
     .select(
-      '*, divisions(*, teams(*, players(*)), division_mobile_links(league_name, season)), games(id, division_id, day, start_time, court, group_id, team1_id, team2_id, label, type, is_playoff, bracket_game_id, team1_source, team2_source, playoff_round, position, game_scores(s1, s2))',
+      '*, divisions(*, teams(*, players(*)), division_mobile_links(league_name, season)), games(id, division_id, day, start_time, court, group_id, team1_id, team2_id, label, type, is_playoff, bracket_game_id, team1_source, team2_source, playoff_round, position, game_scores(s1, s2)), event_sponsors(id, tier, image_path, sort_order)',
     )
     .eq('id', eventId)
     .single();
@@ -33,6 +35,7 @@ export default async function EventEditorPage({ params, searchParams }: PageProp
     theme_text: event.theme_text,
     theme_text_secondary: event.theme_text_secondary,
     theme_heading: event.theme_heading,
+    rules_html: sanitizeRulesHtml(event.rules_html),
     divisions: event.divisions
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((d) => ({
@@ -58,12 +61,22 @@ export default async function EventEditorPage({ params, searchParams }: PageProp
     event.divisions.filter((d) => d.division_mobile_links).map((d) => [d.id, d.division_mobile_links!]),
   );
   const scores = new Map(event.games.map((g) => [g.id, g.game_scores]));
+  const supabaseUrl = clientEnv().NEXT_PUBLIC_SUPABASE_URL;
+  const sponsors = [...event.event_sponsors].sort((a, b) => a.sort_order - b.sort_order);
+  const major = sponsors.find((s) => s.tier === 'major');
   const query = await searchParams;
   const imported = typeof query.imported === 'string' ? query.imported.slice(0, 200) : undefined;
   return (
     <EventEditor
       initial={input}
       links={links}
+      images={{
+        logo: imageUrl(supabaseUrl, event.logo_path),
+        major: major ? imageUrl(supabaseUrl, major.image_path) : null,
+        minors: sponsors
+          .filter((s) => s.tier === 'minor')
+          .map((s) => ({ id: s.id, url: imageUrl(supabaseUrl, s.image_path)! })),
+      }}
       games={gamesFromRows(event.games).map((g) => ({
         ...g,
         score1: scores.get(g.id)?.s1 ?? null,

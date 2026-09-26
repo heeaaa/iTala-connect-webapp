@@ -23,6 +23,19 @@ describe('rules HTML sanitiser (PRD E-71)', () => {
     expect(sanitizeRulesHtml(input)).toBe(expected);
   });
 
+  it("keeps a numbered list's start number, and only a plain number", () => {
+    expect(sanitizeRulesHtml('<ol start="3"><li>Third</li></ol>')).toBe('<ol start="3"><li>Third</li></ol>');
+    expect(sanitizeRulesHtml('<ol start="12"><li>Twelfth</li></ol>')).toBe('<ol start="12"><li>Twelfth</li></ol>');
+    expect(sanitizeRulesHtml('<ol start="d"><li>a</li></ol>')).toBe('<ol><li>a</li></ol>');
+    expect(sanitizeRulesHtml('<ol start="1" type="a" onclick="x()"><li>a</li></ol>')).toBe(
+      '<ol start="1"><li>a</li></ol>',
+    );
+    expect(sanitizeRulesHtml('<ol start="0"><li>a</li></ol>')).toBe('<ol><li>a</li></ol>');
+    expect(sanitizeRulesHtml('<ol start="3 onmouseover=x"><li>a</li></ol>')).toBe('<ol><li>a</li></ol>');
+    expect(sanitizeRulesHtml('<ol start="99999"><li>a</li></ol>')).toBe('<ol><li>a</li></ol>');
+    expect(sanitizeRulesHtml('<ul start="3"><li>a</li></ul>')).toBe('<ul><li>a</li></ul>');
+  });
+
   it('turns the old editor divs into paragraphs and handles empty input', () => {
     expect(sanitizeRulesHtml('<div>Line</div>')).toBe('<p>Line</p>');
     expect(sanitizeRulesHtml(null)).toBe('');

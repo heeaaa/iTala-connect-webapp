@@ -682,6 +682,20 @@ The event editor is a stack of native disclosure sections ("Event details", "Div
 #### Workspace notices
 Inside the admin workspace a notice is a 1 px teal outline with no fill, 1rem padding and Ink body text that wraps anywhere, running the width of its form. It carries status after an action ("Saved", announced as a status), a league link ("Linked to iTala mobile: Harbour League (2026)"), the read-only note on a published event, the event-colour contrast warning, and pending image clean-up with its own action row. Load failures keep the Alert Red outline.
 
+#### Rules editor
+The Rules section (E-70) holds the old toolbar and nothing more: **Bold**, **Italic**, **Underline**, **Heading 2**, **Heading 3**, **Bullet list** and **Numbered list**.
+- **Toolbar:** a labelled toolbar ("Rules formatting") of toggle buttons (`aria-pressed`), 2.75rem tall, on Raised Plate. A pressed tool is solid teal with On Teal text, and stays teal on hover (the teal hover step). The toolbar is one tab stop: arrow keys, Home and End move between the tools, and Tab returns to the last one used. Bold, Italic and Underline also answer Control+B, I and U (Command on a Mac).
+- **Writing area:** a multi-line text box labelled "Event rules" (clicking the label puts the cursor in it), on Network Ground with a 1 px Seam, at least 12rem tall. Focus draws the 2 px teal outline. A numbered list keeps its starting number ("3. " starts at 3) on the event page too.
+- **Saving:** rules save with the rest of the event (Save or Save draft), cleaned to the allow-list on the way in and again on the event page (E-71). Rules with no text are stored as none, so the page says "No rules."
+- Tiptap's own style injection is off (CSP), so its few layout rules live in the workspace stylesheet.
+
+#### Event images
+The Images section (E-15 to E-18) comes before Rules.
+- **Slots:** **Event logo** and **Major sponsor** each have a preview (on Raised Plate, so transparent logos show), **Upload** or **Replace** (a quiet plate that opens the file picker; its hidden input keeps the focus ring on the plate), and a danger **Remove**. **Minor sponsors** are a grid of thumbnails, each with Remove (naming it for screen readers), plus **Add minor sponsors** (several at once).
+- **Behaviour:** images save as soon as they upload, unlike the rest of the editor, and the section says so. The browser checks the file (PNG, JPEG or WebP up to 5 MB) and resizes it to at most 1600 px before sending.
+- **Focus:** Remove takes the image and its button away, so focus moves to that slot's upload control.
+- **Status:** one polite status line under the section reads "Uploading logo…", "Uploading 2 of 3…", "Logo saved.", "2 minor sponsors added." or "Upload failed: {reason}" (in Alert Red).
+
 #### Round robin and playoff dialogs
 Once an event is published, each division's action row reads **+ Add team**, **+ Round robin**, **+ Playoff** (quiet plates, each carrying the division name in screen-reader text), then the danger **Remove division**. The pre-publish **Custom games/team** setting leaves the card and lives in the round robin dialog (E-21).
 - **Frame:** the confirmation dialog's frame, titled "Add round robin · [division]" or "Add playoff · [division]". Cancel comes first as a quiet plate; the go-ahead is teal and names the act ("Add games", "Add playoff"), reading "Adding…" while it runs.

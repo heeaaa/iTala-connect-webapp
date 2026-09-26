@@ -1,5 +1,6 @@
 'use client';
 import { contrastRatio } from '@/lib/color';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useEffectEvent, useRef, useState, useTransition } from 'react';
@@ -15,8 +16,15 @@ import { DatePicker } from '../../_components/date-picker';
 import { useUnsavedGuard } from '../../_components/use-unsaved-guard';
 import w from '../../admin-workspace.module.css';
 import { MatchupReport, repeatedMatchups } from './matchup-report';
+import { EventImages, type EventImagesData, type RunImageTask } from './event-images';
 import { PlayoffDialog, RoundRobinDialog } from './schedule-additions';
 import { ScheduleEditor, type ScheduleGame } from './schedule-editor';
+
+// ProseMirror loads with the Rules section, not with the rest of the editor.
+const RulesEditor = dynamic(() => import('./rules-editor').then((m) => m.RulesEditor), {
+  ssr: false,
+  loading: () => <p className={w.note}>Loading the rules editor…</p>,
+});
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -27,10 +35,13 @@ export function EventEditor({
   initial,
   links,
   games,
+  images,
   published,
   notice,
 }: {
   initial: EditorInput;
+  /** The event logo and sponsors as stored (E-15 to E-17); they save on upload, not with Save. */
+  images: EventImagesData;
   /** Stored games with their scores, so playoff cards can show resolved teams (E-42). */
   games: ScheduleGame[];
   links: Record<string, { league_name: string; season: string | null }>;
@@ -89,7 +100,11 @@ export function EventEditor({
   const save = (): Promise<boolean> =>
     (queue.current = queue.current.then(async () => {
       const snapshot = latest.current;
-      const result = await saveEvent({ ...snapshot, version: version.current });
+      // A request that throws (offline) must fail this save only, not every later one in the queue.
+      const result = await saveEvent({ ...snapshot, version: version.current }).catch(() => ({
+        ok: false as const,
+        error: 'Could not reach the server, so the event was not saved. Check your connection.',
+      }));
       if (!result.ok) {
         setError(result.error);
         return false;
@@ -105,6 +120,26 @@ export function EventEditor({
       if (published) router.refresh();
       return true;
     }));
+  // An image change that touched the event row (the logo) moves its version on;
+  // unsaved edits stay unsaved.
+  const adoptVersion = (next: string) => {
+    version.current = next;
+    setData((v) => ({ ...v, version: next }));
+    setSaved((json) => JSON.stringify({ ...(JSON.parse(json) as EditorInput), version: next }));
+  };
+  // Image changes queue behind any save, so a save never runs on a stale version.
+  const runImage: RunImageTask = (task) => {
+    const done = queue.current.then(async () => {
+      const result = await task(version.current);
+      if (result.ok && result.data.version) adoptVersion(result.data.version);
+      return result;
+    });
+    queue.current = done.then(
+      () => true,
+      () => true,
+    );
+    return done;
+  };
   const autosave = useEffectEvent(() => start(async () => void (await save())));
   const windowKey = windowOf(data);
   const savedWindow = useRef(windowKey);
@@ -329,6 +364,19 @@ export function EventEditor({
                 </p>
               )}
             </div>
+          </details>
+          <details open className={w.section}>
+            <summary>Images</summary>
+            <EventImages eventId={initial.id} images={images} run={runImage} />
+          </details>
+          <details open className={w.section}>
+            <summary>Rules</summary>
+            <p className={w.note}>Shown on the event page&apos;s Rules tab. Rules save with the rest of the event.</p>
+            <RulesEditor
+              value={data.rules_html ?? ''}
+              label="Event rules"
+              onChange={(html) => change('rules_html', html)}
+            />
           </details>
           <details open className={w.section}>
             <summary>Divisions ({data.divisions.length})</summary>

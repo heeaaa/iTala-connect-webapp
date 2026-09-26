@@ -4,7 +4,7 @@ Last updated: 26/09/2026 (Claude, work laptop)
 
 ## Current handoff (26/09/2026, Claude on the work laptop)
 
-**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish, matchup report), 5b (published-event editing), 5c-1 (schedule grid and game dialog), 5c-2 (drag and drop) and 5c-3 (round robin and playoff dialogs) are done and pushed on branch `handoff/codex`, and so is Google sign-in (A-11, user decision 26/09/2026). Next: **5d** (rules editor and images). **5c-3 adds a migration** (see its section); push it to the hosted project after CI passes.
+**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish, matchup report), 5b (published-event editing), 5c-1 (schedule grid and game dialog), 5c-2 (drag and drop), 5c-3 (round robin and playoff dialogs) and 5d (rules editor and event images) are done and pushed on branch `handoff/codex`, and so is Google sign-in (A-11, user decision 26/09/2026). Next: **5e** (platform admin). **5d adds migration `20260926000700_rules_and_images.sql`** (see its section); push it to the hosted project after CI passes. The 5c-3 migration is already on the hosted project.
 
 **CI now runs the Docker suites.** Draft PR https://github.com/heeaaa/iTala-connect-webapp/pull/1 (`handoff/codex` into `main`, not for merging yet) runs the full workflow on every push. **Run 36214770961 on `cd75ff2` was fully green:**
 - 60/60 E2E (390 and 1440 px), 154/154 pgTAP and 22/22 integration.
@@ -25,7 +25,7 @@ npm run lint && npm run typecheck && npm run test:coverage
 npm run build && npm run check:secrets && npm run test:e2e
 ```
 
-- Expected: **68 E2E tests** (66 green at `ffedad2` plus the 5c-3 additions journey at two viewports) and **180 pgTAP assertions** (154 plus 26 in `008_schedule_additions.sql`). Run `npm run db:reset` for the new migration; `npm run db:types` must show no diff.
+- Expected: **70 E2E tests** (68 green at `167c8e7` plus the 5d images and rules journey at two viewports) and **207 pgTAP assertions** (180 plus 27 in `009_rules_and_images.sql`). Run `npm run db:reset` for the new migration; `npm run db:types` must show no diff.
 - Expected: **22 integration tests**, unchanged since 5b.
 - Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
 
@@ -277,11 +277,55 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 - **You, after CI passes:** push migration `20260926000600_schedule_additions.sql` to the hosted project (`supabase db push`), as with the earlier migrations.
 - **For the finish review:** `.impeccable/design.json` is not updated; DESIGN.md is ("Round robin and playoff dialogs", and the dialog focus rule).
 
+### Phase 5d: rules editor and event images (26/09/2026)
+
+- **E-70, rules editor** (`rules-editor.tsx`, Tiptap 3.31.3 pinned, loaded only in the browser): the old toolbar and nothing more, Bold, Italic, Underline, Heading 2, Heading 3, Bullet list and Numbered list.
+  - A WAI-ARIA toolbar: one tab stop, with arrow keys, Home and End moving between tools. Toggle buttons use `aria-pressed`, and `aria-keyshortcuts` lists both Control and Command.
+  - The text box is labelled "Event rules", and clicking the label focuses it.
+  - Rules save with the rest of the event (Save or Save draft). `saveEvent` sanitises them first, and rules with no text are stored as empty, so the page says "No rules."
+- **E-71, sanitising:** `sanitizeRulesHtml` is used on save, when the editor loads (so legacy HTML is cleaned before it is re-sent) and on the public page. A numbered list keeps a plain `start` number (1 to 9999), so "3. " numbering matches on the page; no other attribute survives.
+- **E-15 to E-18, images** (`event-images.tsx`): Event logo, Major sponsor and Minor sponsors (several at once), each with Upload or Replace and Remove.
+  - The browser checks the file (any image except SVG, up to 5 MB) and resizes it on a canvas to at most 1600 px, as WebP (PNG or JPEG fallback). It refuses anything still over 4 MB, which leaves room for the upload's own overhead. No dependency was added.
+  - `uploadEventImage` (Server Action): auth, ownership and zod checks, then it works out the type from the bytes (PNG, JPEG or WebP only) and stores the file at `events/{eventId}/{kind}-{uuid}.{ext}` with the user's session, so storage RLS applies. It records the file, then deletes the file it replaced. If recording fails, the new file is removed.
+  - `removeEventImage` removes the record, then the file. Afterwards focus moves to that slot's upload control.
+  - Image changes join the editor's save queue, so they never run on a stale version. A logo change moves the edit version on only when this window was current (see the review, High 1). Unsaved edits stay unsaved.
+  - `next.config.ts` raises the Server Action body limit to 5 MB.
+- **Migration `20260926000700_rules_and_images.sql`:**
+  - `save_event_editor` again (an exact copy of 0500 plus `rules_html`, unchanged when absent).
+  - `set_event_logo(p_event_id, p_path, p_version)` returns the old path, and the new version only if `p_version` was current. `set_major_sponsor` keeps one major sponsor and returns the old path. Both are security invoker with `assert_event_editor`, lock the event row, and have no EXECUTE for anon.
+  - CHECK constraints keep every `logo_path` and sponsor `image_path` inside that event's own folder, as a single plain file name ending in `.png`, `.jpg` or `.webp`, so `..`, other folders and SVG are refused.
+  - pgTAP `supabase/tests/009_rules_and_images.sql` (27 assertions). `002_functions.sql` sponsor paths now follow the folder rule.
+  - `database.types.ts` is hand-edited for both functions. The Docker PC's `npm run db:types` must show **no diff**; if it differs, keep the generated file.
+- **Independent review** (fresh read-only reviewer). Findings and what happened:
+  - High 1, fixed: a logo change adopted the latest version, even when another window had saved since, so this window's next Save could overwrite that window's changes without the E-22 warning.
+    - The image task now receives the version current when it runs. `set_event_logo` returns a new version only when that one was current, and returns none otherwise, so the next Save still reports the conflict.
+    - Tests: pgTAP (current, then stale), component tests (adopting, waiting for a save in flight, and a stale or refused change not adopting), and a mutation check of the queue.
+  - High 2, fixed: the new CHECK broke `002_functions.sql`, whose sponsor rows used a bare path.
+  - Low 3, fixed (security): the first CHECK allowed `..` segments. The folder rule is now a single plain file name, with pgTAP cases for `..`, another event, `platform/` and `.svg`.
+  - Low 5, fixed: the client limit is now 4 MB, below the 5 MB body limit, and `docs/MIGRATION_PLAN.md` now describes canvas resizing and the Server Action upload.
+  - Low 6, fixed: numbered lists keep `start`; the editor loads sanitised rules; the Rules note no longer claims rules save only on Save (a published event's autosave sends them too).
+  - Low 7, fixed (accessibility): the roving toolbar, Command in `aria-keyshortcuts`, the clickable label, and focus after Remove.
+  - Low 8, fixed (pre-existing): one save that could not reach the server left the queue rejected, so every later save and image change failed. Red first: the new component test failed on the old code (no alert, and an unhandled `TypeError`), then passed.
+  - Test gaps closed: the version assertion uses an event last saved in 2020 (`now()` is fixed inside a transaction); refused callers now include a role-null account and a disabled owner; the E2E collects CSP violations from every page it visits (`page.exposeFunction`), not only the last one.
+  - Accepted, not fixed (Low 4): the 1600 px limit is enforced only in the browser, and there is no cap on minor sponsors. An organiser who calls the action directly can store a 5 MB picture of any size, and one who writes straight to storage also skips the byte check. Such files are served from the Supabase origin, so the app gets no XSS; the cost is page weight on that organiser's own event.
+  - Pre-existing, still open: `publishEvent` followed by `accept()` adopts the latest version the same way the logo did. Fix it the same way (return a version only if the caller's was current) in a later slice.
+- **For the Firebase importer (Phase 7):** write images under `events/{new event id}/` with plain file names, and convert legacy images that are not PNG, JPEG or WebP (the old app accepted any `image/*`), or the CHECKs will refuse them.
+- **Evidence (work laptop):**
+  - Lint and typecheck pass. `test:coverage`: 41 files, **702 tests pass**. `src/lib/event-images.ts`, `compress-image.ts` and `rules-html.ts` are at 100%; `src/domain` is unchanged and still 100%. The actions and components are outside coverage by the existing config, and have their own unit and component tests (`image-actions`, `save-event`, `event-images`, `rules-editor`, `compress-image`, `event-editor`).
+  - Mutation checks failed their tests: the `start` pattern, the label click, the queue order for image changes, and the save-queue catch.
+  - A clean build without the harness passes, and `check:secrets` passes against the real server values (not printed). The two font warnings are the known ones for the event fonts.
+  - Harness in Chromium at 390 and 1440 px, **48/48** (every harness spec, including the 5d ones). The 5d specs cover a 2000 by 1000 PNG sent as a 1600 by 800 WebP (checked from the bytes), no enlarging, SVG, over 5 MB and unreadable files refused before anything is sent, the rules toolbar and shortcuts with the exact HTML sent, the roving toolbar and label, axe with no serious or critical issues, no sideways scroll and no CSP violations beyond zod's known eval probe.
+  - Captures (gitignored): `.impeccable/review/phase5d/{mobile,desktop}/` (images, rules).
+  - NOT RUN here (no Docker): pgTAP, integration and the new E2E `admin-images-rules.spec.ts` (logo resize and replace with the old file deleted, sponsors, remove, rules save, the public page, CSP). CI runs them.
+  - NOT RUN: Safari and Firefox (the canvas WebP fallback), and an upload through Netlify's function payload limit (6 MB, unverified for multipart). Check both on the first deploy.
+- **You, after CI passes:** push migration `20260926000700_rules_and_images.sql` to the hosted project (`npx supabase db push`).
+- **For the finish review:** `.impeccable/design.json` is not updated; DESIGN.md is ("Rules editor", "Event images").
+
 ### Phase 5 plan (remaining slices)
 
 1. Done: 5b. The Phase 2 handovers still open move to 5c: pass stored resolved playoff teams to round robin; add a distinct-days rule on `events.schedule_days` in the database (zod and the save RPC already de-duplicate).
 2. **5c, schedule editor.** Done: 5c-1, 5c-2 (drag and drop, E-45) and 5c-3: "+ Round robin" and "+ Playoff" dialogs (E-63, E-64), with stored resolved playoff teams passed to round robin (Phase 2 handover).
-3. **5d, rules and images.** Tiptap rules editor (E-70, E-71), logo and sponsor uploads with compression and removal (E-15 to E-18).
+3. Done: **5d, rules and images.** Tiptap rules editor (E-70, E-71), logo and sponsor uploads with resizing and removal (E-15 to E-18).
 4. **5e, platform admin.** Settings sponsors and the default rules template (S-01, S-02), the Admins screen (A-09), dashboard View and Results actions (D-02).
 5. **Then** E2E journeys 2, 4, 7 and 8, and a finish review per new surface.
 

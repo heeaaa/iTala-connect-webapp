@@ -6,6 +6,7 @@ import { reconcileSchedule } from '@/domain/schedule-edit';
 import { editorSchema, type EditorInput } from '@/lib/event-editor';
 import { gamesFromRows } from '@/lib/public-event/model';
 import { createClient } from '@/lib/supabase/server';
+import { isEmptyRules, sanitizeRulesHtml } from '@/lib/rules-html';
 import { authorizeAdmin, canEditEvent, type ActionResult } from '@/server/auth';
 import { DEFAULT_RULES_HTML } from '@/server/event-defaults';
 import { cleanDeletedEventImages } from '@/server/image-cleanup';
@@ -44,7 +45,11 @@ export async function saveEvent(input: EditorInput): Promise<ActionResult<SaveOu
   const parsed = editorSchema.safeParse(input);
   if (!parsed.success)
     return { ok: false, error: `Check the event details: ${parsed.error.issues[0]?.message ?? 'invalid fields'}` };
-  const { id, version, divisions, ...details } = parsed.data;
+  const { id, version, divisions, ...fields } = parsed.data;
+  // Rules are cleaned to the allow-list before they are stored (E-71), and
+  // rules with no text are stored as none, so the event page says "No rules."
+  const clean = fields.rules_html === undefined ? undefined : sanitizeRulesHtml(fields.rules_html);
+  const details = clean === undefined ? fields : { ...fields, rules_html: isEmptyRules(clean) ? '' : clean };
   if (!(await canEditEvent(id))) return { ok: false, error: 'You can only edit your own events.' };
   const db = await createClient();
   const { data: games, error: gamesError } = await db

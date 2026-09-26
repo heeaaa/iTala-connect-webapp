@@ -44,10 +44,10 @@ A zero-build static site (8 script files, about 4,000 lines, no dependencies). A
 | Styling | Tailwind CSS v4, CSS variables for tokens | Brand tokens and event tokens are separate layers (section 6) |
 | Components | shadcn/ui (Radix primitives) where it saves work: Dialog, Popover, Tabs, Toast, Dropdown | Accessible dialogs replace `alert` and `confirm` |
 | Forms and validation | zod schemas shared by client forms and Server Actions | |
-| Drag and drop | `@dnd-kit/core` | Pointer, touch and keyboard |
+| Drag and drop | `@dnd-kit/react` (pinned 0.5.0) | Pointer, touch and keyboard |
 | Rich text | Tiptap (StarterKit limited to the old toolbar) + `sanitize-html` on the server | |
 | Backend | Supabase: Postgres, Auth, Storage, Realtime | `@supabase/supabase-js` + `@supabase/ssr` |
-| Image compression | `browser-image-compression` | |
+| Image compression | Browser canvas, no dependency | Longest edge 1600 px, WebP with a PNG or JPEG fallback |
 | PWA | Web app manifest and icons only | No service worker offline promises (CLAUDE.md PWA rules) |
 | Tests | Vitest, React Testing Library, Playwright, `@axe-core/playwright`, pgTAP via `supabase test db` | |
 | Local backend | Supabase CLI (`supabase start`, Docker) | Replaces the old Local Mode |
@@ -92,7 +92,7 @@ iTala-connect-webapp/
       repositories/*.ts         typed queries
       actions/*.ts              Server Actions (zod in, typed result out)
       mobile/reader.ts          read-only mobile Supabase client
-      storage.ts                signed upload URLs, deletes
+      image-cleanup.ts          removes a deleted event's images
     components/                 UI, split by feature
     lib/supabase/{client,server}.ts
   supabase/
@@ -220,7 +220,7 @@ Every policy gets a pgTAP test for allowed and denied cases (section 10). Realti
 - **Public page**: Server Component renders the event, then a client island subscribes to `game_scores` and `games` changes for that event over Realtime and updates the schedule and standings (P-07). Playoff resolution and standings run in `src/domain` on both server and client, so they always agree.
 - **Autosave**: debounced (600 ms) for the E-05 triggers, with a visible "Saving... / Saved" status.
 - **Legacy links**: old links look like `/#/event/{firebaseId}`. A small client component on `/` reads `location.hash`, calls a server lookup by `legacy_firebase_id`, and replaces the URL with `/events/{id}`.
-- **Images**: the server issues a signed upload URL for a path under the event; the browser compresses and uploads directly; the server records the path and deletes the previous object.
+- **Images**: the browser resizes the picture on a canvas, then sends it to a Server Action (`src/server/actions/images.ts`). The action checks the type from the bytes, stores it under `events/{eventId}/` with the user's session (storage RLS limits writes to the event's folder), records it through `set_event_logo` or `set_major_sponsor`, and deletes the replaced file. A path check on the tables keeps every stored path inside its own event's folder.
 - **Mobile integration**: `src/server/mobile/reader.ts` holds the only client for the mobile project, select-only. It reads as an **anonymous session created on the server and cached** (O-3), refreshed server-side, never one sign-in per request. Import actions (stage 1) and the Results page (stage 2) are server-rendered. Details: MOBILE_INTEGRATION.md.
 - **Caching and CSP**: a nonce-based CSP makes pages dynamic. Public event pages are dynamic anyway (live data), and score updates arrive over Realtime, so the LCP target (X-06) is met through small server payloads and streaming rather than static caching. Home can use a strict hash-based CSP and short revalidation instead. Confirm with a measured LCP in phase 8.
 

@@ -199,7 +199,10 @@ test('moves, swaps and unschedules games by drag and drop, warning about short r
       .filter({ has: page.getByRole('rowheader', { name: formatTime(time.slice(0, 5)), exact: true }) })
       .getByRole('cell')
       .first();
-  const status = main.locator('p[aria-live="polite"]');
+  // The schedule's own notice (the Images section has a status line too).
+  const status = main
+    .locator('details', { has: page.locator('summary', { hasText: /^Schedule$/ }) })
+    .locator('p[aria-live="polite"]');
   const hour = (g: (typeof before)[number], add: number) =>
     `${String(Number(g.start_time!.slice(0, 2)) + add).padStart(2, '0')}:00`;
   const oneHourLater = hour(first!, 1);

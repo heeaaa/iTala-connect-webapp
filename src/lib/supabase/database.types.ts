@@ -788,6 +788,17 @@ export type Database = {
         }
         Returns: string
       }
+      set_event_logo: {
+        Args: { p_event_id: string; p_path?: string; p_version?: string }
+        Returns: {
+          old_path: string
+          version: string
+        }[]
+      }
+      set_major_sponsor: {
+        Args: { p_event_id: string; p_path?: string }
+        Returns: string
+      }
       set_score: {
         Args: { p_game_id: string; p_s1: number; p_s2: number }
         Returns: undefined

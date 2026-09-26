@@ -5,15 +5,30 @@ import { type Game } from '@/domain/types';
 import { type ScheduleGame } from '@/app/admin/events/[eventId]/schedule-editor';
 import { type EditorInput } from '@/lib/event-editor';
 
-const fake = vi.hoisted(() => ({ save: vi.fn(), publish: vi.fn(), refresh: vi.fn(), rr: vi.fn(), po: vi.fn() }));
+const fake = vi.hoisted(() => ({
+  save: vi.fn(),
+  publish: vi.fn(),
+  refresh: vi.fn(),
+  rr: vi.fn(),
+  po: vi.fn(),
+  upload: vi.fn(),
+  removeImage: vi.fn(),
+}));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: fake.refresh, push: vi.fn(), replace: vi.fn() }) }));
 vi.mock('@/server/actions/events', () => ({ saveEvent: fake.save }));
 vi.mock('@/server/actions/publish', () => ({ publishEvent: fake.publish }));
+vi.mock('@/lib/compress-image', () => ({
+  ImageProblem: class ImageProblem extends Error {},
+  compressImage: async (f: File) => new Blob([await f.arrayBuffer()], { type: 'image/webp' }),
+}));
+vi.mock('@/server/actions/images', () => ({ uploadEventImage: fake.upload, removeEventImage: fake.removeImage }));
 vi.mock('@/server/actions/schedule-additions', () => ({ addRoundRobin: fake.rr, addPlayoff: fake.po }));
 import { EventEditor } from '@/app/admin/events/[eventId]/event-editor';
 import { MatchupReport } from '@/app/admin/events/[eventId]/matchup-report';
 
 beforeAll(() => {
+  // jsdom has no layout; ProseMirror asks what is under a click.
+  document.elementFromPoint = () => null;
   HTMLDialogElement.prototype.showModal = function () {
     this.setAttribute('open', '');
   };
@@ -22,6 +37,7 @@ beforeAll(() => {
   };
 });
 
+const NO_IMAGES = { logo: null, major: null, minors: [] };
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const team = (n: number, name: string) => ({ id: uuid(100 + n), name, coach: '', players: [] });
 const division = {
@@ -67,7 +83,7 @@ const game = (a: number, b: number, extra: Partial<Game> = {}): ScheduleGame => 
   ...extra,
 });
 const editor = (games: ScheduleGame[] = []) =>
-  render(<EventEditor initial={initial} links={{}} games={games} published={false} notice="" />);
+  render(<EventEditor initial={initial} links={{}} images={NO_IMAGES} games={games} published={false} notice="" />);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -173,7 +189,7 @@ describe('Publish (E-02, E-60 to E-62)', () => {
 
 describe('Published editing (E-02, E-05, E-14, E-22, E-23)', () => {
   const publishedEditor = (games: ScheduleGame[] = []) =>
-    render(<EventEditor initial={initial} links={{}} games={games} published notice="" />);
+    render(<EventEditor initial={initial} links={{}} images={NO_IMAGES} games={games} published notice="" />);
   it('offers Save instead of Save draft and Publish', () => {
     publishedEditor();
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
@@ -207,6 +223,22 @@ describe('Published editing (E-02, E-05, E-14, E-22, E-23)', () => {
       'Saved. 1 game moved to Unscheduled because it no longer fits',
     );
   });
+  it('a save that cannot reach the server says so, and the next Save still works', async () => {
+    const user = userEvent.setup();
+    publishedEditor();
+    await user.type(screen.getByLabelText('Team 1 name'), ' B');
+    fake.save.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not reach the server, so the event was not saved. Check your connection.',
+    );
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    // The button reads "Saving…" until the failed save has finished.
+    await user.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Saved');
+    expect(fake.save).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('alert')).toBeEmptyDOMElement();
+  });
   it('states the games that go with a removed division and the TBD left by a removed team', async () => {
     const user = userEvent.setup();
     publishedEditor([game(1, 2), game(2, 3), game(1, 3)]);
@@ -236,7 +268,7 @@ describe('Published editing (E-02, E-05, E-14, E-22, E-23)', () => {
 
 describe('Round robin and playoff on a published event (E-21, E-63, E-64)', () => {
   const publishedEditor = (value: EditorInput = initial) =>
-    render(<EventEditor initial={value} links={{}} games={[]} published notice="" />);
+    render(<EventEditor initial={value} links={{}} images={NO_IMAGES} games={[]} published notice="" />);
   const dialog = (name: RegExp) => screen.getByRole('dialog', { name });
 
   it('shows Custom games/team before publishing, and the two additions after', () => {
@@ -400,6 +432,86 @@ describe('Round robin and playoff on a published event (E-21, E-63, E-64)', () =
     await user.click(screen.getByRole('button', { name: /^\+ Round robin/ }));
     expect(within(dialog(/Add round robin/)).getByRole('alert')).toHaveTextContent(
       'Select at least one event date first.',
+    );
+  });
+});
+
+describe('Images and rules in the editor (E-15, E-70)', () => {
+  const publishedEditor = () =>
+    render(<EventEditor initial={initial} links={{}} images={NO_IMAGES} games={[]} published notice="" />);
+
+  it('a logo upload moves the save token on, and unsaved edits stay unsaved', async () => {
+    const user = userEvent.setup();
+    fake.upload.mockResolvedValueOnce({ ok: true, data: { version: 'v7' } });
+    fake.save.mockResolvedValueOnce({ ok: true, data: { version: 'v8', moved: 0 } });
+    publishedEditor();
+    await user.type(screen.getByLabelText('Team 1 name'), ' B');
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    await user.upload(
+      screen.getByLabelText('Upload logo'),
+      new File([new Uint8Array([1])], 'logo.png', { type: 'image/png' }),
+    );
+    expect(await screen.findByText('Logo saved.')).toBeInTheDocument();
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(fake.save).toHaveBeenCalledWith(expect.objectContaining({ version: 'v7' }));
+  });
+  it('an image change waits for a save in flight, then sends the version that save returned', async () => {
+    const user = userEvent.setup();
+    let finish: (v: unknown) => void = () => {};
+    fake.save.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    fake.upload.mockResolvedValueOnce({ ok: true, data: {} });
+    publishedEditor();
+    await user.type(screen.getByLabelText('Team 1 name'), ' B');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.upload(
+      screen.getByLabelText('Upload logo'),
+      new File([new Uint8Array([1])], 'logo.png', { type: 'image/png' }),
+    );
+    expect(fake.upload).not.toHaveBeenCalled();
+    await act(async () => finish({ ok: true, data: { version: 'v2', moved: 0 } }));
+    expect(await screen.findByText('Logo saved.')).toBeInTheDocument();
+    expect((fake.upload.mock.lastCall![0] as FormData).get('version')).toBe('v2');
+  });
+  it('a stale or refused image change leaves the version alone, so the next Save still finds the conflict', async () => {
+    const user = userEvent.setup();
+    // Another window saved first: the logo changes, but no version comes back (set_event_logo returns null).
+    fake.upload.mockResolvedValueOnce({ ok: true, data: {} });
+    fake.upload.mockResolvedValueOnce({ ok: false, error: 'You can only edit your own events.' });
+    publishedEditor();
+    const logo = () => new File([new Uint8Array([1])], 'logo.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Upload logo'), logo());
+    expect(await screen.findByText('Logo saved.')).toBeInTheDocument();
+    await user.upload(screen.getByLabelText('Upload logo'), logo());
+    expect(await screen.findByText('You can only edit your own events.')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Team 1 name'), ' B');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(fake.save).toHaveBeenCalledWith(expect.objectContaining({ version: initial.version }));
+  });
+
+  it('a rules edit is unsaved until Save, which sends the rules', async () => {
+    const user = userEvent.setup();
+    fake.save.mockResolvedValueOnce({ ok: true, data: { version: 'v2', moved: 0 } });
+    render(
+      <EventEditor
+        initial={{ ...initial, rules_html: '<p>Two halves</p>' }}
+        links={{}}
+        images={NO_IMAGES}
+        games={[]}
+        published
+        notice=""
+      />,
+    );
+    const rules = await screen.findByRole('textbox', { name: 'Event rules' });
+    expect(rules).toHaveTextContent('Two halves');
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+    await user.click(rules);
+    await user.keyboard('{Control>}a{/Control}');
+    await user.click(screen.getByRole('button', { name: 'Bold' }));
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(fake.save).toHaveBeenCalledWith(
+      expect.objectContaining({ rules_html: '<p><strong>Two halves</strong></p>' }),
     );
   });
 });

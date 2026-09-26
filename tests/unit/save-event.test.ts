@@ -85,6 +85,23 @@ describe('saveEvent (E-02, E-14)', () => {
       p_unschedule: [uuid(202), uuid(203), uuid(204)],
     });
   });
+  it('cleans the rules to the allow-list before storing them, and stores rules with no text as none (E-70, E-71)', async () => {
+    const details = () => (fake.rpc.mock.lastCall![1] as { p_details: Record<string, unknown> }).p_details;
+    await saveEvent({
+      ...input,
+      rules_html:
+        '<h2>Fouls</h2><p onclick="steal()">Five <strong>fouls</strong> <a href="javascript:x">out</a></p><script>alert(1)</script><ul><li><p>Be kind</p></li></ul>',
+    });
+    expect(details().rules_html).toBe(
+      '<h2>Fouls</h2><p>Five <strong>fouls</strong> out</p><ul><li><p>Be kind</p></li></ul>',
+    );
+    await saveEvent({ ...input, rules_html: '<p></p>' });
+    expect(details().rules_html).toBe('');
+    // Not sent (another caller): the stored rules stay as they are.
+    await saveEvent(input);
+    expect(details()).not.toHaveProperty('rules_html');
+  });
+
   it('refuses invalid input, other owners and unauthorised callers before any write', async () => {
     expect((await saveEvent({ ...input, time_end: '08:00' })).ok).toBe(false);
     fake.canEdit.mockResolvedValue(false);
