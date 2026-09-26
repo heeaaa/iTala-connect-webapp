@@ -1,6 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import { buildLeaguePreview, mobileLeagueSchema, mobilePlayerSchema, mobileTeamSchema } from '@/lib/mobile-import';
+import { mobileFinalSchema } from '@/lib/mobile-results';
 
 const sessionSchema = z.object({
   access_token: z.string().min(1),
@@ -41,16 +42,17 @@ export function createMobileReader(url: string, key: string, request: typeof fet
     }
   }
   async function rows<T>(
-    table: 'leagues' | 'teams' | 'players',
+    table: 'leagues' | 'teams' | 'players' | 'final_game_scores',
     schema: z.ZodType<T>,
     leagueId?: string,
+    order = 'id.asc',
   ): Promise<T[]> {
     const result: T[] = [];
     const accessToken = await token();
     for (let offset = 0; offset < 100_000; offset += 500) {
       const target = new URL(`${url}/rest/v1/${table}`);
       target.searchParams.set('select', '*');
-      target.searchParams.set('order', 'id.asc');
+      target.searchParams.set('order', order);
       target.searchParams.set('limit', '500');
       target.searchParams.set('offset', String(offset));
       if (leagueId) target.searchParams.set('league_id', `eq.${leagueId}`);
@@ -92,6 +94,10 @@ export function createMobileReader(url: string, key: string, request: typeof fet
       const league = leagues.find((l) => l.id === leagueId);
       if (!league) throw new Error('Mobile league no longer exists');
       return buildLeaguePreview(league, teams, players);
+    },
+    /** A league's finished games (M-02), newest first as the old inbox read them. */
+    async finals(leagueId: string) {
+      return rows('final_game_scores', mobileFinalSchema, leagueId, 'finished_at.desc,game_id.asc');
     },
   };
 }

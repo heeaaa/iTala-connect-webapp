@@ -6,7 +6,18 @@ import { deleteEvent } from '@/server/actions/events';
 import { platformStyles as s } from '@/components/platform/platform-frame';
 import { ConfirmDialog } from './confirm-dialog';
 import w from '../admin-workspace.module.css';
-export function EventActions({ id, name, published }: { id: string; name: string; published: boolean }) {
+/** D-02: Edit, View (published only), Results (only with the mobile integration on), Delete. */
+export function EventActions({
+  id,
+  name,
+  published,
+  results = false,
+}: {
+  id: string;
+  name: string;
+  published: boolean;
+  results?: boolean;
+}) {
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState('');
   const [pending, start] = useTransition();
@@ -20,6 +31,11 @@ export function EventActions({ id, name, published }: { id: string; name: string
         {published && (
           <Link className={`${s.button} ${s.buttonQuiet}`} href={`/events/${id}`}>
             View<span className="sr-only"> {name}</span>
+          </Link>
+        )}
+        {results && (
+          <Link className={`${s.button} ${s.buttonQuiet}`} href={`/admin/events/${id}/results`}>
+            Results<span className="sr-only"> {name}</span>
           </Link>
         )}
         <button className={w.danger} onClick={() => setConfirm(true)}>

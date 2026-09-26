@@ -27,12 +27,24 @@ const server = createServer(async (req, res) => {
       expires_in: 3600,
     });
   const table = url.pathname.replace('/rest/v1/', '');
-  if (req.method !== 'GET' || !['leagues', 'teams', 'players'].includes(table))
+  if (req.method !== 'GET' || !['leagues', 'teams', 'players', 'final_game_scores'].includes(table))
     return send(405, { message: 'Mobile writes are forbidden' });
-  let rows = mode === 'empty' ? [] : fixture[table];
+  // Finished-game times are relative to now, so settling and today behave the same on every run.
+  const ago = { 'NOW-2H': 2 * 3600e3, 'NOW-2M': 2 * 60e3, 'NOW-1M': 60e3 };
+  const at = (v, iso) => (v in ago ? (iso ? new Date(Date.now() - ago[v]).toISOString() : Date.now() - ago[v]) : v);
+  let rows = (mode === 'empty' ? [] : (fixture[table] ?? [])).map((r) =>
+    table === 'final_game_scores'
+      ? {
+          ...r,
+          finished_at: at(r.finished_at, false),
+          finished_at_ts: at(r.finished_at_ts, true),
+          last_event_at: at(r.last_event_at, true),
+        }
+      : r,
+  );
   const league = url.searchParams.get('league_id')?.replace(/^eq\./, '');
   if (league) rows = rows.filter((r) => r.league_id === league);
-  rows = [...rows].sort((a, b) => a.id.localeCompare(b.id));
+  rows = [...rows].sort((a, b) => (a.id ?? a.game_id).localeCompare(b.id ?? b.game_id));
   const offset = Number(url.searchParams.get('offset') ?? 0);
   const limit = Number(url.searchParams.get('limit') ?? 500);
   return send(200, rows.slice(offset, offset + limit));

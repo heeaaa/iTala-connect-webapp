@@ -27,7 +27,7 @@ npm run lint && npm run typecheck && npm run test:coverage
 npm run build && npm run check:secrets && npm run test:e2e
 ```
 
-- Expected: **76 E2E tests** (72 green at `562592f` plus the 5e-2 accounts journey and the journey 4 re-publish test, each at two viewports) and **238 pgTAP assertions** (220 plus 18 in `011_admin_accounts.sql`, green in CI at `6c627e6`). Run `npm run db:reset` for the new migration; `npm run db:types` must show no diff.
+- Expected: **78 E2E tests** (76 green at `3a46ce9` plus the 6a results inbox journey at two viewports) and **238 pgTAP assertions** (220 plus 18 in `011_admin_accounts.sql`, green in CI at `6c627e6`). Run `npm run db:reset` for the new migration; `npm run db:types` must show no diff.
 - Expected: **29 integration tests** (22 plus 7 in `admin-accounts.test.ts`).
 - Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
 
@@ -406,6 +406,20 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
   - P3, fixed: the Actions column wrapped and the phone cards had extra space, both from the form button row's margin applied inside table cells (now none there, and one line on wider screens); the Settings thumbnails now lazy-load; the New account note says both fields are needed. The harness audit measurements then showed no findings on any of the four pages, and the Admins and Settings specs passed (22/22 with the measurements).
 - **CI run 36275201647 on `3a46ce9`: green.** 76/76 E2E with no retries (including the accounts journey and journey 4, and the drag test without a retry), 238/238 pgTAP, integration, and gitleaks "no leaks found".
 - **Evidence for the fix (work laptop):** lint and typecheck pass; `test:coverage` 49 files, **750 tests pass**; a clean build and `check:secrets` pass; harness **74/74**.
+
+### Phase 6a: results inbox, read only (27/09/2026)
+
+- **Plan for Phase 6** (mobile results inbox, PRD M-01 to M-09 and D-02), in slices: **6a** the read-only inbox and the dashboard Results action (done); **6b** Approve, Re-approve, Keep published score and Attach to a fixture; **6c** the link wizard for divisions made by hand (M-03). Built against recorded fixtures; the real mobile connection stays **NOT RUN** until you say go.
+- **D-02:** the dashboard shows **Results** on every event while the mobile integration is on, as the old app did.
+- **`/admin/events/[eventId]/results`** (owner or superadmin; a 404 when the integration is off, M-01): "Pending results" with Refresh and Back to event, the linked divisions, and the finished games in the old groups and order (Ready to approve, Changed since you approved them, More than one fixture matches, Still settling, Needs a look, Team not linked, No fixture matches, Approved), each with its count.
+  - Card (M-05): "Harbour Hawks 58 - 51 Night Owls", "{league} · finished DD/MM/YYYY h:mm am · N stats" in the event's time zone, the proposed fixture ("Fixture: Hawks vs Owls · Sun 27/09/2026 7:00 pm · Court 1", plus "Note: a different day"), the drift ("Published 58-51, the mobile app now says 60-51 (48 to 52 stats)") and the reason.
+  - Empty: "Nothing waiting" / "No finished games in the linked leagues." Not linked: "No division in this event is linked to a mobile app league yet."
+- **Loader `src/server/mobile/results.ts`:** Connect data through the organiser's session (RLS); games through the public page's helpers, so a playoff game carries its resolved teams (M-09); the ported `matchFinals` per linked division, one mobile request per division in turn. Safety refusals kept (M-07): if the existing scores or approvals cannot be read, nothing is offered and the page says why; a division the mobile app does not answer for is reported on its own. The old "game ids could not be prepared" refusal is not needed: games have stable ids.
+- **Reader:** `finals(leagueId)` reads `final_game_scores` (GET only, paged, newest first); numeric strings from PostgREST are read as numbers.
+- **Fixtures:** `final_game_scores` rows for Harbour League (a result ready to approve, a 0-0 with no stats, one still settling, one against an unlinked team), with times the fixture server fills in relative to now.
+- **Found for 6b (parity bug from Phase 1):** `dismiss_mobile_result` (Keep published score) only stamps `dismissed_at`. The old app also recorded the mobile app's current points, stat count and last stat time, so the same change was not raised again; without that the Changed card would come back on every refresh. 6b fixes it with a test.
+- **Evidence (work laptop):** lint and typecheck pass; `test:coverage` 52 files, **767 tests pass** (new: `mobile-results` 11 with the reader and loader, `results-view` 4, `dashboard-view` 2); `mobile-results.ts` 97% lines and 82% branches, the loader 100% and 84%; a clean build and `check:secrets` pass. Harness (sample inbox, every group) at 390 and 1440 px: axe clean, no sideways scroll; capture `.impeccable/review/phase6/{mobile,desktop}/results.png`.
+- Not run on the laptop: the new E2E `mobile-results.spec.ts` (import, publish, Results from the dashboard, the four groups from the fixtures, the unreachable case, zero mobile writes and no browser calls to mobile). CI runs it.
 
 ### Phase 5 plan (remaining slices)
 

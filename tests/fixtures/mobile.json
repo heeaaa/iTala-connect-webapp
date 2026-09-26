@@ -16,8 +16,19 @@
       "is_closed": true,
       "is_archived": true
     },
-    { "id": "league-dropin", "name": "Friday Drop-in", "season": "", "kind": "recreational", "is_shared": true },
-    { "id": "league-small", "name": "New League", "season": "2026", "kind": "league" }
+    {
+      "id": "league-dropin",
+      "name": "Friday Drop-in",
+      "season": "",
+      "kind": "recreational",
+      "is_shared": true
+    },
+    {
+      "id": "league-small",
+      "name": "New League",
+      "season": "2026",
+      "kind": "league"
+    }
   ],
   "teams": [
     {
@@ -36,11 +47,102 @@
       "player_ids": ["player-unlisted"],
       "team_only": true
     },
-    { "id": "team-new", "league_id": "league-small", "name": "Newcomers", "player_ids": [], "team_only": false }
+    {
+      "id": "team-new",
+      "league_id": "league-small",
+      "name": "Newcomers",
+      "player_ids": [],
+      "team_only": false
+    }
   ],
   "players": [
-    { "id": "player-ari", "league_id": "league-open", "name": "Ari", "number": "04" },
-    { "id": "player-bea", "league_id": "league-open", "name": "Bea", "number": "7" },
-    { "id": "player-unlisted", "league_id": "league-open", "name": "Unlisted", "number": "99" }
+    {
+      "id": "player-ari",
+      "league_id": "league-open",
+      "name": "Ari",
+      "number": "04"
+    },
+    {
+      "id": "player-bea",
+      "league_id": "league-open",
+      "name": "Bea",
+      "number": "7"
+    },
+    {
+      "id": "player-unlisted",
+      "league_id": "league-open",
+      "name": "Unlisted",
+      "number": "99"
+    }
+  ],
+  "final_game_scores": [
+    {
+      "league_id": "league-open",
+      "league_name": "Harbour League",
+      "season": "2026",
+      "home_team_id": "team-hawks",
+      "home_name": "Harbour Hawks",
+      "away_team_id": "team-owls",
+      "away_name": "Night Owls",
+      "winner_team_id": "team-hawks",
+      "finished_at": "NOW-2H",
+      "finished_at_ts": "NOW-2H",
+      "event_count": 48,
+      "last_event_at": "NOW-2H",
+      "game_id": "fin-result",
+      "home_pts": 58,
+      "away_pts": 51
+    },
+    {
+      "league_id": "league-open",
+      "league_name": "Harbour League",
+      "season": "2026",
+      "home_team_id": "team-owls",
+      "home_name": "Night Owls",
+      "away_team_id": "team-hawks",
+      "away_name": "Harbour Hawks",
+      "winner_team_id": null,
+      "finished_at": "NOW-2H",
+      "finished_at_ts": "NOW-2H",
+      "event_count": 0,
+      "last_event_at": "NOW-2H",
+      "game_id": "fin-empty",
+      "home_pts": 0,
+      "away_pts": 0
+    },
+    {
+      "league_id": "league-open",
+      "league_name": "Harbour League",
+      "season": "2026",
+      "home_team_id": "team-hawks",
+      "home_name": "Harbour Hawks",
+      "away_team_id": "team-owls",
+      "away_name": "Night Owls",
+      "winner_team_id": "team-hawks",
+      "finished_at": "NOW-2M",
+      "finished_at_ts": "NOW-2M",
+      "event_count": "30",
+      "last_event_at": "NOW-1M",
+      "game_id": "fin-settling",
+      "home_pts": "20",
+      "away_pts": "18"
+    },
+    {
+      "league_id": "league-open",
+      "league_name": "Harbour League",
+      "season": "2026",
+      "home_team_id": "team-hawks",
+      "home_name": "Harbour Hawks",
+      "away_team_id": "team-ghost",
+      "away_name": "Ghost Town",
+      "winner_team_id": "team-hawks",
+      "finished_at": "NOW-2H",
+      "finished_at_ts": "NOW-2H",
+      "event_count": 48,
+      "last_event_at": "NOW-2H",
+      "game_id": "fin-ghost",
+      "home_pts": 40,
+      "away_pts": 38
+    }
   ]
 }

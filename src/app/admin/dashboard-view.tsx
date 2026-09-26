@@ -92,7 +92,7 @@ export function DashboardView({
                     </td>
                     <td>{event.divisions?.[0]?.count ?? 0}</td>
                     <td>
-                      <EventActions id={event.id} name={event.name} published={published} />
+                      <EventActions id={event.id} name={event.name} published={published} results={mobileEnabled} />
                     </td>
                   </tr>
                 );

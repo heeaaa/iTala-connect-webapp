@@ -709,6 +709,12 @@ Superadmin only (A-09). Two sections under the title plate.
 - **Phones (under 40rem):** each account is a stacked card on Plate: a muted uppercase label beside each value, long emails wrapping. The table keeps its header row for screen readers.
 - **Set-up link page (`/auth/confirm`):** the sign-in frame, titled "Set up your account" or "Choose a new password", with one line and **Continue**. Nothing happens until Continue. **Password page (`/admin/password`):** "Choose your password" after a link, "Change your password" otherwise; New password (with "At least 10 characters.") and "Type it again", **Save password**, then "Password saved…" with **Go to the dashboard**.
 
+#### Results inbox
+Owner or superadmin, only with the mobile integration on (M-04, M-05).
+- **Header:** title plate "Pending results" with the event name, then **Refresh** (quiet; reads "Reading the mobile app…" while it runs, and stays focusable) and **Back to event**. A note lists the linked divisions and leagues.
+- **Groups:** Seam-topped sections in the old order, each headed "{title} ({count})". Each result is a Plate row like the import page's league rows: the score line first ("Harbour Hawks 58 - 51 Night Owls", bold, tabular numerals), then muted lines for league, finish time and stats, the proposed fixture, the drift and the reason. Controls sit to the right, and below on phones (6b).
+- **States:** a refusal (not linked, scores unreadable) is a notice line; a division the mobile app did not answer for is an alert line; with nothing to show, "Nothing waiting" and "No finished games in the linked leagues."
+
 #### Round robin and playoff dialogs
 Once an event is published, each division's action row reads **+ Add team**, **+ Round robin**, **+ Playoff** (quiet plates, each carrying the division name in screen-reader text), then the danger **Remove division**. The pre-publish **Custom games/team** setting leaves the card and lives in the round robin dialog (E-21).
 - **Frame:** the confirmation dialog's frame, titled "Add round robin · [division]" or "Add playoff · [division]". Cancel comes first as a quiet plate; the go-ahead is teal and names the act ("Add games", "Add playoff"), reading "Adding…" while it runs.
