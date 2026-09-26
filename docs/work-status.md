@@ -12,7 +12,7 @@ Last updated: 26/09/2026 (Claude, work laptop)
 - This is the first real-Supabase proof of the Phase 3b guard (signed-in Sign out and Back), publish and published editing.
 - The first run failed only on my new publish E2E: `getByRole('alert')` also matched Next's route announcer. That was fixed by scoping to `main`.
 
-Latest green run: 36216176809 on `68abdaf` (Google sign-in): **64/64 E2E**, 154 pgTAP, 22 integration. Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
+Latest green run: **36221904647 on `ffedad2` (5c-2 drag and drop): 66/66 E2E**, 154/154 pgTAP, 22/22 integration, 638 unit and component tests, plus lint, typecheck, build, `check:secrets` and gitleaks. The run before it, 36216176809 on `68abdaf` (Google sign-in), was 64/64. Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
 
 **Important for the Docker PC:** 5b adds migration `20260926000500_event_editor.sql` (replaces `save_draft_editor` with `save_event_editor`). Apply it (`npm run db:reset` on the local stack), then run `npm run db:types`. `src/lib/supabase/database.types.ts` was hand-edited for the new function and must come out with **no diff**; if it differs, keep the generated file.
 
@@ -113,7 +113,7 @@ npm run build && npm run check:secrets && npm run test:e2e
   - Red on the old CSS and green on the new, in the harness at 390 px.
   - The E2E overflow checks in `mobile-import.spec.ts` and `today-prototype.spec.ts` now compare with `page.viewportSize()`. The Today prototype passes 8/8 under the stronger check.
 - **Evidence (work laptop):** lint and typecheck pass; 30 files, **594 unit and component tests pass**; clean build passes; `check:secrets` passes against the real server values. Harness at 390 and 1440 px: the grid and dialog pass axe with no overflow. Captures: `.impeccable/review/phase5c/{mobile,desktop}/{schedule,game-dialog}.png`.
-- **Runs in CI on push:** the new E2E "adds, validates, edits and deletes games on the published schedule", plus the strengthened overflow checks.
+- **Passed in CI (run 36221904647):** the new E2E "adds, validates, edits and deletes games on the published schedule", plus the strengthened overflow checks.
 
 ### Google sign-in (A-11, 26/09/2026)
 
@@ -186,6 +186,7 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
   - Fix, product: the notice clears as soon as the next drag starts, so it never sits over drop targets during a drag. A component test is red without it.
   - Fix, test: the E2E drag helper uses `hover()`, which scrolls the handle clear of the notice before pressing, as a person would.
   - The harness regression passes at 390 and 1440 px.
+  - **Green:** CI run 36221904647 on `ffedad2`: 66/66 E2E, and the drag and drop journey passed first time at both viewports.
 - **Test changes:** `admin-publish.spec.ts` status checks are scoped to `main`, because dnd-kit adds its own `role="status"` live region to `<body>`. The component test setup gains a no-op `ResizeObserver`, which jsdom lacks and dnd-kit needs when it loads.
 - **Evidence (work laptop):**
   - Lint and typecheck pass.
