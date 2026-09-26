@@ -12,7 +12,7 @@ Last updated: 26/09/2026 (Claude, work laptop)
 - This is the first real-Supabase proof of the Phase 3b guard (signed-in Sign out and Back), publish and published editing.
 - The first run failed only on my new publish E2E: `getByRole('alert')` also matched Next's route announcer. That was fixed by scoping to `main`.
 
-Latest green run: **36221904647 on `ffedad2` (5c-2 drag and drop): 66/66 E2E**, 154/154 pgTAP, 22/22 integration, 638 unit and component tests, plus lint, typecheck, build, `check:secrets` and gitleaks. The run before it, 36216176809 on `68abdaf` (Google sign-in), was 64/64. Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
+Latest green run: **36234713687 on `167c8e7` (5c-3 round robin and playoff): 68/68 E2E, 180/180 pgTAP**, with integration, unit coverage, lint, typecheck, build, `check:secrets` and gitleaks all passing. Before it: 36221904647 on `ffedad2` (5c-2) was 66/66 E2E with 154 pgTAP. Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
 
 **Important for the Docker PC:** 5b adds migration `20260926000500_event_editor.sql` (replaces `save_draft_editor` with `save_event_editor`). Apply it (`npm run db:reset` on the local stack), then run `npm run db:types`. `src/lib/supabase/database.types.ts` was hand-edited for the new function and must come out with **no diff**; if it differs, keep the generated file.
 
@@ -273,6 +273,7 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
   - Integration and every other E2E passed.
   - The new additions E2E failed at both viewports on a **test bug**. Its "unscheduled games come last" check used `findIndex`, which is -1 when every game fits, as it did here. The stronger check just before it (stored order follows day and time) passed.
   - The check now compares the scheduled and unscheduled pattern with its sorted form, which holds with or without unscheduled games. It was checked on none unscheduled, some at the end, and one out of place.
+  - **Green:** CI run 36234713687 on `167c8e7`: 68/68 E2E, with the additions journey passing at both viewports, and 180/180 pgTAP.
 - **You, after CI passes:** push migration `20260926000600_schedule_additions.sql` to the hosted project (`supabase db push`), as with the earlier migrations.
 - **For the finish review:** `.impeccable/design.json` is not updated; DESIGN.md is ("Round robin and playoff dialogs", and the dialog focus rule).
 
@@ -299,6 +300,7 @@ Rebuild the iTala Platform scheduler as iTala Connect (Next.js + Supabase) with 
   - Aeron applied all migrations to the hosted project (`supabase db push`, through `20260926000500_event_editor`) and configured Google sign-in (A-11) with public sign-ups off.
   - Each new migration must be pushed to hosted the same way, after CI passes.
 - `.env` on the work laptop points at the hosted project (Aeron's choice for local runs; git-ignored). Keep the `MOBILE_*` values blank until the real mobile import is authorised; they must be the mobile project's URL and **publishable** key, never a secret key.
+- 26/09/2026 (Aeron): the Firebase importer (Phase 7, `scripts/migrate-firebase.ts`) is built **after Phase 5**, as planned. Its first real import goes into the **hosted Connect project**: not live yet, it serves as staging, and the import re-runs for the final cutover copy (no separate staging project, which keeps within the free-plan project limit). Dry runs first. The input is a Firebase JSON export kept outside git, and O-1 (the owner of events from the shared login) is still to confirm when it starts.
 - Mobile integration starts with a simple league import (docs/MOBILE_INTEGRATION.md stage 1), built as the first feature slice (phase 3b). Mobile reader uses a server-side cached anonymous session (O-3 decided).
 - 25/09/2026: Aeron confirmed anonymous sign-ins are switched on in Supabase (needed on the iTala **mobile** project for the O-3 reader). The iTala Connect project itself should keep anonymous sign-ins and public sign-ups **off**; the schema gives anonymous users no profile and no access either way (tested).
 - Phase 1 used the suggested options for open decisions it touches: O-1 superadmin owns legacy events (ownership reassignable by superadmin only), O-2 Admins screen in this migration (read-only list now, `npm run admin:create` meanwhile), O-4 per-event time zone defaulting to `DEFAULT_EVENT_TIMEZONE`.
