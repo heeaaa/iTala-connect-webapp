@@ -211,3 +211,70 @@
     justify-self: end;
   }
 }
+.matchup {
+  border-inline-start: 3px solid var(--brand-border);
+  padding-inline-start: 1rem;
+}
+.matchup h3 {
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+.matchup ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+}
+.chip {
+  padding: 0.25rem 0.6rem;
+  background: var(--brand-raised);
+  font-size: 0.875rem;
+}
+.chipWarn {
+  color: var(--brand-danger);
+  box-shadow: inset 0 0 0 1px var(--brand-danger);
+}
+.matchupScroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.matchupScroll:focus-visible {
+  outline: 2px solid var(--brand-focus);
+  outline-offset: 2px;
+}
+.matchupTable {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.matchupTable th,
+.matchupTable td {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--brand-border);
+  text-align: center;
+  white-space: nowrap;
+}
+.matchupTable thead th,
+.matchupTable tbody th {
+  position: sticky;
+  background: var(--brand-surface);
+  color: var(--brand-muted);
+  font-weight: 600;
+}
+.matchupTable thead th {
+  top: 0;
+}
+.matchupTable tbody th {
+  left: 0;
+  text-align: left;
+}
+.matchupTable .repeat {
+  color: var(--brand-danger);
+  font-weight: 750;
+  box-shadow: inset 0 0 0 2px var(--brand-danger);
+}
+.summaryMeta {
+  margin-inline-start: 0.5rem;
+  color: var(--brand-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
+  font-stretch: 100%;
+}

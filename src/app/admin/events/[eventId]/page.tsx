@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { requireAdmin, canEditEvent } from '@/server/auth';
 import type { EditorInput } from '@/lib/event-editor';
+import { gamesFromRows } from '@/lib/public-event/model';
 import { DraftEditor } from './draft-editor';
 export default async function EventEditorPage({ params, searchParams }: PageProps<'/admin/events/[eventId]'>) {
   const { eventId } = await params;
@@ -11,7 +12,9 @@ export default async function EventEditorPage({ params, searchParams }: PageProp
   const db = await createClient();
   const { data: event, error } = await db
     .from('events')
-    .select('*, divisions(*, teams(*, players(*)), division_mobile_links(league_name, season))')
+    .select(
+      '*, divisions(*, teams(*, players(*)), division_mobile_links(league_name, season)), games(id, division_id, day, start_time, court, group_id, team1_id, team2_id, label, type, is_playoff, bracket_game_id, team1_source, team2_source, playoff_round, position)',
+    )
     .eq('id', eventId)
     .single();
   if (error) throw new Error('Could not load the event. Please try again.');
@@ -60,6 +63,7 @@ export default async function EventEditorPage({ params, searchParams }: PageProp
     <DraftEditor
       initial={input}
       links={links}
+      games={gamesFromRows(event.games)}
       readOnly={event.status !== 'draft'}
       notice={
         imported

@@ -1,19 +1,78 @@
 # Work status
 
-Last updated: 26/09/2026
+Last updated: 26/09/2026 (Claude, work laptop)
 
-## Current handoff: Phase 3b in progress
+## Current handoff (26/09/2026, Claude on the work laptop)
 
-**Live checkpoint (26/09, 13:00 NZ):** Full 56-test browser suite passed before review fixes. Reviewer required 44px secondary action targets (fixed) and unsaved Back/Sign out protection. Sign out guard works; new browser Back regression still fails on both viewports (no confirmation). Latest focused run:6 pass/2 fail. Latest unit/component total546, coverage96.27% lines/93.36% branches. Build and secret scan pass; Prettier needs auth.spec.ts formatted. See handoff for exact reproduction and next steps. Do not call latest tree complete.
+**Where things are:** Phase 3b is code complete. Phase 5 has started: slice 5a (publish and matchup report) is done. Both are on branch `handoff/codex`, committed and pushed. The next slice is **5b: published-event editing** (see "Phase 5 plan" below).
 
-Read [PHASE_3B_HANDOFF.md](PHASE_3B_HANDOFF.md) first when resuming on the other laptop. The user authorised implementing Phase 3b and testing thoroughly, then requested a written checkpoint because this session's token budget was running low.
+**Laptop split.** The work laptop has no Docker, so pgTAP, integration and E2E are **NOT RUN** there. It proves UI in real Chromium through a local-only harness route (`src/app/prototype/zz-*`, excluded in `.git/info/exclude`, never committed). On the Docker PC, after `git pull`, run:
 
-- Phase 4 Docker verification is complete. Phase 3b (mobile league import) was skipped in the old next-action list and is now the active implementation, before the remainder of phase 5.
-- Written: server-only anonymous mobile reader; league list and preview; atomic import RPC and audit; new/delete dashboard actions; draft editor for dates, courts, hours, time zone, colours, divisions, teams and players; local mock mobile HTTP server and tests.
-- Latest local Docker evidence: **145 pgTAP assertions**, **21 integration tests** (including concurrent duplicate imports), **539 unit/component tests**, 96.17% line / 93.36% branch coverage. Production build, TypeScript, lint and environment-aware client secret scan passed.
-- Six focused Phase 3b browser journeys passed. Full 56-test suite now running on the rebuilt application, including actual nested Storage image deletion and remembered editor collapse state. Existing dashboard tests currently have selector failures under investigation; completion is not claimed.
-- Added durable image cleanup migration: delete the database event first, queue cleanup atomically, retain/retry failed Storage removal. Added schema and cleanup failure tests, contrast warnings and remembered collapse state. Design detector returned no findings; visual finish review remains pending.
-- All changes are **uncommitted**, including new/untracked files. They must be transferred with the working tree or committed before the other laptop can see them. No push, hosted migration, deployment, or real mobile connection was performed.
+```bash
+npm ci && npm run db:start && npm run env:local
+npm run test:db && npm run test:integration
+npm run lint && npm run typecheck && npm run test:coverage
+npm run build && npm run check:secrets && npm run test:e2e
+```
+
+- Expected: **60 E2E tests**: the previous 56, the new unsaved-guard test and the new publish journey, each at two viewports. Codex's last full Docker run was 56/56 before the guard work.
+- No migrations have changed since Codex's run: 145 pgTAP assertions and 21 integration tests are expected unchanged.
+- Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
+
+### Phase 3b close-out (26/09/2026)
+
+- **Back guard fixed.**
+  - Root cause: Next 16's own popstate listener always routes and cannot be cancelled, so the earlier attempts raced it.
+  - Fix: `src/app/admin/_components/use-unsaved-guard.ts` keeps a same-URL history entry on top while there are unsaved edits. Back lands on the page itself, and the accessible dialog asks. Continue goes back two entries. After a save the entry is skipped silently, and a link Continue replaces it.
+  - Also fixed: Done in the players dialog falsely asked "Discard unsaved changes?". Forms that stay on the page now use `data-keeps-page`.
+- **Evidence (harness, Chromium, 390 and 1440 px):**
+  - The HEAD code failed the new guard spec at the players dialog, and with that step skipped failed at the Back prompt on both viewports.
+  - The fixed code passed 10/10 (5 repeats) and later 18/18, including a real server-action Sign out.
+  - The Codex GUARD diagnostics were removed from `tests/e2e/mobile-import.spec.ts`, and the guard E2E was extended.
+- **Finish review (fresh reviewer, verdict pass):** 44 px targets resolved; guard resolved after a recapture round with Sign out continue frames and video. Disposition **ship**, scoped to those two findings.
+- **Documenter:** DESIGN.md and `.impeccable/design.json` extended with the admin patterns: action rows, danger text, confirmation dialog, players dialog, calendar, editor sections and workspace notices. Existing system preserved.
+- **Design drift reported, not repaired (for the Phase 8 Impeccable audit):**
+  - Plain-text secondary actions (Cancel, Expand all, Collapse all).
+  - "+" used as an icon.
+  - Dialogs and league rows missing the corner cut.
+  - Two notice styles.
+  - Editor section heading weight and case.
+  - Admin forms 65rem wide against the documented 26rem.
+  - The Lime Is Air Time rule text is out of date for the Dashboard.
+- **Still NOT RUN:** the real signed-in E2E for the guard, the import preview recapture, and the real mobile league import (needs your explicit go-ahead).
+
+### Phase 5a: publish and matchup report (26/09/2026)
+
+- **E-60:** `src/domain/publish.ts` holds the old messages in the old order. Fix: every division needs 2 teams, and the short ones are named.
+- **E-61:** `src/lib/schedule-rows.ts` maps stored rows to the scheduler input exactly as the golden suite does (teams by `sort_order`, games per team only when ticked with a value above 0) and maps games back to insert rows.
+- **Action:** `src/server/actions/publish.ts` re-reads the saved event (never client state), validates, generates, counts recorded scores, then calls the atomic `publish_event`.
+- **E-62:** it asks with the count, or says it could not count, and clears only on Continue. A `scores_exist` race asks again.
+- **E-02 editor:** drafts show Save draft (teal) and Publish (the one lime action). Publish saves unsaved edits first. The toast reads "Published with N game(s).", then the page refreshes into the published view.
+- **E-30, E-31:** Team matchup report section.
+  - Per division, an N x N grid with sticky headers, horizontal scroll, and repeats outlined in red with a tooltip.
+  - Chips: total games, repeated matchups, pairings not scheduled. The heading meta shows the repeated count.
+  - Hints: no divisions, and fewer than 2 teams.
+  - It uses the editor's current divisions, so unsaved team edits show at once.
+- Refactor: `gamesFromRows` extracted from `toEventModel` (`src/lib/public-event/model.ts`), with no behaviour change; public model tests pass.
+- **Evidence (work laptop):**
+  - Lint and typecheck pass. `test:coverage`: 26 files, **564 tests pass**, 96.34% lines and 93.61% branches, `src/domain` 100%.
+  - A clean `next build` without the harness passes, and `check:secrets` passes.
+  - Harness: axe finds no serious or critical issues and nothing scrolls sideways at 390 and 1440 on the editor with the matchup report. Capture: `.impeccable/review/phase5a/{mobile,desktop}/editor.png`.
+- **NOT RUN (Docker):** `tests/e2e/admin-publish.spec.ts` (journey 1). It covers create, the refused publish without dates, the refused publish with one team, then a publish that saves first, "Published with 1 game.", one game row in the database, and the public page.
+
+### Phase 5 plan (remaining slices)
+
+1. **5b, published editing.** Save on published events (E-02), reconcile with a moved count (E-14), confirm when removing a division with its game count (E-22) and when removing a team with games (E-23), autosave rules (E-05).
+   - Needs a new `save_event_editor` RPC plus pgTAP, because `save_draft_editor` refuses published events.
+   - Phase 2 handovers to include: distinct days (zod done, database pending), and passing stored resolved playoff teams to round robin.
+2. **5c, schedule editor.**
+   - Day grids, game cards and the Unscheduled row (E-40 to E-44).
+   - Drag and drop with dnd-kit, keyboard support and the rest warning (E-45).
+   - Game dialog, validation and delete (E-46 to E-50).
+   - "+ Round robin" and "+ Playoff" dialogs (E-63, E-64).
+3. **5d, rules and images.** Tiptap rules editor (E-70, E-71), logo and sponsor uploads with compression and removal (E-15 to E-18).
+4. **5e, platform admin.** Settings sponsors and the default rules template (S-01, S-02), the Admins screen (A-09), dashboard View and Results actions (D-02).
+5. **Then** E2E journeys 2, 4, 7 and 8, and a finish review per new surface.
 
 ## Objective
 

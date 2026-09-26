@@ -1,8 +1,20 @@
 # Phase 3b handoff to Claude
 
+**Superseded:** Phase 3b is code complete. The live status is the "Current handoff" section of [work-status.md](work-status.md). This file is kept as the Phase 3b history.
+
 Updated 26/09/2026, 13:00 NZ time. User authorised implementing Phase 3b and thorough local Docker testing. User requests continuous written checkpoints; latest budget reported 29% remaining.
 
 ## Resume here
+
+**Claude checkpoint 26/09/2026 (work laptop, no Docker).** The Back defect is fixed; the Codex notes below are history.
+
+- Root cause: Next 16's own `popstate` listener (`node_modules/next/dist/client/components/app-router.js`) always routes on Back and cannot be cancelled, so every attempt to intercept it raced Next.
+- Fix: new hook `src/app/admin/_components/use-unsaved-guard.ts`. While there are unsaved edits it keeps an extra history entry for the same URL on top, so Back lands on this page's own entry, which Next restores in place, and the accessible dialog then decides. Continue calls `history.go(-2)`. After a save the extra entry is skipped silently, and a link Continue replaces it.
+- Also fixed: Done in the players dialog asked "Discard unsaved changes?" after any edit. Forms that stay on the page now carry `data-keeps-page`.
+- Removed Codex's Navigation API attempt and the GUARD diagnostic logging from `tests/e2e/mobile-import.spec.ts`. The guard test now also covers the players dialog, Back cancelled twice, and one Back after saving.
+- Evidence here: a temporary no-database harness route (`src/app/prototype/zz-guard`, deleted before commit) rendered the real DraftEditor. Scratch Playwright spec: new code 10/10 over 5 repeats at 390 and 1440 px. HEAD code failed at the players dialog, and with that step skipped failed at the Back prompt on both viewports. Restored fix: 6/6 over 3 repeats.
+- Lint, typecheck and unit/coverage pass here. pgTAP, integration and the real E2E suite are **NOT RUN on this laptop (no Docker)**. On the Docker PC run: `npm run build && npm run test:e2e` (expect 58 tests).
+- Finish reviewer verdict pass: requested with new editor captures in `.impeccable/review/phase3b/{mobile,desktop}/editor{,-discard}.png`. The import preview was not recaptured.
 
 Live update13:08: Runtime trace proves Back handler DOES run and restores URL, but Next's earlier popstate handler has already queued a route transition. Added history.replaceState(null, '', currentURL) after restoring saved entry to invoke Next's public History integration and restore route state too. Rebuilding/testing now. Current diagnostic instrumentation exists temporarily in the new E2E test (GUARD console/add/remove listener trace); remove before finish. Lint and secret scan passed before this latest change. No final pass yet.
 

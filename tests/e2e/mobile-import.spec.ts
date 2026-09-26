@@ -156,45 +156,47 @@ test('creates a draft, guards unsaved edits, deletes with confirmation, and refu
   expect((await adminClient().from('event_image_cleanup').select('event_id').eq('event_id', eventId)).data).toEqual([]);
 });
 
-test('guards unsaved edits on sign out and browser Back', async ({ page }) => {
-  page.on('console', (m) => { if (m.text().startsWith('GUARD')) console.log(m.text()); });
-  page.on('pageerror', (e) => console.log('GUARD error', e.message));
-  await page.addInitScript(() => {
-    const add = window.addEventListener.bind(window);
-    const remove = window.removeEventListener.bind(window);
-    window.addEventListener = ((type: string, listener: EventListener, options: boolean) => {
-      if(type === 'popstate') console.log('GUARD add', options, listener.toString());
-      add(type, listener, options);
-    }) as typeof window.addEventListener;
-    window.removeEventListener = ((type: string, listener: EventListener, options: boolean) => {
-      if(type === 'popstate') console.log('GUARD remove', options);
-      remove(type, listener, options);
-    }) as typeof window.removeEventListener;
-    add('popstate', () => console.log('GUARD pop', location.pathname), true);
-    (window as Window & {navigation?: EventTarget}).navigation?.addEventListener('navigate', (e) => console.log('GUARD nav', e.cancelable, (e as Event & {navigationType: string}).navigationType));
-    const push = history.pushState.bind(history);
-    history.pushState = (state, unused, url) => { console.log('GUARD push', url, Boolean(state?.__NA)); push(state, unused, url); };
-  });
+test('guards unsaved edits on sign out and browser Back, but not in-page dialogs or after saving', async ({ page }) => {
+  const discard = page.getByRole('dialog').filter({ hasText: 'Discard unsaved changes?' });
   await signInAndWait(page, organiser);
   await page.getByRole('link', { name: '+ New event', exact: true }).click();
   await page.getByLabel('Event name', { exact: true }).fill('Navigation guard');
   await page.getByRole('button', { name: 'Create event', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/events\/[a-f0-9-]+\?created=1/);
+  const editorURL = page.url();
   await page.getByLabel('Event name', { exact: true }).fill('Unsaved navigation');
+  // A dialog form that stays on the page must not ask about leaving.
+  await page.getByRole('button', { name: '+ Add division', exact: true }).click();
+  await page.getByLabel('Division 1 name', { exact: true }).fill('Open');
+  await page.getByRole('button', { name: '+ Add team', exact: true }).click();
+  await page.getByRole('button', { name: /^Players \(0\)/ }).click();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(discard).toHaveCount(0);
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-  await expect(page.getByRole('dialog')).toContainText('Discard unsaved changes?');
+  await expect(discard).toBeVisible();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(page.getByText('Unsaved changes', { exact: true })).toBeVisible();
+  // Back, cancelled twice: the edits and the URL stay.
+  for (let i = 0; i < 2; i++) {
+    await page.evaluate(() => history.back());
+    await expect(discard).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(page).toHaveURL(editorURL);
+    await expect(page.getByLabel('Event name', { exact: true })).toHaveValue('Unsaved navigation');
+  }
   await page.evaluate(() => history.back());
-  await expect(page.getByRole('dialog')).toContainText('Discard unsaved changes?');
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(page.getByLabel('Event name', { exact: true })).toHaveValue('Unsaved navigation');
-  await page.evaluate(() => history.back());
-  await expect(page.getByRole('dialog')).toContainText('Discard unsaved changes?');
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/events\/new$/);
   await page.goForward();
   await expect(page.getByLabel('Event name', { exact: true })).toHaveValue('Navigation guard');
+  // After saving, one Back leaves without asking.
+  await page.getByLabel('Event name', { exact: true }).fill('Saved navigation');
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await page.evaluate(() => history.back());
+  await expect(page).toHaveURL(/\/admin\/events\/new$/);
+  await expect(discard).toHaveCount(0);
+  await page.goForward();
   await page.getByLabel('Event name', { exact: true }).fill('Unsaved again');
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();

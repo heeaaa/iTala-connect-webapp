@@ -1,23 +1,30 @@
 'use client';
 import { contrastRatio } from '@/lib/color';
 import Link from 'next/link';
-import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState, useTransition } from 'react';
+import { republishWarning } from '@/domain/publish';
+import { type Game } from '@/domain/types';
 import { DIVISION_COLOURS, type EditorInput, type EditorDivision, type EditorTeam } from '@/lib/event-editor';
 import { saveDraft } from '@/server/actions/events';
+import { publishEvent } from '@/server/actions/publish';
 import { platformStyles as s, TitlePlate } from '@/components/platform/platform-frame';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
 import { PlayersDialog } from '../../_components/players-dialog';
 import { DatePicker } from '../../_components/date-picker';
+import { useUnsavedGuard } from '../../_components/use-unsaved-guard';
 import w from '../../admin-workspace.module.css';
+import { MatchupReport, repeatedMatchups } from './matchup-report';
 
 export function DraftEditor({
   initial,
   links,
+  games,
   readOnly,
   notice,
 }: {
   initial: EditorInput;
+  games: Game[];
   links: Record<string, { league_name: string; season: string | null }>;
   readOnly: boolean;
   notice: string;
@@ -30,8 +37,8 @@ export function DraftEditor({
   const [players, setPlayers] = useState<{ divisionId: string; team: EditorTeam } | null>(null);
   const [confirm, setConfirm] = useState<{ title: string; message: string; run: () => void } | null>(null);
   const form = useRef<HTMLFormElement>(null);
-  const router = useRouter();
   const dirty = JSON.stringify(data) !== saved;
+  const router = useRouter();
   useEffect(() => {
     const sections = Array.from(form.current?.querySelectorAll('details') ?? []);
     const key = `event-sections:${initial.id}`;
@@ -54,92 +61,41 @@ export function DraftEditor({
     sections.forEach((section) => section.addEventListener('toggle', remember));
     return () => sections.forEach((section) => section.removeEventListener('toggle', remember));
   }, [initial.id]);
-  useEffect(() => {
-    if (!dirty) return;
-    const currentURL = window.location.href;
-    const currentState = window.history.state;
-    const navigation = (window as Window & {
-      navigation?: EventTarget & { traverseTo: (key: string) => unknown };
-    }).navigation;
-    const unload = (e: BeforeUnloadEvent) => e.preventDefault();
-    // Modern browsers expose traversal before popstate and before Next routes.
-    const navigate = (event: Event) => {
-      const e = event as Event & { navigationType: string; destination: { key: string; sameDocument: boolean } };
-      if (e.navigationType !== 'traverse' || !e.cancelable || !e.destination.sameDocument) return;
-      e.preventDefault();
-      setConfirm({
-        title: 'Discard unsaved changes?',
-        message: 'Your latest edits have not been saved.',
-        run: () => {
-          navigation?.removeEventListener('navigate', navigate);
-          window.removeEventListener('beforeunload', unload);
-          setSaved(JSON.stringify(data));
-          navigation?.traverseTo(e.destination.key);
-        },
-      });
-    };
-    // Restore this entry before Next changes the rendered route, then let the
-    // same accessible confirmation handle both cancelling and continuing Back.
-    const back = (e: PopStateEvent) => {
-      e.stopImmediatePropagation();
-      window.history.pushState(currentState, '', currentURL);
-      // Next may already have queued its traverse update on this target event.
-      // Its public History API integration restores the matching route as well.
-      window.history.replaceState(null, '', currentURL);
-      setConfirm({
-        title: 'Discard unsaved changes?',
-        message: 'Your latest edits have not been saved.',
-        run: () => {
-          window.removeEventListener('popstate', back, true);
-          window.removeEventListener('beforeunload', unload);
-          setSaved(JSON.stringify(data));
-          window.history.back();
-        },
-      });
-    };
-    const submit = (e: SubmitEvent) => {
-      const target = e.target;
-      if (!(target instanceof HTMLFormElement) || target === form.current) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const submitter = e.submitter;
-      setConfirm({
-        title: 'Discard unsaved changes?',
-        message: 'Your latest edits have not been saved.',
-        run: () => {
-          document.removeEventListener('submit', submit, true);
-          window.removeEventListener('beforeunload', unload);
-          setSaved(JSON.stringify(data));
-          target.requestSubmit(submitter);
-        },
-      });
-    };
-    const click = (e: MouseEvent) => {
-      const link = (e.target as Element).closest('a');
-      if (!link || e.ctrlKey || e.metaKey || e.shiftKey || link.target === '_blank') return;
-      e.preventDefault();
-      setConfirm({
-        title: 'Discard unsaved changes?',
-        message: 'Your latest edits have not been saved.',
-        run: () => {
-          setSaved(JSON.stringify(data));
-          router.push(link.href);
-        },
-      });
-    };
-    window.addEventListener('beforeunload', unload);
-    if (navigation) navigation.addEventListener('navigate', navigate);
-    else window.addEventListener('popstate', back, true);
-    document.addEventListener('click', click, true);
-    document.addEventListener('submit', submit, true);
-    return () => {
-      window.removeEventListener('beforeunload', unload);
-      window.removeEventListener('popstate', back, true);
-      navigation?.removeEventListener('navigate', navigate);
-      document.removeEventListener('click', click, true);
-      document.removeEventListener('submit', submit, true);
-    };
-  }, [dirty, data, router]);
+  useUnsavedGuard(dirty, (proceed) =>
+    setConfirm({ title: 'Discard unsaved changes?', message: 'Your latest edits have not been saved.', run: proceed }),
+  );
+  /** Saves the draft first when needed, so Publish uses what is on screen (E-02). */
+  const save = async () => {
+    const result = await saveDraft(data);
+    if (!result.ok) {
+      setError(result.error);
+      return false;
+    }
+    const next = { ...data, version: result.data };
+    setData(next);
+    setSaved(JSON.stringify(next));
+    return true;
+  };
+  const publish = (clearScores = false) => {
+    setError('');
+    setMessage('');
+    start(async () => {
+      if (dirty && !(await save())) return;
+      const result = await publishEvent(data.id, clearScores);
+      if (!result.ok) setError(result.error);
+      else if (result.data.status === 'confirm')
+        setConfirm({
+          title: 'Re-publish this event?',
+          message: republishWarning(result.data.scores),
+          run: () => publish(true),
+        });
+      else {
+        const n = result.data.games;
+        setMessage(`Published with ${n} game${n === 1 ? '' : 's'}.`);
+        router.refresh();
+      }
+    });
+  };
   const change = <K extends keyof EditorInput>(key: K, value: EditorInput[K]) => {
     setData((v) => ({ ...v, [key]: value }));
     setMessage('');
@@ -181,27 +137,31 @@ export function DraftEditor({
       )}
       <form
         ref={form}
+        data-keeps-page
         className={w.form}
         onSubmit={(e) => {
           e.preventDefault();
           setError('');
           start(async () => {
-            const result = await saveDraft(data);
-            if (!result.ok) setError(result.error);
-            else {
-              const next = { ...data, version: result.data };
-              setData(next);
-              setSaved(JSON.stringify(next));
-              setMessage('Saved');
-            }
+            if (await save()) setMessage('Saved');
           });
         }}
       >
         <div className={w.actions}>
           {!readOnly && (
-            <button disabled={pending} className={`${s.button} ${s.buttonLive}`}>
-              {pending ? 'Saving…' : 'Save draft'}
-            </button>
+            <>
+              <button disabled={pending} className={`${s.button} ${s.buttonTeal}`}>
+                {pending ? 'Saving…' : 'Save draft'}
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                className={`${s.button} ${s.buttonLive}`}
+                onClick={() => publish()}
+              >
+                Publish
+              </button>
+            </>
           )}
           <Link href="/admin">{readOnly ? 'Back to events' : 'Cancel'}</Link>
           <button
@@ -476,6 +436,18 @@ export function DraftEditor({
             >
               + Add division
             </button>
+          </details>
+          <details open className={w.section}>
+            <summary>
+              Team matchup report{' '}
+              <span className={w.summaryMeta}>
+                {(() => {
+                  const n = repeatedMatchups(data.divisions, games);
+                  return n ? `${n} repeated matchup${n === 1 ? '' : 's'}` : 'No repeated matchups';
+                })()}
+              </span>
+            </summary>
+            <MatchupReport divisions={data.divisions} games={games} />
           </details>
         </fieldset>
       </form>

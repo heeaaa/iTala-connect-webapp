@@ -31,6 +31,7 @@ export function PlayersDialog({
     >
       <h2 id="players-title">Players · {team.name}</h2>
       <form
+        data-keeps-page
         onSubmit={(e) => {
           e.preventDefault();
           onDone(players);

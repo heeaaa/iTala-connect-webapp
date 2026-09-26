@@ -157,4 +157,4 @@ Everything above still applies. Where this section is more specific, it wins for
 
 ### Status
 
-- Foundations, domain port, design and Phase 4 public pages are complete; Docker verification passed on 26/09/2026. Phase 3b mobile league import is IN PROGRESS, with database/unit checks passing but its new E2E and finish reviews not yet run. Before continuing, read docs/PHASE_3B_HANDOFF.md and docs/work-status.md. The working tree contains uncommitted implementation files and earlier Docker test fixes; preserve them.
+- Foundations, domain port, design and Phase 4 public pages are complete; Docker verification passed on 26/09/2026. Phase 3b mobile league import is code complete and finish-reviewed (its newest E2E and the real mobile import are NOT RUN). Phase 5 is IN PROGRESS: 5a (publish, matchup report) is done, 5b (published editing) is next. Work is committed on branch handoff/codex. Before continuing, read the "Current handoff" section of docs/work-status.md.
