@@ -149,7 +149,7 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
   - Every card has a **Move** handle (grip plus the word, at least 44 px). A mouse drags at once; touch needs a 250 ms press, so swiping a card still scrolls the table.
   - Keyboard: Space or Enter picks up, arrows step one cell at a time (`nextTarget`: across courts, through the times, into the next or previous day, and up into the Unscheduled row and its games), Space or Enter drops, and Escape or Tab cancels (dnd-kit's default would drop on Tab).
   - The card shows in its new place at once (`useOptimistic`) and settles when the save returns. A refused or failed save (including an unreachable server) puts it back. Dragging and Edit are locked while a save runs.
-  - A pinned notice at the foot of the schedule names the move. It adds a non-blocking "Rest warning:" line for each team left with two games under 2 hours apart that day (`restBreaks`, new pairs only). It has a Dismiss action.
+  - A pinned notice at the foot of the schedule names the move. It adds a non-blocking "Rest warning:" line for each team left with two games under 2 hours apart that day (`restBreaks`, new pairs only). It has a Dismiss action and clears when the next drag starts.
   - NZ English screen-reader instructions and announcements (picked up, over which slot, swap or move, dropped, cancelled).
 - **Pure logic:** `planDrop`, `applyDrop`, `ownTarget` and `nextTarget` are in `src/lib/schedule-grid.ts`; `restBreaks` is in `src/domain/schedule-edit.ts`.
 - **Action** `dropGame` (`src/server/actions/games.ts`):
@@ -180,20 +180,26 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
   - Fixed: Edit during a save opened the optimistic copy. It is now locked while saving.
   - Fixed: Dismiss dropped focus; it now goes to the game the notice is about. A dialog save clears an old drop notice.
   - Not fixed (low): the extra court columns the grid shows for out-of-range games still accept drops. The server refuses them with "Choose a court from 1 to N", and the card goes back. This is rare, because E-14 unschedules such games.
+- **CI run 36221272993 on `506ac42`:** everything passed except the new drag and drop E2E, at both viewports and on retry.
+  - The failure screenshot: the keyboard half had passed, then the first mouse drag pressed on the third game's Move button while the pinned notice (with its rest warning) covered it. The press selected the notice's text instead of starting a drag.
+  - Reproduced in the harness: the card near the foot of the viewport, and a check that its Move button is covered. A blind press hits the notice.
+  - Fix, product: the notice clears as soon as the next drag starts, so it never sits over drop targets during a drag. A component test is red without it.
+  - Fix, test: the E2E drag helper uses `hover()`, which scrolls the handle clear of the notice before pressing, as a person would.
+  - The harness regression passes at 390 and 1440 px.
 - **Test changes:** `admin-publish.spec.ts` status checks are scoped to `main`, because dnd-kit adds its own `role="status"` live region to `<body>`. The component test setup gains a no-op `ResizeObserver`, which jsdom lacks and dnd-kit needs when it loads.
 - **Evidence (work laptop):**
   - Lint and typecheck pass.
-  - `test:coverage`: 33 files, **637 tests pass**. `src/domain` and `schedule-grid.ts` are at 100%.
-  - Mutation checks: removing the focus restore, the refocus, the rest warning, the focus guard, the Edit lock, the Dismiss focus, the document nonce or the stale-swap check each failed its test.
+  - `test:coverage`: 33 files, **638 tests pass**. `src/domain` and `schedule-grid.ts` are at 100%.
+  - Mutation checks: removing the focus restore, the refocus, the rest warning, the focus guard, the Edit lock, the Dismiss focus, the document nonce, the stale-swap check or clearing the notice on the next drag each failed its test.
   - A clean build without the harness passes, and `check:secrets` passes against the real server values (not printed).
-  - Harness in Chromium at 390 and 1440 px, **16/16** (after the review fixes):
+  - Harness in Chromium at 390 and 1440 px, **18/18** (after the review and CI fixes; 2 touch cases run on the phone project only):
     - mouse move, swap, unschedule and an unscheduled game swapping in;
     - keyboard pick-up, arrows, drop, cancel with focus kept, into day two, and into Unscheduled;
     - touch press and hold (Chromium touch emulation at 390 only), and a quick swipe that scrolls instead of dragging;
     - a refused save putting the card back, with the exact action payloads checked;
     - the success path, with the real action response rewritten to `ok`, showing the notice and rest warning while it stays in view;
     - axe with no serious or critical issues, no sideways scroll, and no CSP violations from dragging;
-    - the two review regressions: drag styles after a client-side navigation, and Tab cancelling.
+    - the two review regressions (drag styles after a client-side navigation, Tab cancelling) and the CI regression (dragging a card from under the pinned notice).
   - Captures: `.impeccable/review/phase5c2/{mobile,desktop}/` (grid, mouse and keyboard dragging, refused, rest warning, touch dragging).
 - **Runs in CI on push:** the new E2E "moves, swaps and unschedules games by drag and drop, warning about short rest" (keyboard with a Tab cancel, and mouse with a mid-drag style check; stored results checked, no scores written).
 - **NOT RUN:**

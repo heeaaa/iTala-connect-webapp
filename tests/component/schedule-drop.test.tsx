@@ -207,6 +207,20 @@ describe('dropping games (E-45)', () => {
     expect(status().parentElement).toHaveAttribute('data-tone', 'error');
   });
 
+  it('clears the last notice as soon as the next drag starts', async () => {
+    renderGrid();
+    await drop(uuid(201), slot('10:00', 1));
+    expect(status()).toHaveTextContent('Moved Hawks vs Owls (Open)');
+    act(() =>
+      dnd.handlers.onDragStart!(
+        { nativeEvent: new Event('pointerdown'), operation: { source: { id: uuid(202) } } },
+        { actions: { setDropTarget: vi.fn() } },
+      ),
+    );
+    expect(status()).toHaveTextContent('');
+    expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument();
+  });
+
   it('does nothing for a cancelled drag, its own slot, no target, or two unscheduled games', async () => {
     renderGrid([...games, game(4, null, null, 1, 2)]);
     await drop(uuid(201), slot('10:00', 1), true);

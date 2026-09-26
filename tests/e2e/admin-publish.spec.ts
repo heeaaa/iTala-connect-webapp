@@ -144,7 +144,8 @@ test('adds, validates, edits and deletes games on the published schedule', async
 });
 
 async function mouseDrag(page: Page, handle: Locator, target: Locator) {
-  await handle.scrollIntoViewIfNeeded();
+  // hover() scrolls the handle clear of anything pinned over it (such as the schedule notice).
+  await handle.hover();
   const from = (await handle.boundingBox())!;
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();

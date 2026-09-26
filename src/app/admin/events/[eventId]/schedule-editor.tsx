@@ -573,6 +573,8 @@ export function ScheduleEditor({
   };
 
   const onDragStart: Handlers['onDragStart'] = (e, manager) => {
+    // A new drag supersedes the last result, and the pinned notice must not sit over the drop targets.
+    setStatus(null);
     const game = shown.find((g) => g.id === e.operation.source?.id);
     keyboard.current = e.nativeEvent instanceof KeyboardEvent && game ? ownTarget(game) : null;
     if (keyboard.current) void manager.actions.setDropTarget(targetId(keyboard.current));
