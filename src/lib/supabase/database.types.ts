@@ -758,11 +758,12 @@ export type Database = {
         Args: { p_clear_scores?: boolean; p_event_id: string; p_games: Json }
         Returns: number
       }
-      save_draft_editor: {
+      save_event_editor: {
         Args: {
           p_details: Json
           p_divisions: Json
           p_event_id: string
+          p_unschedule?: string[]
           p_version: string
         }
         Returns: string

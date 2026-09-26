@@ -134,10 +134,10 @@ describe('Atomic mobile import', () => {
     });
     const { id, version, divisions, ...details } = input;
     const saveArgs = { p_event_id: id, p_version: version, p_details: details, p_divisions: divisions };
-    expect((await (await signedInClient(other)).rpc('save_draft_editor', saveArgs)).error?.code).toBe('42501');
-    const result = await client.rpc('save_draft_editor', saveArgs);
+    expect((await (await signedInClient(other)).rpc('save_event_editor', saveArgs)).error?.code).toBe('42501');
+    const result = await client.rpc('save_event_editor', saveArgs);
     expect(result.error).toBeNull();
-    expect((await client.rpc('save_draft_editor', saveArgs)).error?.code).toBe('40001');
+    expect((await client.rpc('save_event_editor', saveArgs)).error?.code).toBe('40001');
     const players = (
       await client
         .from('players')
@@ -149,7 +149,7 @@ describe('Atomic mobile import', () => {
     expect(
       (await client.from('division_mobile_links').select('*').eq('division_id', divisions[0]!.id)).data,
     ).toHaveLength(1);
-    const bad = await client.rpc('save_draft_editor', {
+    const bad = await client.rpc('save_event_editor', {
       ...saveArgs,
       p_version: result.data!,
       p_details: { ...details, name: 'Should roll back' },

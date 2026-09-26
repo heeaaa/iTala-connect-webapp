@@ -2,7 +2,9 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { serverEnv } from '@/env';
+import { reconcileSchedule } from '@/domain/schedule-edit';
 import { editorSchema, type EditorInput } from '@/lib/event-editor';
+import { gamesFromRows } from '@/lib/public-event/model';
 import { createClient } from '@/lib/supabase/server';
 import { authorizeAdmin, canEditEvent, type ActionResult } from '@/server/auth';
 import { DEFAULT_RULES_HTML } from '@/server/event-defaults';
@@ -24,7 +26,19 @@ export async function createEvent(name: string): Promise<ActionResult<string>> {
   return { ok: true, data };
 }
 
-export async function saveDraft(input: EditorInput): Promise<ActionResult<string>> {
+export type SaveOutcome = {
+  version: string;
+  /** Games moved to Unscheduled because they no longer fit (E-14). */
+  moved: number;
+};
+
+/**
+ * Editor save for drafts and published events (E-02, E-05, E-14). On a
+ * published event, games that no longer fit the new days, hours or courts
+ * are found with the ported reconcileSchedule and unscheduled in the same
+ * transaction. Scores, provenance and mobile links are never written (E-06).
+ */
+export async function saveEvent(input: EditorInput): Promise<ActionResult<SaveOutcome>> {
   const auth = await authorizeAdmin();
   if (!auth.ok) return auth;
   const parsed = editorSchema.safeParse(input);
@@ -33,11 +47,25 @@ export async function saveDraft(input: EditorInput): Promise<ActionResult<string
   const { id, version, divisions, ...details } = parsed.data;
   if (!(await canEditEvent(id))) return { ok: false, error: 'You can only edit your own events.' };
   const db = await createClient();
-  const { data, error } = await db.rpc('save_draft_editor', {
+  const { data: games, error: gamesError } = await db
+    .from('games')
+    .select(
+      'id, division_id, day, start_time, court, group_id, team1_id, team2_id, label, type, is_playoff, bracket_game_id, team1_source, team2_source, playoff_round, position',
+    )
+    .eq('event_id', id);
+  if (gamesError) return { ok: false, error: 'Could not save the event. Please try again.' };
+  const stored = gamesFromRows(games);
+  const reconciled = reconcileSchedule(
+    { days: details.schedule_days, timeStart: details.time_start, timeEnd: details.time_end, courts: details.courts },
+    stored,
+  );
+  const unschedule = reconciled.games.filter((g, i) => g.day === null && stored[i]!.day !== null).map((g) => g.id);
+  const { data, error } = await db.rpc('save_event_editor', {
     p_event_id: id,
     p_version: version,
     p_details: details,
     p_divisions: divisions,
+    p_unschedule: unschedule,
   });
   if (error)
     return {
@@ -45,12 +73,12 @@ export async function saveDraft(input: EditorInput): Promise<ActionResult<string
       error:
         error.code === '40001'
           ? 'This event changed in another window. Reload before saving.'
-          : 'Could not save the draft. Check the details and try again.',
+          : 'Could not save the event. Check the details and try again.',
     };
   revalidatePath('/admin');
   revalidatePath(`/admin/events/${id}`);
   revalidatePath(`/events/${id}`);
-  return { ok: true, data };
+  return { ok: true, data: { version: data, moved: unschedule.length } };
 }
 
 export async function deleteEvent(eventId: string): Promise<ActionResult> {

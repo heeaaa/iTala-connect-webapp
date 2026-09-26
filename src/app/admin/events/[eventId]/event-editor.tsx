@@ -2,11 +2,11 @@
 import { contrastRatio } from '@/lib/color';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, useTransition } from 'react';
 import { republishWarning } from '@/domain/publish';
 import { type Game } from '@/domain/types';
 import { DIVISION_COLOURS, type EditorInput, type EditorDivision, type EditorTeam } from '@/lib/event-editor';
-import { saveDraft } from '@/server/actions/events';
+import { saveEvent } from '@/server/actions/events';
 import { publishEvent } from '@/server/actions/publish';
 import { platformStyles as s, TitlePlate } from '@/components/platform/platform-frame';
 import { ConfirmDialog } from '../../_components/confirm-dialog';
@@ -16,17 +16,22 @@ import { useUnsavedGuard } from '../../_components/use-unsaved-guard';
 import w from '../../admin-workspace.module.css';
 import { MatchupReport, repeatedMatchups } from './matchup-report';
 
-export function DraftEditor({
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** Days, hours and courts: the fields that autosave a published event (E-05). */
+const windowOf = (d: EditorInput) => JSON.stringify([d.schedule_days, d.time_start, d.time_end, d.courts]);
+
+export function EventEditor({
   initial,
   links,
   games,
-  readOnly,
+  published,
   notice,
 }: {
   initial: EditorInput;
   games: Game[];
   links: Record<string, { league_name: string; season: string | null }>;
-  readOnly: boolean;
+  published: boolean;
   notice: string;
 }) {
   const [data, setData] = useState(initial);
@@ -64,23 +69,56 @@ export function DraftEditor({
   useUnsavedGuard(dirty, (proceed) =>
     setConfirm({ title: 'Discard unsaved changes?', message: 'Your latest edits have not been saved.', run: proceed }),
   );
-  /** Saves the draft first when needed, so Publish uses what is on screen (E-02). */
-  const save = async () => {
-    const result = await saveDraft(data);
-    if (!result.ok) {
-      setError(result.error);
-      return false;
-    }
-    const next = { ...data, version: result.data };
-    setData(next);
-    setSaved(JSON.stringify(next));
-    return true;
+  // Saves run one after another on the latest edits and version, so an
+  // autosave and a manual Save never race on the edit token.
+  const latest = useRef(data);
+  const version = useRef(initial.version);
+  const queue = useRef(Promise.resolve(true));
+  useEffect(() => {
+    latest.current = data;
+  });
+  const accept = (snapshot: EditorInput, next: string) => {
+    version.current = next;
+    setData((v) => ({ ...v, version: next }));
+    setSaved(JSON.stringify({ ...snapshot, version: next }));
   };
+  const save = (): Promise<boolean> =>
+    (queue.current = queue.current.then(async () => {
+      const snapshot = latest.current;
+      const result = await saveEvent({ ...snapshot, version: version.current });
+      if (!result.ok) {
+        setError(result.error);
+        return false;
+      }
+      setError('');
+      accept(snapshot, result.data.version);
+      const moved = result.data.moved;
+      setMessage(
+        moved
+          ? `Saved. ${plural(moved, 'game')} moved to Unscheduled because ${moved === 1 ? 'it no longer fits' : 'they no longer fit'} the event's days, hours or courts.`
+          : 'Saved',
+      );
+      if (published) router.refresh();
+      return true;
+    }));
+  const autosave = useEffectEvent(() => start(async () => void (await save())));
+  const windowKey = windowOf(data);
+  const savedWindow = useRef(windowKey);
+  useEffect(() => {
+    if (!published || windowKey === savedWindow.current) return;
+    const timer = setTimeout(() => {
+      savedWindow.current = windowKey;
+      autosave();
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [published, windowKey]);
   const publish = (clearScores = false) => {
     setError('');
     setMessage('');
     start(async () => {
+      // Publish uses what is on screen, so unsaved edits are saved first (E-02).
       if (dirty && !(await save())) return;
+      setMessage('');
       const result = await publishEvent(data.id, clearScores);
       if (!result.ok) setError(result.error);
       else if (result.data.status === 'confirm')
@@ -90,12 +128,14 @@ export function DraftEditor({
           run: () => publish(true),
         });
       else {
-        const n = result.data.games;
-        setMessage(`Published with ${n} game${n === 1 ? '' : 's'}.`);
+        accept(latest.current, result.data.version);
+        setMessage(`Published with ${plural(result.data.games, 'game')}.`);
         router.refresh();
       }
     });
   };
+  const divisionGames = (id: string) => games.filter((g) => g.divisionId === id).length;
+  const teamGames = (id: string) => games.filter((g) => g.team1Id === id || g.team2Id === id).length;
   const change = <K extends keyof EditorInput>(key: K, value: EditorInput[K]) => {
     setData((v) => ({ ...v, [key]: value }));
     setMessage('');
@@ -124,15 +164,16 @@ export function DraftEditor({
   );
   return (
     <>
-      <TitlePlate title={initial.name || 'Event editor'} sub={readOnly ? 'Published event' : 'Draft event'} />
+      <TitlePlate title={initial.name || 'Event editor'} sub={published ? 'Published event' : 'Draft event'} />
       {message && (
         <p role="status" className={w.notice}>
           {message}
         </p>
       )}
-      {readOnly && (
+      {published && (
         <p className={w.notice}>
-          This event is published. <Link href={`/events/${data.id}`}>Open its schedule and enter scores.</Link>
+          This event is published. <Link href={`/events/${data.id}`}>Open its public page to enter scores.</Link>{' '}
+          Changes to days, hours and courts save automatically; other edits need Save.
         </p>
       )}
       <form
@@ -142,13 +183,15 @@ export function DraftEditor({
         onSubmit={(e) => {
           e.preventDefault();
           setError('');
-          start(async () => {
-            if (await save()) setMessage('Saved');
-          });
+          start(async () => void (await save()));
         }}
       >
         <div className={w.actions}>
-          {!readOnly && (
+          {published ? (
+            <button disabled={pending} className={`${s.button} ${s.buttonLive}`}>
+              {pending ? 'Saving…' : 'Save'}
+            </button>
+          ) : (
             <>
               <button disabled={pending} className={`${s.button} ${s.buttonTeal}`}>
                 {pending ? 'Saving…' : 'Save draft'}
@@ -163,7 +206,7 @@ export function DraftEditor({
               </button>
             </>
           )}
-          <Link href="/admin">{readOnly ? 'Back to events' : 'Cancel'}</Link>
+          <Link href="/admin">Cancel</Link>
           <button
             type="button"
             onClick={() => form.current?.querySelectorAll('details').forEach((d) => (d.open = true))}
@@ -181,16 +224,12 @@ export function DraftEditor({
         <p role="alert" className={s.formError}>
           {error}
         </p>
-        <fieldset disabled={readOnly || pending} className={w.stack}>
+        <fieldset className={w.stack}>
           <details open className={w.section}>
             <summary>Event details</summary>
             <div className={w.stack}>
               {field('name', 'Event name')}
-              <DatePicker
-                value={data.schedule_days}
-                onChange={(v) => change('schedule_days', v)}
-                disabled={readOnly || pending}
-              />
+              <DatePicker value={data.schedule_days} onChange={(v) => change('schedule_days', v)} />
               <div className={w.fields}>
                 {field('time_start', 'Daily start time', 'time')}
                 {field('time_end', 'Daily end time', 'time')}
@@ -374,7 +413,11 @@ export function DraftEditor({
                         onClick={() =>
                           setConfirm({
                             title: `Remove ${t.name || 'team'}?`,
-                            message: 'The team and its players will be removed when you save.',
+                            message: `The team and its players will be removed when you save.${
+                              teamGames(t.id)
+                                ? ` Its ${plural(teamGames(t.id), 'game')} will show TBD in its place.`
+                                : ''
+                            }`,
                             run: () => division(d.id, { teams: d.teams.filter((v) => v.id !== t.id) }),
                           })
                         }
@@ -402,7 +445,9 @@ export function DraftEditor({
                     onClick={() =>
                       setConfirm({
                         title: `Remove ${d.name || 'division'}?`,
-                        message: `Its ${d.teams.length} teams and their players will be removed when you save.`,
+                        message: divisionGames(d.id)
+                          ? `Its ${plural(d.teams.length, 'team')}, their players and ${plural(divisionGames(d.id), 'game')} will be removed when you save. Scores for those games are removed too.`
+                          : `Its ${plural(d.teams.length, 'team')} and their players will be removed when you save.`,
                         run: () =>
                           change(
                             'divisions',

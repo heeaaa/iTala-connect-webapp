@@ -1,14 +1,14 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type Game } from '@/domain/types';
 import { type EditorInput } from '@/lib/event-editor';
 
 const fake = vi.hoisted(() => ({ save: vi.fn(), publish: vi.fn(), refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: fake.refresh, push: vi.fn(), replace: vi.fn() }) }));
-vi.mock('@/server/actions/events', () => ({ saveDraft: fake.save }));
+vi.mock('@/server/actions/events', () => ({ saveEvent: fake.save }));
 vi.mock('@/server/actions/publish', () => ({ publishEvent: fake.publish }));
-import { DraftEditor } from '@/app/admin/events/[eventId]/draft-editor';
+import { EventEditor } from '@/app/admin/events/[eventId]/event-editor';
 import { MatchupReport } from '@/app/admin/events/[eventId]/matchup-report';
 
 beforeAll(() => {
@@ -63,12 +63,12 @@ const game = (a: number, b: number, extra: Partial<Game> = {}): Game => ({
   ...extra,
 });
 const editor = (games: Game[] = []) =>
-  render(<DraftEditor initial={initial} links={{}} games={games} readOnly={false} notice="" />);
+  render(<EventEditor initial={initial} links={{}} games={games} published={false} notice="" />);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  fake.save.mockResolvedValue({ ok: true, data: 'v2' });
-  fake.publish.mockResolvedValue({ ok: true, data: { status: 'published', games: 3 } });
+  fake.save.mockResolvedValue({ ok: true, data: { version: 'v2', moved: 0 } });
+  fake.publish.mockResolvedValue({ ok: true, data: { status: 'published', games: 3, version: 'v3' } });
 });
 
 describe('Team matchup report (E-30, E-31)', () => {
@@ -123,7 +123,7 @@ describe('Publish (E-02, E-60 to E-62)', () => {
     await user.click(screen.getByRole('button', { name: 'Publish' }));
     expect(await screen.findByText('Check the event details: bad')).toBeInTheDocument();
     expect(fake.publish).not.toHaveBeenCalled();
-    fake.publish.mockResolvedValueOnce({ ok: true, data: { status: 'published', games: 1 } });
+    fake.publish.mockResolvedValueOnce({ ok: true, data: { status: 'published', games: 1, version: 'v3' } });
     await user.click(screen.getByRole('button', { name: 'Publish' }));
     expect(await screen.findByRole('status')).toHaveTextContent('Published with 1 game.');
     expect(fake.save).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'League night 2026' }));
@@ -155,9 +155,77 @@ describe('Publish (E-02, E-60 to E-62)', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Published with 3 games.');
     expect(fake.publish).toHaveBeenLastCalledWith(initial.id, true);
   });
-  it('hides Save draft and Publish on a published event', () => {
-    render(<DraftEditor initial={initial} links={{}} games={[]} readOnly notice="" />);
+  it('saves with the version publishing returned, not the stale one', async () => {
+    const user = userEvent.setup();
+    editor();
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    await screen.findByText('Published with 3 games.');
+    await user.type(screen.getByLabelText('Event name'), '!');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Saved');
+    expect(fake.save).toHaveBeenLastCalledWith(expect.objectContaining({ version: 'v3', name: 'League night!' }));
+  });
+});
+
+describe('Published editing (E-02, E-05, E-14, E-22, E-23)', () => {
+  const publishedEditor = (games: Game[] = []) =>
+    render(<EventEditor initial={initial} links={{}} games={games} published notice="" />);
+  it('offers Save instead of Save draft and Publish', () => {
+    publishedEditor();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Changes to days, hours and courts save automatically/)).toBeInTheDocument();
+  });
+  it('autosaves a change of courts once, says how many games moved, and refreshes the schedule', async () => {
+    fake.save.mockResolvedValueOnce({ ok: true, data: { version: 'v2', moved: 2 } });
+    publishedEditor();
+    // A controlled, clamped number input: set the whole value at once.
+    fireEvent.change(screen.getByLabelText('Courts'), { target: { value: '2' } });
+    expect(await screen.findByRole('status', {}, { timeout: 3000 })).toHaveTextContent(
+      "Saved. 2 games moved to Unscheduled because they no longer fit the event's days, hours or courts.",
+    );
+    expect(fake.save).toHaveBeenCalledTimes(1);
+    expect(fake.save).toHaveBeenCalledWith(expect.objectContaining({ courts: 2, court_names: ['Court 1', 'Court 2'] }));
+    expect(fake.refresh).toHaveBeenCalled();
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+  });
+  it('does not autosave team edits: they need Save', async () => {
+    const user = userEvent.setup();
+    publishedEditor();
+    await user.type(screen.getByLabelText('Team 1 name'), ' B');
+    await new Promise((r) => setTimeout(r, 800));
+    expect(fake.save).not.toHaveBeenCalled();
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    fake.save.mockResolvedValueOnce({ ok: true, data: { version: 'v2', moved: 1 } });
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Saved. 1 game moved to Unscheduled because it no longer fits',
+    );
+  });
+  it('states the games that go with a removed division and the TBD left by a removed team', async () => {
+    const user = userEvent.setup();
+    publishedEditor([game(1, 2), game(2, 3), game(1, 3)]);
+    await user.click(screen.getByRole('button', { name: /^Remove team\s*Rats$/ }));
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      'The team and its players will be removed when you save. Its 2 games will show TBD in its place.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Remove division' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      'Its 3 teams, their players and 3 games will be removed when you save. Scores for those games are removed too.',
+    );
+  });
+  it('keeps the plain removal messages when there are no games', async () => {
+    const user = userEvent.setup();
+    publishedEditor();
+    await user.click(screen.getByRole('button', { name: /^Remove team\s*Rats$/ }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('The team and its players will be removed when you save.');
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('TBD');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Remove division' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      'Its 3 teams and their players will be removed when you save.',
+    );
   });
 });

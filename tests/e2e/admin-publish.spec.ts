@@ -47,8 +47,22 @@ test('creates an event, refuses an incomplete publish, then publishes and shows 
   expect(games).toHaveLength(1);
   expect(games![0]!.label).toBe('Open');
 
+  // Published editing: hours autosave (E-05) and the moved game is reported (E-14).
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
+  await page.getByLabel('Daily start time', { exact: true }).fill('10:00');
+  await expect(page.getByRole('status')).toHaveText(
+    "Saved. 1 game moved to Unscheduled because it no longer fits the event's days, hours or courts.",
+  );
+  const { data: moved } = await adminClient().from('games').select('day, court').eq('event_id', eventId).single();
+  expect(moved).toEqual({ day: null, court: null });
+  // Team edits need Save, and reach the public page.
+  await page.getByLabel('Team 2 name', { exact: true }).fill('Harbour Rats');
+  await expect(page.getByText('Unsaved changes', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+
   await page.goto(`/events/${eventId}?tab=teams`);
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
   await expect(page.getByText('Hawks')).toBeVisible();
-  await expect(page.getByText('Rats')).toBeVisible();
+  await expect(page.getByText('Harbour Rats')).toBeVisible();
 });

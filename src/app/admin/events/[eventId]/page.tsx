@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireAdmin, canEditEvent } from '@/server/auth';
 import type { EditorInput } from '@/lib/event-editor';
 import { gamesFromRows } from '@/lib/public-event/model';
-import { DraftEditor } from './draft-editor';
+import { EventEditor } from './event-editor';
 export default async function EventEditorPage({ params, searchParams }: PageProps<'/admin/events/[eventId]'>) {
   const { eventId } = await params;
   await requireAdmin(`/admin/events/${eventId}`);
@@ -60,11 +60,11 @@ export default async function EventEditorPage({ params, searchParams }: PageProp
   const query = await searchParams;
   const imported = typeof query.imported === 'string' ? query.imported.slice(0, 200) : undefined;
   return (
-    <DraftEditor
+    <EventEditor
       initial={input}
       links={links}
       games={gamesFromRows(event.games)}
-      readOnly={event.status !== 'draft'}
+      published={event.status !== 'draft'}
       notice={
         imported
           ? `Event created from ${imported}. Add dates and courts, then publish.`

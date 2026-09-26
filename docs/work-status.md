@@ -4,7 +4,9 @@ Last updated: 26/09/2026 (Claude, work laptop)
 
 ## Current handoff (26/09/2026, Claude on the work laptop)
 
-**Where things are:** Phase 3b is code complete. Phase 5 has started: slice 5a (publish and matchup report) is done. Both are on branch `handoff/codex`, committed and pushed. The next slice is **5b: published-event editing** (see "Phase 5 plan" below).
+**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish and matchup report) and 5b (published-event editing) are done, committed and pushed on branch `handoff/codex`. The next slice is **5c: the schedule editor** (see "Phase 5 plan" below).
+
+**Important for the Docker PC:** 5b adds migration `20260926000500_event_editor.sql` (replaces `save_draft_editor` with `save_event_editor`). Apply it (`npm run db:reset` on the local stack), then run `npm run db:types`. `src/lib/supabase/database.types.ts` was hand-edited for the new function and must come out with **no diff**; if it differs, keep the generated file.
 
 **Laptop split.** The work laptop has no Docker, so pgTAP, integration and E2E are **NOT RUN** there. It proves UI in real Chromium through a local-only harness route (`src/app/prototype/zz-*`, excluded in `.git/info/exclude`, never committed). On the Docker PC, after `git pull`, run:
 
@@ -15,8 +17,8 @@ npm run lint && npm run typecheck && npm run test:coverage
 npm run build && npm run check:secrets && npm run test:e2e
 ```
 
-- Expected: **60 E2E tests**: the previous 56, the new unsaved-guard test and the new publish journey, each at two viewports. Codex's last full Docker run was 56/56 before the guard work.
-- No migrations have changed since Codex's run: 145 pgTAP assertions and 21 integration tests are expected unchanged.
+- Expected: **60 E2E tests**: the previous 56, the new unsaved-guard test and the new publish journey (now also covering published editing), each at two viewports. Codex's last full Docker run was 56/56 before the guard work.
+- Expected: **154 pgTAP assertions** (145 plus 9 in the new `supabase/tests/007_event_editor.sql`) and **22 integration tests** (21 plus `tests/integration/event-editor.test.ts`). Both new files are written but NOT RUN.
 - Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
 
 ### Phase 3b close-out (26/09/2026)
@@ -60,11 +62,33 @@ npm run build && npm run check:secrets && npm run test:e2e
   - Harness: axe finds no serious or critical issues and nothing scrolls sideways at 390 and 1440 on the editor with the matchup report. Capture: `.impeccable/review/phase5a/{mobile,desktop}/editor.png`.
 - **NOT RUN (Docker):** `tests/e2e/admin-publish.spec.ts` (journey 1). It covers create, the refused publish without dates, the refused publish with one team, then a publish that saves first, "Published with 1 game.", one game row in the database, and the public page.
 
+### Phase 5b: published-event editing (26/09/2026)
+
+- **Migration `20260926000500_event_editor.sql`:** `save_event_editor(event, version, details, divisions, unschedule[])` replaces `save_draft_editor`. It works for drafts and published events in one transaction and never writes scores, provenance or mobile links itself (E-06). On a published event:
+  - It unschedules the listed games (E-14).
+  - Removing a division removes its games, and so their scores (E-22).
+  - Removing a team leaves its games TBD (E-23, through the teams foreign key).
+- **Action:** `saveEvent` (was `saveDraft`, `src/server/actions/events.ts`) runs the ported `reconcileSchedule` over the stored games to find the ones that no longer fit, passes their ids, and returns `{ version, moved }`.
+- **Editor:** `draft-editor.tsx` was renamed to `event-editor.tsx` (`EventEditor`).
+  - Published events get Save (the lime action) and a note that days, hours and courts save automatically.
+  - Changes to days, hours or courts autosave after 600 ms (E-05). Other edits need Save.
+  - After a save the page shows "Saved. N game(s) moved to Unscheduled because..." (E-14).
+  - Saves run one after another on the latest version, so an autosave and a manual Save cannot race.
+  - The form no longer disables while saving, so focus is kept.
+  - The removal confirmations state game counts and warn about scores (E-22, E-23).
+- **Bug fixed before it could ship:** publishing changes `events.updated_at` (the edit token), so the next save after publishing would have failed "changed in another window". `publishEvent` now returns the new version and the editor adopts it; a regression component test covers this.
+- **Evidence (work laptop):**
+  - Lint and typecheck pass. `test:coverage`: 27 files, **572 tests pass**.
+  - A clean build passes (after deleting stale `.next/dev/types` harness types).
+  - `check:secrets` passes against the real `.env` server values (not printed).
+  - Harness in Chromium, 390 and 1440 px: in published mode the autosave fires exactly once after a start-time change, the field stays focused and enabled, and axe finds no serious or critical issues.
+- **NOT RUN (Docker):** pgTAP `007_event_editor.sql`, `tests/integration/event-editor.test.ts`, and the extended `admin-publish.spec.ts`.
+- **For the 5b finish review:** an autosave error shows in the alert at the top of the form, which can be off-screen while editing lower down. A toast or a sticky status would fix it (E-07).
+- **Found on this laptop:** a git-ignored `.env` holds the hosted Supabase URL, secret key, mobile credentials and a Firebase URL. Next auto-loads it, so `npm run dev` would talk to the hosted project. CLAUDE.md keeps real values in `.env.local` (local stack) and Netlify only. Harness runs here override all server values with blanks, and nothing contacted the hosted or mobile projects.
+
 ### Phase 5 plan (remaining slices)
 
-1. **5b, published editing.** Save on published events (E-02), reconcile with a moved count (E-14), confirm when removing a division with its game count (E-22) and when removing a team with games (E-23), autosave rules (E-05).
-   - Needs a new `save_event_editor` RPC plus pgTAP, because `save_draft_editor` refuses published events.
-   - Phase 2 handovers to include: distinct days (zod done, database pending), and passing stored resolved playoff teams to round robin.
+1. Done: 5b. The Phase 2 handovers still open move to 5c: pass stored resolved playoff teams to round robin; add a distinct-days rule on `events.schedule_days` in the database (zod and the save RPC already de-duplicate).
 2. **5c, schedule editor.**
    - Day grids, game cards and the Unscheduled row (E-40 to E-44).
    - Drag and drop with dnd-kit, keyboard support and the rest warning (E-45).

@@ -8,8 +8,8 @@ import { createClient } from '@/lib/supabase/server';
 import { authorizeAdmin, canEditEvent, type ActionResult } from '@/server/auth';
 
 export type PublishOutcome =
-  /** Published; `games` fixtures were created. */
-  | { status: 'published'; games: number }
+  /** Published; `games` fixtures were created. `version` is the event's new edit token. */
+  | { status: 'published'; games: number; version: string }
   /** Nothing changed: ask first. `scores` is null when they could not be counted (E-62). */
   | { status: 'confirm'; scores: number | null };
 
@@ -78,9 +78,11 @@ export async function publishEvent(eventId: string, clearScores = false): Promis
       return { ok: true, data: { status: 'confirm', scores: await recordedScores(db, eventId) } };
     return { ok: false, error: 'Could not publish the event. Nothing was changed. Please try again.' };
   }
+  // Publishing changes the event row, so the editor needs its new version to save again.
+  const { data: after } = await db.from('events').select('updated_at').eq('id', eventId).single();
   revalidatePath('/admin');
   revalidatePath(`/admin/events/${eventId}`);
   revalidatePath(`/events/${eventId}`);
   revalidatePath('/');
-  return { ok: true, data: { status: 'published', games: count } };
+  return { ok: true, data: { status: 'published', games: count, version: after?.updated_at ?? '' } };
 }

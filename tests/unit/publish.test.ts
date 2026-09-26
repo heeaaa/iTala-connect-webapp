@@ -159,7 +159,8 @@ describe('publishEvent action', () => {
     vi.clearAllMocks();
     fake.authorize.mockResolvedValue({ ok: true });
     fake.canEdit.mockResolvedValue(true);
-    fake.single.mockResolvedValue({ data: event([division(1, 4)]), error: null });
+    // The same row serves the load and the version read after publishing.
+    fake.single.mockResolvedValue({ data: { ...event([division(1, 4)]), updated_at: 'v9' }, error: null });
     fake.count.mockResolvedValue({ count: 0, error: null });
     fake.rpc.mockResolvedValue({ data: 6, error: null });
   });
@@ -175,7 +176,7 @@ describe('publishEvent action', () => {
   });
   it('publishes the schedule the ported scheduler generates from the saved event', async () => {
     const result = await publishEvent(id);
-    expect(result).toEqual({ ok: true, data: { status: 'published', games: 6 } });
+    expect(result).toEqual({ ok: true, data: { status: 'published', games: 6, version: 'v9' } });
     const expected = gameRows(generateSchedule(eventSetupFromRows(event([]), [division(1, 4)])));
     expect(fake.rpc).toHaveBeenCalledWith('publish_event', {
       p_event_id: id,
@@ -190,7 +191,8 @@ describe('publishEvent action', () => {
     expect(await publishEvent(id)).toEqual({ ok: false, error: expect.stringContaining('Add teams to: Div 1') });
     fake.single.mockResolvedValue({ data: event([division(1, 2)], { time_end: '09:00:00' }), error: null });
     const none = await publishEvent(id);
-    expect(none).toEqual({ ok: true, data: { status: 'published', games: 6 } });
+    // No readable version: the editor then asks for a reload on its next save.
+    expect(none).toEqual({ ok: true, data: { status: 'published', games: 6, version: '' } });
     expect(fake.rpc).toHaveBeenLastCalledWith(
       'publish_event',
       expect.objectContaining({ p_games: [expect.objectContaining({ day: null, start_time: null })] }),
@@ -209,7 +211,7 @@ describe('publishEvent action', () => {
     fake.count.mockResolvedValue({ count: null, error: { message: 'down' } });
     expect(await publishEvent(id)).toEqual({ ok: true, data: { status: 'confirm', scores: null } });
     expect(fake.rpc).not.toHaveBeenCalled();
-    expect(await publishEvent(id, true)).toEqual({ ok: true, data: { status: 'published', games: 6 } });
+    expect(await publishEvent(id, true)).toEqual({ ok: true, data: { status: 'published', games: 6, version: 'v9' } });
     expect(fake.rpc).toHaveBeenCalledWith('publish_event', expect.objectContaining({ p_clear_scores: true }));
   });
   it('asks again when a score lands between the count and the publish', async () => {
