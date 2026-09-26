@@ -89,15 +89,15 @@ select is((select logo_path from public.events where id = '10000000-0000-0000-00
 -- ---------------------------------------------------------------------------
 -- The edit version (the editor's "changed in another window" token)
 -- ---------------------------------------------------------------------------
-select results_eq(
-  $$select version is not null and version = (select updated_at from public.events
-                                              where id = '10000000-0000-0000-0000-0000000000c7')
-    from public.set_event_logo('10000000-0000-0000-0000-0000000000c7',
-      'events/10000000-0000-0000-0000-0000000000c7/logo-1.webp', '2020-01-01T00:00:00Z')$$,
-  $$values (true)$$,
+-- The update trigger stamps now(), which is fixed for this transaction and far from 2020.
+-- (A subquery in the same statement as the call would still see the 2020 row.)
+select is(
+  (select version from public.set_event_logo('10000000-0000-0000-0000-0000000000c7',
+      'events/10000000-0000-0000-0000-0000000000c7/logo-1.webp', '2020-01-01T00:00:00Z')),
+  now(),
   'a caller on the current version gets the new version back');
-select isnt((select updated_at from public.events where id = '10000000-0000-0000-0000-0000000000c7'),
-  '2020-01-01T00:00:00Z'::timestamptz, 'changing the logo moves the version on');
+select is((select updated_at from public.events where id = '10000000-0000-0000-0000-0000000000c7'),
+  now(), 'changing the logo moves the version on');
 select results_eq(
   $$select version from public.set_event_logo('10000000-0000-0000-0000-0000000000c7',
       'events/10000000-0000-0000-0000-0000000000c7/logo-2.webp', '2019-06-01T00:00:00Z')$$,
@@ -146,10 +146,10 @@ reset role;
 update public.profiles set disabled_at = now() where id = '00000000-0000-0000-0000-0000000000a7';
 select pg_temp.login('00000000-0000-0000-0000-0000000000a7');
 select throws_ok(
-  $select * from public.set_event_logo('10000000-0000-0000-0000-0000000000a7')$,
+  $$select * from public.set_event_logo('10000000-0000-0000-0000-0000000000a7')$$,
   '42501', null, 'a disabled owner cannot change their logo');
 select throws_ok(
-  $select public.set_major_sponsor('10000000-0000-0000-0000-0000000000a7')$,
+  $$select public.set_major_sponsor('10000000-0000-0000-0000-0000000000a7')$$,
   '42501', null, 'a disabled owner cannot change their major sponsor');
 
 reset role;
