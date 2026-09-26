@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 const fixture = JSON.parse(readFileSync(new URL('../fixtures/mobile.json', import.meta.url), 'utf8'));
 let mode = 'normal';
+const started = Date.now();
 const requests = [];
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1:3211');
@@ -29,9 +30,15 @@ const server = createServer(async (req, res) => {
   const table = url.pathname.replace('/rest/v1/', '');
   if (req.method !== 'GET' || !['leagues', 'teams', 'players', 'final_game_scores'].includes(table))
     return send(405, { message: 'Mobile writes are forbidden' });
-  // Finished-game times are relative to now, so settling and today behave the same on every run.
-  const ago = { 'NOW-2H': 2 * 3600e3, 'NOW-1H': 3600e3, 'NOW-2M': 2 * 60e3, 'NOW-1M': 60e3 };
-  const at = (v, iso) => (v in ago ? (iso ? new Date(Date.now() - ago[v]).toISOString() : Date.now() - ago[v]) : v);
+  // Finished-game times are relative, so settling and today behave the same on every run. Games that
+  // finished hours ago are fixed at server start (an approved result must not drift between requests);
+  // only the still-settling game follows each request, to stay inside the 5-minute window.
+  const ago = { 'NOW-2H': [2 * 3600e3, started], 'NOW-1H': [3600e3, started], 'NOW-2M': [2 * 60e3], 'NOW-1M': [60e3] };
+  const at = (v, iso) => {
+    if (!(v in ago)) return v;
+    const [back, from = Date.now()] = ago[v];
+    return iso ? new Date(from - back).toISOString() : from - back;
+  };
   // 'changed': the ready result gained points and stats after it was approved (the drift case, M-05).
   const changed = (r) =>
     mode === 'changed' && r.game_id === 'fin-result'
