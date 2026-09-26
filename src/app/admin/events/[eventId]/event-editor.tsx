@@ -3,8 +3,8 @@ import { contrastRatio } from '@/lib/color';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useEffectEvent, useRef, useState, useTransition } from 'react';
+import { resolveAllPlayoffs } from '@/domain/playoffs';
 import { republishWarning } from '@/domain/publish';
-import { type Game } from '@/domain/types';
 import { DIVISION_COLOURS, type EditorInput, type EditorDivision, type EditorTeam } from '@/lib/event-editor';
 import { saveEvent } from '@/server/actions/events';
 import { publishEvent } from '@/server/actions/publish';
@@ -15,6 +15,7 @@ import { DatePicker } from '../../_components/date-picker';
 import { useUnsavedGuard } from '../../_components/use-unsaved-guard';
 import w from '../../admin-workspace.module.css';
 import { MatchupReport, repeatedMatchups } from './matchup-report';
+import { ScheduleEditor, type ScheduleGame } from './schedule-editor';
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -29,7 +30,8 @@ export function EventEditor({
   notice,
 }: {
   initial: EditorInput;
-  games: Game[];
+  /** Stored games with their scores, so playoff cards can show resolved teams (E-42). */
+  games: ScheduleGame[];
   links: Record<string, { league_name: string; season: string | null }>;
   published: boolean;
   notice: string;
@@ -494,6 +496,31 @@ export function EventEditor({
             </summary>
             <MatchupReport divisions={data.divisions} games={games} />
           </details>
+          {published && (
+            <details open className={w.section}>
+              <summary>Schedule</summary>
+              {/* The grid shows what is stored, so it reads the saved event, not unsaved edits. */}
+              <ScheduleEditor
+                event={{
+                  id: initial.id,
+                  days: initial.schedule_days,
+                  timeStart: initial.time_start,
+                  timeEnd: initial.time_end,
+                  courts: initial.courts,
+                  courtNames: initial.court_names,
+                }}
+                divisions={initial.divisions}
+                games={resolveAllPlayoffs(
+                  initial.divisions.map((d) => ({ id: d.id, teamIds: d.teams.map((t) => t.id) })),
+                  games,
+                )}
+                onChanged={(text) => {
+                  setMessage(text);
+                  router.refresh();
+                }}
+              />
+            </details>
+          )}
         </fieldset>
       </form>
       {players && (

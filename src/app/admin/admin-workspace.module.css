@@ -16,6 +16,9 @@
 }
 .stack {
   display: grid;
+  /* Children may shrink below their content, so wide tables scroll inside
+     their own container instead of widening the page (X-05). */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
 }
 .form {
@@ -277,4 +280,71 @@
   font-size: 0.95rem;
   font-weight: 500;
   font-stretch: 100%;
+}
+.unscheduled {
+  padding: 1rem;
+  background: var(--brand-surface);
+  border: 1px dashed var(--brand-border);
+}
+.unscheduled h3 {
+  margin-bottom: 0.75rem;
+}
+.unscheduledList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+  gap: 0.5rem;
+}
+.scheduleTable {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  min-width: 100%;
+}
+.scheduleTable th,
+.scheduleTable td {
+  border: 1px solid var(--brand-border);
+  padding: 0.35rem;
+  vertical-align: top;
+}
+.scheduleTable thead th {
+  color: var(--brand-muted);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  min-width: 11rem;
+}
+.scheduleTable thead th:first-child,
+.scheduleTable tbody th {
+  min-width: 5.5rem;
+  position: sticky;
+  left: 0;
+  background: var(--brand-surface);
+  color: var(--brand-muted);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+.emptySlot {
+  display: block;
+  color: var(--brand-muted);
+  padding: 0.5rem;
+}
+.gameCard {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.5rem 0.6rem;
+  border-inline-start: 3px solid var(--brand-border);
+  background: color-mix(in srgb, var(--card, transparent) 15%, var(--brand-surface));
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.gameLabel {
+  color: var(--brand-muted);
+  font-size: 0.8rem;
+}
+.gameEdit {
+  justify-self: start;
+  min-height: 2.75rem;
+  padding-inline: 0.25rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }

@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type Game } from '@/domain/types';
+import { type ScheduleGame } from '@/app/admin/events/[eventId]/schedule-editor';
 import { type EditorInput } from '@/lib/event-editor';
 
 const fake = vi.hoisted(() => ({ save: vi.fn(), publish: vi.fn(), refresh: vi.fn() }));
@@ -48,7 +49,9 @@ const initial: EditorInput = {
   theme_heading: '#FFFFFF',
   divisions: [division],
 };
-const game = (a: number, b: number, extra: Partial<Game> = {}): Game => ({
+let gameCount = 0;
+const game = (a: number, b: number, extra: Partial<Game> = {}): ScheduleGame => ({
+  id: uuid(900 + ++gameCount),
   day: null,
   time: null,
   court: null,
@@ -62,7 +65,7 @@ const game = (a: number, b: number, extra: Partial<Game> = {}): Game => ({
   score2: null,
   ...extra,
 });
-const editor = (games: Game[] = []) =>
+const editor = (games: ScheduleGame[] = []) =>
   render(<EventEditor initial={initial} links={{}} games={games} published={false} notice="" />);
 
 beforeEach(() => {
@@ -168,7 +171,7 @@ describe('Publish (E-02, E-60 to E-62)', () => {
 });
 
 describe('Published editing (E-02, E-05, E-14, E-22, E-23)', () => {
-  const publishedEditor = (games: Game[] = []) =>
+  const publishedEditor = (games: ScheduleGame[] = []) =>
     render(<EventEditor initial={initial} links={{}} games={games} published notice="" />);
   it('offers Save instead of Save draft and Publish', () => {
     publishedEditor();

@@ -14,7 +14,10 @@ async function accessible(page: Page) {
       .filter((v) => ['serious', 'critical'].includes(v.impact ?? ''))
       .map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })),
   ).toEqual([]);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // Compare with the configured viewport: mobile emulation widens innerWidth to fit overflowing content.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    page.viewportSize()!.width,
+  );
 }
 test.beforeEach(async ({ request }) => {
   organiser = await createUser('admin', { tag: 'import-e2e', name: 'Import organiser' });

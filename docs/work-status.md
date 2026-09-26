@@ -4,7 +4,15 @@ Last updated: 26/09/2026 (Claude, work laptop)
 
 ## Current handoff (26/09/2026, Claude on the work laptop)
 
-**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish and matchup report) and 5b (published-event editing) are done, committed and pushed on branch `handoff/codex`. The next slice is **5c: the schedule editor** (see "Phase 5 plan" below).
+**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish, matchup report), 5b (published-event editing) and 5c-1 (schedule grid and game dialog) are done and pushed on branch `handoff/codex`. Next: **5c-2, drag and drop** (dnd-kit), then 5c-3 (round robin and playoff dialogs).
+
+**CI now runs the Docker suites.** Draft PR https://github.com/heeaaa/iTala-connect-webapp/pull/1 (`handoff/codex` into `main`, not for merging yet) runs the full workflow on every push. **Run 36214770961 on `cd75ff2` was fully green:**
+- 60/60 E2E (390 and 1440 px), 154/154 pgTAP and 22/22 integration.
+- Lint, typecheck, unit coverage, build, `check:secrets` and gitleaks.
+- This is the first real-Supabase proof of the Phase 3b guard (signed-in Sign out and Back), publish and published editing.
+- The first run failed only on my new publish E2E: `getByRole('alert')` also matched Next's route announcer. That was fixed by scoping to `main`.
+
+Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
 
 **Important for the Docker PC:** 5b adds migration `20260926000500_event_editor.sql` (replaces `save_draft_editor` with `save_event_editor`). Apply it (`npm run db:reset` on the local stack), then run `npm run db:types`. `src/lib/supabase/database.types.ts` was hand-edited for the new function and must come out with **no diff**; if it differs, keep the generated file.
 
@@ -59,7 +67,8 @@ npm run build && npm run check:secrets && npm run test:e2e
 - **Evidence (work laptop):**
   - Lint and typecheck pass. `test:coverage`: 26 files, **564 tests pass**, 96.34% lines and 93.61% branches, `src/domain` 100%.
   - A clean `next build` without the harness passes, and `check:secrets` passes.
-  - Harness: axe finds no serious or critical issues and nothing scrolls sideways at 390 and 1440 on the editor with the matchup report. Capture: `.impeccable/review/phase5a/{mobile,desktop}/editor.png`.
+  - Harness: axe finds no serious or critical issues on the editor with the matchup report. Capture: `.impeccable/review/phase5a/{mobile,desktop}/editor.png`.
+  - **Correction (found in 5c-1):** the "no sideways scroll" check was blind on mobile emulation. It compared against `innerWidth`, which mobile Chrome widens to fit overflowing content, and the editor was in fact 418 px wide at 390. Fixed in 5c-1 (see below).
 - **NOT RUN (Docker):** `tests/e2e/admin-publish.spec.ts` (journey 1). It covers create, the refused publish without dates, the refused publish with one team, then a publish that saves first, "Published with 1 game.", one game row in the database, and the public page.
 
 ### Phase 5b: published-event editing (26/09/2026)
@@ -86,14 +95,30 @@ npm run build && npm run check:secrets && npm run test:e2e
 - **For the 5b finish review:** an autosave error shows in the alert at the top of the form, which can be off-screen while editing lower down. A toast or a sticky status would fix it (E-07).
 - **Found on this laptop:** a git-ignored `.env` holds the hosted Supabase URL, secret key, mobile credentials and a Firebase URL. Next auto-loads it, so `npm run dev` would talk to the hosted project. CLAUDE.md keeps real values in `.env.local` (local stack) and Netlify only. Harness runs here override all server values with blanks, and nothing contacted the hosted or mobile projects.
 
+### Phase 5c-1: schedule grid and game dialog (26/09/2026)
+
+- **Schedule section** (published events only, after the matchup report; E-40 to E-44): `schedule-editor.tsx`.
+  - One table per day: hourly slots with end minutes honoured (E-41), plus off-grid times, days and courts that games already use. Pure model in `src/lib/schedule-grid.ts`.
+  - Court-name columns, a sticky time column, and horizontal scroll inside the card.
+  - Cards: division colour, or `playoffColour` for semis and finals (E-43, valid hex). Label, "Team vs Team" with playoff teams resolved from standings (E-42), and Edit.
+  - The Unscheduled row, with its count and empty hint.
+  - The grid reads the saved event, not unsaved edits.
+- **Game dialog** (E-46 to E-50): Day (or Unscheduled), a typed time, Court, Division, Label, Team 1 and 2 ("Team (Division)" or TBD) and Type.
+  - Messages: "A team can't play itself..." and "That slot (DD/MM/YYYY 9:00 am Court) is already taken." (checked in the client, with the slot index as the final guard on the server).
+  - Delete asks "Delete this game?"; its score goes with it.
+  - Bracket games explain that bracket results replace hand-picked teams, and offer "Detach from the bracket".
+  - The dialog renders in a portal (no nested forms) with `data-keeps-page`.
+- **Actions** `src/server/actions/games.ts`: `saveGame` and `deleteGame`. Each does auth, zod and ownership checks, then writes through the session client (RLS plus the `games_validate_refs` trigger), and never writes scores. Every change saves at once (E-05).
+- **Layout bug fixed** (X-05): `.stack` grid children could not shrink below their content, so wide tables widened the page on mobile (418 px editor, 457 px with the schedule, at a 390 px viewport). The fix is `grid-template-columns: minmax(0, 1fr)`.
+  - Red on the old CSS and green on the new, in the harness at 390 px.
+  - The E2E overflow checks in `mobile-import.spec.ts` and `today-prototype.spec.ts` now compare with `page.viewportSize()`. The Today prototype passes 8/8 under the stronger check.
+- **Evidence (work laptop):** lint and typecheck pass; 30 files, **594 unit and component tests pass**; clean build passes; `check:secrets` passes against the real server values. Harness at 390 and 1440 px: the grid and dialog pass axe with no overflow. Captures: `.impeccable/review/phase5c/{mobile,desktop}/{schedule,game-dialog}.png`.
+- **Runs in CI on push:** the new E2E "adds, validates, edits and deletes games on the published schedule", plus the strengthened overflow checks.
+
 ### Phase 5 plan (remaining slices)
 
 1. Done: 5b. The Phase 2 handovers still open move to 5c: pass stored resolved playoff teams to round robin; add a distinct-days rule on `events.schedule_days` in the database (zod and the save RPC already de-duplicate).
-2. **5c, schedule editor.**
-   - Day grids, game cards and the Unscheduled row (E-40 to E-44).
-   - Drag and drop with dnd-kit, keyboard support and the rest warning (E-45).
-   - Game dialog, validation and delete (E-46 to E-50).
-   - "+ Round robin" and "+ Playoff" dialogs (E-63, E-64).
+2. **5c, schedule editor.** 5c-1 is done. 5c-2: drag and drop with dnd-kit (mouse, touch, keyboard), swap, move and unschedule through the existing RPCs, and the non-blocking 120-minute rest warning (E-45). 5c-3: "+ Round robin" and "+ Playoff" dialogs (E-63, E-64), with stored resolved playoff teams passed to round robin (Phase 2 handover).
 3. **5d, rules and images.** Tiptap rules editor (E-70, E-71), logo and sponsor uploads with compression and removal (E-15 to E-18).
 4. **5e, platform admin.** Settings sponsors and the default rules template (S-01, S-02), the Admins screen (A-09), dashboard View and Results actions (D-02).
 5. **Then** E2E journeys 2, 4, 7 and 8, and a finish review per new surface.

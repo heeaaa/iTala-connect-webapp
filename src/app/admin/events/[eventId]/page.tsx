@@ -13,7 +13,7 @@ export default async function EventEditorPage({ params, searchParams }: PageProp
   const { data: event, error } = await db
     .from('events')
     .select(
-      '*, divisions(*, teams(*, players(*)), division_mobile_links(league_name, season)), games(id, division_id, day, start_time, court, group_id, team1_id, team2_id, label, type, is_playoff, bracket_game_id, team1_source, team2_source, playoff_round, position)',
+      '*, divisions(*, teams(*, players(*)), division_mobile_links(league_name, season)), games(id, division_id, day, start_time, court, group_id, team1_id, team2_id, label, type, is_playoff, bracket_game_id, team1_source, team2_source, playoff_round, position, game_scores(s1, s2))',
     )
     .eq('id', eventId)
     .single();
@@ -57,13 +57,18 @@ export default async function EventEditorPage({ params, searchParams }: PageProp
   const links = Object.fromEntries(
     event.divisions.filter((d) => d.division_mobile_links).map((d) => [d.id, d.division_mobile_links!]),
   );
+  const scores = new Map(event.games.map((g) => [g.id, g.game_scores]));
   const query = await searchParams;
   const imported = typeof query.imported === 'string' ? query.imported.slice(0, 200) : undefined;
   return (
     <EventEditor
       initial={input}
       links={links}
-      games={gamesFromRows(event.games)}
+      games={gamesFromRows(event.games).map((g) => ({
+        ...g,
+        score1: scores.get(g.id)?.s1 ?? null,
+        score2: scores.get(g.id)?.s2 ?? null,
+      }))}
       published={event.status !== 'draft'}
       notice={
         imported
