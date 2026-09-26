@@ -682,6 +682,15 @@ The event editor is a stack of native disclosure sections ("Event details", "Div
 #### Workspace notices
 Inside the admin workspace a notice is a 1 px teal outline with no fill, 1rem padding and Ink body text that wraps anywhere, running the width of its form. It carries status after an action ("Saved", announced as a status), a league link ("Linked to iTala mobile: Harbour League (2026)"), the read-only note on a published event, the event-colour contrast warning, and pending image clean-up with its own action row. Load failures keep the Alert Red outline.
 
+#### Schedule drag and drop
+The published event's schedule grid moves games by drag and drop (E-45).
+- **Move handle:** each game card ends in an action row of **Move** (a six-dot grip in Muted Ink, then the word, `cursor: grab`) and **Edit** (underlined text). Both are at least 2.75rem tall and carry the matchup in screen-reader text ("Move Hawks vs Owls"). Only the handle starts a drag: a mouse drags at once, touch needs a press and hold (250 ms), so a swipe on a card still scrolls the table on a phone.
+- **Keyboard:** Space or Enter picks the game up, arrow keys step one cell at a time (across courts, through the times, on into the next day, and up into the Unscheduled row and its games), Space or Enter drops, and Escape or Tab cancels, so leaving the grid never moves a game. Focus stays on the game's Move button, in its new cell after a drop.
+- **Drop target:** the cell, Unscheduled game or Unscheduled row under the game gets a 2 px teal outline drawn inside its edge (the current place, The Teal Is Identity Rule).
+- **Lifted card:** the dragged card keeps its look on Raised Plate with a 2 px teal outline; no shadow. It lands instantly: no drop animation and no keyboard glide, because platform screens have no motion beyond colour transitions.
+- **Outcome:** the card shows in its new place at once and settles when the save returns; a refused save puts it back. Dragging and Edit wait while a move saves.
+- **Schedule notice:** the result sits in a notice pinned to the foot of the viewport while the schedule is on screen (`position: sticky`): Raised Plate, 1 px teal outline (Alert Red when refused), at most 40rem wide, with a **Dismiss** text action that hands focus back to the game. It names the move ("Moved Hawks vs Owls (Open) to Sat 03/10/2026 10:00 am, Court 1.") and adds a **Rest warning:** line for each team left with two games under 2 hours apart. The warning never blocks the move. "Saving…" shows while the save runs.
+
 #### Motion
 One easing, `cubic-bezier(0.16, 1, 0.3, 1)`. Colour transitions 150ms (nav links, buttons, rows, date blocks, input underlines). The title plate wipe (420ms, sub-strip delayed 120ms) is the signature and runs once. The LIVE pip (1.6s ease-in-out, infinite) is the only repeating motion. Under `prefers-reduced-motion` the wipe, the pip and every transition are off.
 

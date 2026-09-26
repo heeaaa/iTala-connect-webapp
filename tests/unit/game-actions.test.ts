@@ -13,11 +13,13 @@ vi.mock('@/server/auth', () => ({ authorizeAdmin: fake.authorize, canEditEvent: 
 vi.mock('@/lib/supabase/server', () => ({
   // A chainable query recorder: every call is logged; awaiting a terminal
   // (single, maybeSingle) returns the result set for "<table>.<first op>".
+  // Awaiting the chain itself (a list query) works the same way; rpc calls
+  // are logged under table "rpc" with the function name as the op.
   createClient: async () => ({
     from: (table: string) => {
       let first = '';
       const chain: Record<string, unknown> = {};
-      for (const op of ['select', 'insert', 'update', 'delete', 'eq', 'order', 'limit'])
+      for (const op of ['select', 'insert', 'update', 'delete', 'eq', 'in', 'order', 'limit'])
         chain[op] = (...args: unknown[]) => {
           if (!first) first = op;
           fake.calls.push({ table, op, args });
@@ -26,11 +28,16 @@ vi.mock('@/lib/supabase/server', () => ({
       const done = async () => fake.results[`${table}.${first}`] ?? { data: null, error: null };
       chain.single = done;
       chain.maybeSingle = done;
+      chain.then = (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => done().then(resolve, reject);
       return chain;
+    },
+    rpc: async (fn: string, args: unknown) => {
+      fake.calls.push({ table: 'rpc', op: fn, args: [args] });
+      return fake.results[`rpc.${fn}`] ?? { data: null, error: null };
     },
   }),
 }));
-import { deleteGame, saveGame, type GameInput } from '@/server/actions/games';
+import { deleteGame, dropGame, saveGame, type DropInput, type GameInput } from '@/server/actions/games';
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const input = (extra: Partial<GameInput> = {}): GameInput => ({
@@ -142,5 +149,133 @@ describe('deleteGame (E-49)', () => {
       ok: false,
       error: 'Could not delete the game. Refresh and try again.',
     });
+  });
+});
+
+describe('dropGame (E-45)', () => {
+  // Stored rows: game 200 at Sat 9:00 on court 1, game 201 at Sat 10:00 on court 2, others unscheduled.
+  const stored: Record<number, { day: string | null; start_time: string | null; court: number | null }> = {
+    200: { day: '2026-10-03', start_time: '09:00:00', court: 1 },
+    201: { day: '2026-10-03', start_time: '10:00:00', court: 2 },
+  };
+  const found = (...ids: number[]) => ({
+    data: ids.map((n) => ({ id: uuid(n), ...(stored[n] ?? { day: null, start_time: null, court: null }) })),
+    error: null,
+  });
+  const seen = {
+    200: { day: '2026-10-03', time: '09:00', court: 1 },
+    201: { day: '2026-10-03', time: '10:00', court: 2 },
+  };
+  const swap = (other = 201, extra: Partial<DropInput> = {}): DropInput =>
+    ({
+      kind: 'swap',
+      eventId: uuid(1),
+      gameId: uuid(200),
+      otherId: uuid(other),
+      gameSlot: seen[200],
+      otherSlot: seen[201],
+      ...extra,
+    }) as DropInput;
+  const move = (extra: Partial<DropInput> = {}): DropInput =>
+    ({
+      kind: 'move',
+      eventId: uuid(1),
+      gameId: uuid(200),
+      day: '2026-10-03',
+      time: '10:00',
+      court: 2,
+      ...extra,
+    }) as DropInput;
+  const rpcs = () => fake.calls.filter((c: Call) => c.table === 'rpc').map((c: Call) => [c.op, c.args[0]]);
+
+  it('moves a game of this event to a free slot through move_game', async () => {
+    fake.results['games.select'] = found(200);
+    expect(await dropGame(move())).toEqual({ ok: true, data: undefined });
+    expect(calls('games', 'eq')).toContainEqual(['event_id', uuid(1)]);
+    expect(calls('games', 'in')).toEqual([['id', [uuid(200)]]]);
+    expect(rpcs()).toEqual([
+      ['move_game', { p_game_id: uuid(200), p_day: '2026-10-03', p_start_time: '10:00', p_court: 2 }],
+    ]);
+    expect(fake.revalidate).toHaveBeenCalledWith(`/admin/events/${uuid(1)}`);
+    expect(fake.calls.some((c: Call) => c.table === 'game_scores')).toBe(false);
+  });
+
+  it('swaps two games and unschedules one through their database functions', async () => {
+    fake.results['games.select'] = found(200, 201);
+    expect(await dropGame(swap())).toEqual({
+      ok: true,
+      data: undefined,
+    });
+    fake.results['games.select'] = found(200);
+    expect(await dropGame({ kind: 'unschedule', eventId: uuid(1), gameId: uuid(200) })).toEqual({
+      ok: true,
+      data: undefined,
+    });
+    expect(rpcs()).toEqual([
+      ['swap_games', { p_a: uuid(200), p_b: uuid(201) }],
+      ['unschedule_game', { p_game_id: uuid(200) }],
+    ]);
+  });
+
+  it('refuses a swap when either game has moved since the organiser saw it', async () => {
+    // Another window unscheduled game 201 after this grid was drawn.
+    stored[201] = { day: null, start_time: null, court: null };
+    fake.results['games.select'] = found(200, 201);
+    try {
+      expect(await dropGame(swap())).toEqual({
+        ok: false,
+        error: 'The schedule changed in another window. It has been refreshed; try again.',
+      });
+      fake.results['games.select'] = found(200, 201);
+      expect(await dropGame(swap(201, { otherSlot: { day: null, time: null, court: null } }))).toEqual({
+        ok: true,
+        data: undefined,
+      });
+    } finally {
+      stored[201] = { day: '2026-10-03', start_time: '10:00:00', court: 2 };
+    }
+    expect(rpcs()).toEqual([['swap_games', { p_a: uuid(200), p_b: uuid(201) }]]);
+    expect(fake.revalidate).toHaveBeenCalledWith(`/admin/events/${uuid(1)}`);
+  });
+
+  it('names the taken slot and refreshes when another change got there first', async () => {
+    fake.results['games.select'] = found(200);
+    fake.results['rpc.move_game'] = { data: null, error: { code: '23505', message: 'games_slot_unique' } };
+    expect(await dropGame(move())).toEqual({
+      ok: false,
+      error: 'That slot (03/10/2026 10:00 am West court) is already taken. The schedule has been refreshed.',
+    });
+    expect(fake.revalidate).toHaveBeenCalledWith(`/admin/events/${uuid(1)}`);
+    fake.results['rpc.move_game'] = { data: null, error: { code: '42501', message: 'secret detail' } };
+    expect(await dropGame(move())).toEqual({
+      ok: false,
+      error: 'Could not move the game. The schedule has been refreshed; try again.',
+    });
+  });
+
+  it('refuses games from another event, a court the event lacks and bad input before any write', async () => {
+    fake.results['games.select'] = found(200);
+    expect(await dropGame(swap(999))).toEqual({
+      ok: false,
+      error: 'The schedule changed in another window. It has been refreshed; try again.',
+    });
+    expect(await dropGame(move({ court: 3 } as Partial<DropInput>))).toEqual({
+      ok: false,
+      error: 'Choose a court from 1 to 2.',
+    });
+    fake.results['events.select'] = { data: null, error: null };
+    expect((await dropGame(move())).ok).toBe(false);
+    expect((await dropGame(move({ time: '25:00' } as Partial<DropInput>))).ok).toBe(false);
+    expect((await dropGame(swap(200))).ok).toBe(false);
+    expect((await dropGame({ kind: 'teleport' } as unknown as DropInput)).ok).toBe(false);
+    expect(rpcs()).toEqual([]);
+  });
+
+  it('refuses unauthorised callers and other owners', async () => {
+    fake.canEdit.mockResolvedValue(false);
+    expect(await dropGame(move())).toEqual({ ok: false, error: 'You can only edit your own events.' });
+    fake.authorize.mockResolvedValue({ ok: false, error: 'Sign in' });
+    expect(await dropGame(move())).toEqual({ ok: false, error: 'Sign in' });
+    expect(fake.calls).toEqual([]);
   });
 });

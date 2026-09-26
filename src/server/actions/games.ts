@@ -115,3 +115,90 @@ export async function deleteGame(eventId: string, gameId: string): Promise<Actio
   refresh(eventId);
   return { ok: true, data: undefined };
 }
+
+const slotSchema = z.object({
+  day: z.iso.date().nullable(),
+  time: time.nullable(),
+  court: z.number().int().min(1).max(10).nullable(),
+});
+type Slot = z.infer<typeof slotSchema>;
+const sameSlot = (row: { day: string | null; start_time: string | null; court: number | null }, slot: Slot) =>
+  row.day === slot.day && (row.start_time?.slice(0, 5) ?? null) === slot.time && row.court === slot.court;
+
+const dropSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('move'),
+    eventId: z.uuid(),
+    gameId: z.uuid(),
+    day: z.iso.date(),
+    time,
+    court: z.number().int().min(1).max(10),
+  }),
+  z.object({
+    kind: z.literal('swap'),
+    eventId: z.uuid(),
+    gameId: z.uuid(),
+    otherId: z.uuid(),
+    /** The slots the organiser saw: a swap exchanges them, so both must still hold. */
+    gameSlot: slotSchema,
+    otherSlot: slotSchema,
+  }),
+  z.object({ kind: z.literal('unschedule'), eventId: z.uuid(), gameId: z.uuid() }),
+]);
+export type DropInput = z.input<typeof dropSchema>;
+
+const STALE = 'The schedule changed in another window. It has been refreshed; try again.';
+
+/**
+ * Drag and drop (PRD E-45): move a game to a free slot, swap the slots of
+ * two games, or clear a game's slot. Each runs one atomic database function
+ * (move_game, swap_games, unschedule_game) through the session client, so
+ * RLS, the editor check and the slot index all apply. Never writes scores
+ * (E-06). A refused move refreshes the page so the grid shows what is stored.
+ */
+export async function dropGame(input: DropInput): Promise<ActionResult> {
+  const auth = await authorizeAdmin();
+  if (!auth.ok) return auth;
+  const parsed = dropSchema.safeParse(input);
+  if (!parsed.success || (parsed.data.kind === 'swap' && parsed.data.otherId === parsed.data.gameId))
+    return { ok: false, error: 'Check the game details and try again.' };
+  const d = parsed.data;
+  if (!(await canEditEvent(d.eventId))) return { ok: false, error: 'You can only edit your own events.' };
+  const db = await createClient();
+  const ids = d.kind === 'swap' ? [d.gameId, d.otherId] : [d.gameId];
+  const { data: found } = await db
+    .from('games')
+    .select('id, day, start_time, court')
+    .eq('event_id', d.eventId)
+    .in('id', ids);
+  const row = (id: string) => found?.find((g) => g.id === id);
+  const stale =
+    found?.length !== ids.length ||
+    (d.kind === 'swap' && !(sameSlot(row(d.gameId)!, d.gameSlot) && sameSlot(row(d.otherId)!, d.otherSlot)));
+  if (stale) {
+    refresh(d.eventId);
+    return { ok: false, error: STALE };
+  }
+  let result;
+  if (d.kind === 'move') {
+    const { data: event } = await db.from('events').select('courts, court_names').eq('id', d.eventId).single();
+    if (!event) return { ok: false, error: 'Could not load the event. Please try again.' };
+    if (d.court > event.courts) return { ok: false, error: `Choose a court from 1 to ${event.courts}.` };
+    result = await db.rpc('move_game', { p_game_id: d.gameId, p_day: d.day, p_start_time: d.time, p_court: d.court });
+    if (result.error?.code === '23505') {
+      refresh(d.eventId);
+      const court = event.court_names[d.court - 1] || `Court ${d.court}`;
+      return {
+        ok: false,
+        error: `That slot (${formatDate(d.day)} ${formatTime(d.time)} ${court}) is already taken. The schedule has been refreshed.`,
+      };
+    }
+  } else if (d.kind === 'swap') {
+    result = await db.rpc('swap_games', { p_a: d.gameId, p_b: d.otherId });
+  } else {
+    result = await db.rpc('unschedule_game', { p_game_id: d.gameId });
+  }
+  refresh(d.eventId);
+  if (result.error) return { ok: false, error: 'Could not move the game. The schedule has been refreshed; try again.' };
+  return { ok: true, data: undefined };
+}

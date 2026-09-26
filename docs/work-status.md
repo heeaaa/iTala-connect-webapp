@@ -4,7 +4,7 @@ Last updated: 26/09/2026 (Claude, work laptop)
 
 ## Current handoff (26/09/2026, Claude on the work laptop)
 
-**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish, matchup report), 5b (published-event editing) and 5c-1 (schedule grid and game dialog) are done and pushed on branch `handoff/codex`, and so is Google sign-in (A-11, user decision 26/09/2026). Next: **5c-2, drag and drop** (dnd-kit), then 5c-3 (round robin and playoff dialogs).
+**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish, matchup report), 5b (published-event editing), 5c-1 (schedule grid and game dialog) and 5c-2 (drag and drop) are done and pushed on branch `handoff/codex`, and so is Google sign-in (A-11, user decision 26/09/2026). Next: **5c-3** (round robin and playoff dialogs).
 
 **CI now runs the Docker suites.** Draft PR https://github.com/heeaaa/iTala-connect-webapp/pull/1 (`handoff/codex` into `main`, not for merging yet) runs the full workflow on every push. **Run 36214770961 on `cd75ff2` was fully green:**
 - 60/60 E2E (390 and 1440 px), 154/154 pgTAP and 22/22 integration.
@@ -25,7 +25,7 @@ npm run lint && npm run typecheck && npm run test:coverage
 npm run build && npm run check:secrets && npm run test:e2e
 ```
 
-- Expected: **60 E2E tests**: the previous 56, the new unsaved-guard test and the new publish journey (now also covering published editing), each at two viewports. Codex's last full Docker run was 56/56 before the guard work.
+- Expected: **66 E2E tests**: the 64 green at `68abdaf` plus the 5c-2 drag and drop journey at two viewports. 5c-2 adds no migration, so the pgTAP and integration counts below are unchanged.
 - Expected: **154 pgTAP assertions** (145 plus 9 in the new `supabase/tests/007_event_editor.sql`) and **22 integration tests** (21 plus `tests/integration/event-editor.test.ts`). Both new files are written but NOT RUN.
 - Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
 
@@ -139,10 +139,74 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
   - Hosted state confirmed by read-only checks: Google provider on, **sign-ups disabled**, and the 26/09 migrations applied (`event_image_cleanup` now exists).
 - **For design review:** Google's brand guidelines prefer their "G" mark on the button (it is text-only now).
 
+### Phase 5c-2: schedule drag and drop (26/09/2026)
+
+- **Dependencies:** `@dnd-kit/react` and `@dnd-kit/dom`, both pinned at 0.5.0 (MIT).
+  - `@dnd-kit/dom` is imported directly for the plugin classes. It is the same version `@dnd-kit/react` depends on, so there is one copy.
+  - This laptop's npm 11.6 dropped the two `@emnapi` lockfile entries again. They were restored from HEAD, so the lockfile diff is additions only, and `npm ci --dry-run` accepts it.
+- **E-45 behaviour** (`schedule-editor.tsx`), matching the old `schedDrop`, `schedDropSlot` and `schedDropUnscheduled`:
+  - Drop on a game swaps slots. Drop on an empty cell moves. Drop on the Unscheduled row clears the slot. An unscheduled game dropped on a scheduled one swaps them, and so does a scheduled game dropped on an unscheduled card.
+  - Every card has a **Move** handle (grip plus the word, at least 44 px). A mouse drags at once; touch needs a 250 ms press, so swiping a card still scrolls the table.
+  - Keyboard: Space or Enter picks up, arrows step one cell at a time (`nextTarget`: across courts, through the times, into the next or previous day, and up into the Unscheduled row and its games), Space or Enter drops, and Escape or Tab cancels (dnd-kit's default would drop on Tab).
+  - The card shows in its new place at once (`useOptimistic`) and settles when the save returns. A refused or failed save (including an unreachable server) puts it back. Dragging and Edit are locked while a save runs.
+  - A pinned notice at the foot of the schedule names the move. It adds a non-blocking "Rest warning:" line for each team left with two games under 2 hours apart that day (`restBreaks`, new pairs only). It has a Dismiss action.
+  - NZ English screen-reader instructions and announcements (picked up, over which slot, swap or move, dropped, cancelled).
+- **Pure logic:** `planDrop`, `applyDrop`, `ownTarget` and `nextTarget` are in `src/lib/schedule-grid.ts`; `restBreaks` is in `src/domain/schedule-edit.ts`.
+- **Action** `dropGame` (`src/server/actions/games.ts`):
+  - Checks, in order: auth, a zod discriminated union, ownership, and that the games belong to the event (a court range check too for moves).
+  - Then one database function (`move_game`, `swap_games` or `unschedule_game`) through the session client, so RLS, the editor check and the slot index apply.
+  - A swap carries the two slots the organiser saw and is refused as stale if either game has moved since (another window).
+  - A slot conflict (23505) names the slot. Any refusal revalidates, so the grid shows what is stored.
+  - It never writes scores.
+- **CSP:** dnd-kit injects `<style>` elements. They carry the nonce of the page's own policy, read from the document's scripts. A nonce passed down in props would go stale: the proxy mints one per request, including client-side navigations and Server Action refreshes.
+- **Found and fixed in Chromium:** dnd-kit 0.5.0 restores focus only after a drop animation, and the design allows none. After Escape, focus fell to the page.
+  - The fix: the Move button takes focus back once dnd-kit is idle.
+  - The harness keyboard spec failed at the Escape step before the fix and passes after. A component test fails with the restore removed.
+- **Bug fixed (X-05 class):** the absolutely positioned screen-reader text in the matchup report and schedule cells escaped the tables' scroll boxes. That widened the editor to 457 px at a 390 px viewport once a division had 3 teams.
+  - Red: the harness 3-team sample measured `scrollWidth` 457. The 2-team 5c-1 sample measured 390, which is why 5c-1 missed it.
+  - Fix: `.matchupScroll { position: relative }`.
+  - Green: 390. The new E2E journey (3 teams) now also checks for sideways scroll.
+- **Baseline, not fixed (not from this slice):** the editor's client-side zod v4 probes `Function("")` once on load to detect eval support. The CSP reports this as a `script-src eval` violation.
+  - It is harmless (zod falls back) and also happens on the draft editor, which has no drag and drop.
+  - Possible fix: `z.config({ jitless: true })` in the client bundle.
+- **Independent review** (fresh read-only reviewer): security found nothing material, and the old semantics and the rest rule were confirmed. Findings and what happened:
+  - High, fixed (reproduce, fail, fix, pass): the stale CSP nonce. After a client-side navigation (Create event uses `router.push`), or after any successful drop, dnd-kit's styles were blocked, and the lifted card did not follow the pointer. The first fix passed the request nonce down in props, which goes stale.
+    - Red: a harness regression that opens the editor through a client-side link failed, because `translate` stayed `none` mid-drag.
+    - Green after reading the nonce from the document.
+    - A component test and a mid-drag check in the CI E2E guard it. `position: fixed` alone proves nothing, because a popover is fixed by default.
+  - Fixed: Tab dropped and saved. It now cancels. The harness regression was red, then green; the CI E2E covers it too.
+  - Fixed: the refocus could pull focus back from a field the organiser moved to while a save ran. Focus now returns only when it was lost to the page. Covered by a component test (red when the guard is removed).
+  - Fixed: a swap used the other game's current slot, not the one the organiser saw. Covered by an action test (red without the check).
+  - Fixed: Edit during a save opened the optimistic copy. It is now locked while saving.
+  - Fixed: Dismiss dropped focus; it now goes to the game the notice is about. A dialog save clears an old drop notice.
+  - Not fixed (low): the extra court columns the grid shows for out-of-range games still accept drops. The server refuses them with "Choose a court from 1 to N", and the card goes back. This is rare, because E-14 unschedules such games.
+- **Test changes:** `admin-publish.spec.ts` status checks are scoped to `main`, because dnd-kit adds its own `role="status"` live region to `<body>`. The component test setup gains a no-op `ResizeObserver`, which jsdom lacks and dnd-kit needs when it loads.
+- **Evidence (work laptop):**
+  - Lint and typecheck pass.
+  - `test:coverage`: 33 files, **637 tests pass**. `src/domain` and `schedule-grid.ts` are at 100%.
+  - Mutation checks: removing the focus restore, the refocus, the rest warning, the focus guard, the Edit lock, the Dismiss focus, the document nonce or the stale-swap check each failed its test.
+  - A clean build without the harness passes, and `check:secrets` passes against the real server values (not printed).
+  - Harness in Chromium at 390 and 1440 px, **16/16** (after the review fixes):
+    - mouse move, swap, unschedule and an unscheduled game swapping in;
+    - keyboard pick-up, arrows, drop, cancel with focus kept, into day two, and into Unscheduled;
+    - touch press and hold (Chromium touch emulation at 390 only), and a quick swipe that scrolls instead of dragging;
+    - a refused save putting the card back, with the exact action payloads checked;
+    - the success path, with the real action response rewritten to `ok`, showing the notice and rest warning while it stays in view;
+    - axe with no serious or critical issues, no sideways scroll, and no CSP violations from dragging;
+    - the two review regressions: drag styles after a client-side navigation, and Tab cancelling.
+  - Captures: `.impeccable/review/phase5c2/{mobile,desktop}/` (grid, mouse and keyboard dragging, refused, rest warning, touch dragging).
+- **Runs in CI on push:** the new E2E "moves, swaps and unschedules games by drag and drop, warning about short rest" (keyboard with a Tab cancel, and mouse with a mid-drag style check; stored results checked, no scores written).
+- **NOT RUN:**
+  - Real-device touch: emulation only. Check on a phone.
+  - A screen reader listening test: the announcements are checked in code and tests but not heard.
+- **For the finish review:**
+  - `.impeccable/design.json` is not updated; DESIGN.md is ("Schedule drag and drop").
+  - dnd-kit sets `aria-pressed` and `aria-grabbed` on the Move button (library default), so screen readers may announce it as a toggle.
+
 ### Phase 5 plan (remaining slices)
 
 1. Done: 5b. The Phase 2 handovers still open move to 5c: pass stored resolved playoff teams to round robin; add a distinct-days rule on `events.schedule_days` in the database (zod and the save RPC already de-duplicate).
-2. **5c, schedule editor.** 5c-1 is done. 5c-2: drag and drop with dnd-kit (mouse, touch, keyboard), swap, move and unschedule through the existing RPCs, and the non-blocking 120-minute rest warning (E-45). 5c-3: "+ Round robin" and "+ Playoff" dialogs (E-63, E-64), with stored resolved playoff teams passed to round robin (Phase 2 handover).
+2. **5c, schedule editor.** 5c-1 and 5c-2 (drag and drop, E-45) are done. 5c-3: "+ Round robin" and "+ Playoff" dialogs (E-63, E-64), with stored resolved playoff teams passed to round robin (Phase 2 handover).
 3. **5d, rules and images.** Tiptap rules editor (E-70, E-71), logo and sponsor uploads with compression and removal (E-15 to E-18).
 4. **5e, platform admin.** Settings sponsors and the default rules template (S-01, S-02), the Admins screen (A-09), dashboard View and Results actions (D-02).
 5. **Then** E2E journeys 2, 4, 7 and 8, and a finish review per new surface.

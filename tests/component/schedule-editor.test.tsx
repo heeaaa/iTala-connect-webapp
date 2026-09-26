@@ -99,7 +99,7 @@ describe('Schedule grid (E-40 to E-44)', () => {
   });
   it('paints semi and final cards in the playoff colour, group cards in the division colour', () => {
     renderGrid();
-    const [group, final] = dayCards().map((b) => b.parentElement!);
+    const [group, final] = dayCards().map((b) => b.closest<HTMLElement>('[data-game]')!);
     expect(group!.style.borderInlineStartColor).toBe('rgb(108, 99, 255)');
     expect(final!.style.borderInlineStartColor).toBe('rgb(168, 139, 235)');
   });

@@ -1,4 +1,5 @@
 import { toMinutes } from './game-day';
+import { MIN_GAP } from './scheduler';
 import { isGroupGame } from './standings';
 import { type EventSetup, type Game } from './types';
 
@@ -49,4 +50,53 @@ export function matchupCounts(games: readonly Game[], divisionId: string, teamId
     totalGames++;
   }
   return { counts, totalGames };
+}
+
+export interface RestBreak {
+  teamId: string;
+  day: string;
+  /** The two start times, earlier first ("HH:MM"). */
+  times: [string, string];
+}
+
+type IdGame = Pick<Game, 'day' | 'time' | 'team1Id' | 'team2Id'> & { id: string };
+
+/** Same-day pairs of games closer than MIN_GAP that share a team, keyed "team|idA|idB". */
+function closePairs(games: readonly IdGame[], moved: ReadonlySet<string>) {
+  const pairs = new Map<string, RestBreak>();
+  const scheduled = games.filter((g) => g.day && g.time);
+  for (const a of scheduled) {
+    if (!moved.has(a.id)) continue;
+    for (const b of scheduled) {
+      if (b.id === a.id || b.day !== a.day) continue;
+      const gap = toMinutes(b.time!) - toMinutes(a.time!);
+      if (Math.abs(gap) >= MIN_GAP) continue;
+      const [first, second] = gap < 0 ? [b, a] : [a, b];
+      for (const team of new Set([a.team1Id, a.team2Id])) {
+        if (team === null || (team !== b.team1Id && team !== b.team2Id)) continue;
+        const key = [team, ...[a.id, b.id].sort()].join('|');
+        pairs.set(key, { teamId: team, day: a.day!, times: [first.time!, second.time!] });
+      }
+    }
+  }
+  return pairs;
+}
+
+/**
+ * E-45: a manual move never refuses a short rest gap (the old editor had no
+ * check), but the editor warns about the ones it creates. Returns each team
+ * whose moved game now sits under MIN_GAP from another of its games that
+ * day, leaving out pairs that were already that close before the move.
+ * TBD sides (null) have no rest to break.
+ */
+export function restBreaks(before: readonly IdGame[], after: readonly IdGame[], movedIds: readonly string[]) {
+  const moved = new Set(movedIds);
+  const old = closePairs(before, moved);
+  return [...closePairs(after, moved)]
+    .filter(([key]) => !old.has(key))
+    .map(([, found]) => found)
+    .sort(
+      (x, y) =>
+        x.day.localeCompare(y.day) || toMinutes(x.times[0]) - toMinutes(y.times[0]) || x.teamId.localeCompare(y.teamId),
+    );
 }
