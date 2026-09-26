@@ -4,7 +4,7 @@ Last updated: 26/09/2026 (Claude, work laptop)
 
 ## Current handoff (26/09/2026, Claude on the work laptop)
 
-**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish, matchup report), 5b (published-event editing) and 5c-1 (schedule grid and game dialog) are done and pushed on branch `handoff/codex`. Next: **5c-2, drag and drop** (dnd-kit), then 5c-3 (round robin and playoff dialogs).
+**Where things are:** Phase 3b is code complete. Phase 5 slices 5a (publish, matchup report), 5b (published-event editing) and 5c-1 (schedule grid and game dialog) are done and pushed on branch `handoff/codex`, and so is Google sign-in (A-11, user decision 26/09/2026). Next: **5c-2, drag and drop** (dnd-kit), then 5c-3 (round robin and playoff dialogs).
 
 **CI now runs the Docker suites.** Draft PR https://github.com/heeaaa/iTala-connect-webapp/pull/1 (`handoff/codex` into `main`, not for merging yet) runs the full workflow on every push. **Run 36214770961 on `cd75ff2` was fully green:**
 - 60/60 E2E (390 and 1440 px), 154/154 pgTAP and 22/22 integration.
@@ -12,7 +12,7 @@ Last updated: 26/09/2026 (Claude, work laptop)
 - This is the first real-Supabase proof of the Phase 3b guard (signed-in Sign out and Back), publish and published editing.
 - The first run failed only on my new publish E2E: `getByRole('alert')` also matched Next's route announcer. That was fixed by scoping to `main`.
 
-Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
+Latest green run: 36215576306 on `97c38d9` (5c-1): **62/62 E2E**, 154 pgTAP, 22 integration. Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
 
 **Important for the Docker PC:** 5b adds migration `20260926000500_event_editor.sql` (replaces `save_draft_editor` with `save_event_editor`). Apply it (`npm run db:reset` on the local stack), then run `npm run db:types`. `src/lib/supabase/database.types.ts` was hand-edited for the new function and must come out with **no diff**; if it differs, keep the generated file.
 
@@ -114,6 +114,29 @@ npm run build && npm run check:secrets && npm run test:e2e
   - The E2E overflow checks in `mobile-import.spec.ts` and `today-prototype.spec.ts` now compare with `page.viewportSize()`. The Today prototype passes 8/8 under the stronger check.
 - **Evidence (work laptop):** lint and typecheck pass; 30 files, **594 unit and component tests pass**; clean build passes; `check:secrets` passes against the real server values. Harness at 390 and 1440 px: the grid and dialog pass axe with no overflow. Captures: `.impeccable/review/phase5c/{mobile,desktop}/{schedule,game-dialog}.png`.
 - **Runs in CI on push:** the new E2E "adds, validates, edits and deletes games on the published schedule", plus the strengthened overflow checks.
+
+### Google sign-in (A-11, 26/09/2026)
+
+User decision: add Google sign-in (the same Google account as the iTala mobile app); no Apple. Accounts stay invite-only.
+
+- `/auth/google` (GET link, so the CSP `form-action` rule never meets the Google redirect) starts the PKCE flow with the callback on `NEXT_PUBLIC_SITE_URL`.
+- `/auth/callback` exchanges the code, then applies the same `resolveAccess` role checks as password sign-in; anyone without admin rights is signed out.
+  - Failures, including Supabase's "Signups not allowed" for uninvited accounts, show one fixed notice. Provider text is never echoed, and `next` stays on-site.
+- The login page shows "Continue with Google" only when `/auth/v1/settings` reports Google on (`src/server/auth-providers.ts`, cached 5 minutes). It is a plain `<a>`, because a prefetching `Link` would start the flow.
+- `supabase/config.toml` has a disabled `[auth.external.google]` block (env-substituted id and secret) plus local callback redirect URLs.
+- **Evidence:**
+  - 10 unit tests: provider check, notices, both routes, open-redirect and no-role cases.
+  - 604 unit and component tests in total, lint, typecheck, clean build and `check:secrets` all pass.
+  - Harness with a local settings stub at 390 and 1440 px: the button is at least 44 px, axe is clean and there is no overflow. Capture `.impeccable/review/google/{mobile,desktop}/login.png`.
+  - New E2E `google-sign-in.spec.ts` (provider off) runs in CI.
+- **Setup (you, done in the dashboards):**
+  - Google Cloud: a "Web application" OAuth client in the mobile app's Google Cloud project. JavaScript origins: `http://localhost:3000` and the production URL. Redirect URIs: `https://ephhjzrkbjrhcjrwtknn.supabase.co/auth/v1/callback` and `http://127.0.0.1:54321/auth/v1/callback`.
+  - Supabase: Google provider with that Client ID and secret; Redirect URLs `http://localhost:3000/auth/callback` and the production `/auth/callback`. Keep sign-ups off.
+- **NOT RUN (manual):** a real Google round trip. It needs the hosted database migrated (not yet authorised) or the local stack with the provider switched on (Docker PC, see the config.toml comment).
+  - To check: create an account with `npm run admin:create` using a Google email, then sign in with Google.
+  - Expected: the dashboard. An uninvited Google account should get the fixed notice.
+  - Also confirm Supabase links the identity while sign-ups are off; the docs do not state this case.
+- **For design review:** Google's brand guidelines prefer their "G" mark on the button (it is text-only now).
 
 ### Phase 5 plan (remaining slices)
 
