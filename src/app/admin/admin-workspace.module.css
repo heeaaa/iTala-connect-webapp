@@ -568,6 +568,18 @@
 .accounts td {
   overflow-wrap: anywhere;
 }
+/* In a table cell the actions sit on the row, not spaced like the button row under a form. */
+.accounts .actions {
+  margin: 0;
+}
+@media (min-width: 40rem) {
+  .accounts .actions {
+    flex-wrap: nowrap;
+  }
+  .accounts .actions > * {
+    white-space: nowrap;
+  }
+}
 /* On phones each account is a stacked card: a label beside each value (data-label).
    Explicit table roles in the markup keep Safari reading it as a table. */
 @media (max-width: 39.99rem) {

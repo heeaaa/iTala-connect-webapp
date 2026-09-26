@@ -403,7 +403,7 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 - **Measured:** no control under 44 px on any of the four pages; no sideways scroll at 390 px or with text at 200%; every control reached by Tab shows a focus ring; axe clean; the site's CSP blocked even injected test styles.
 - **Findings:**
   - P2, fixed: after a refused Continue or Save password, focus dropped to the page (the submit was disabled while it ran). Confirmed in Chromium at both viewports, then fixed on those two forms and the sign-in form: the button stays focusable (`aria-disabled`, styled busy) and a second submit is stopped in `onSubmit`. The harness now shows focus back on the button; a new component test (`confirm-form.test.tsx`) proves the one-time token is sent once, and failed with the guard removed.
-  - P3, open: the Accounts table's Actions column wraps its two buttons on desktop; the Admins phone cards have extra space under the actions; the Settings thumbnails are not lazy-loaded; the New account fields are all required but not marked. Suggested next: `/impeccable layout`, then `/impeccable clarify`, then `/impeccable polish`.
+  - P3, fixed: the Actions column wrapped and the phone cards had extra space, both from the form button row's margin applied inside table cells (now none there, and one line on wider screens); the Settings thumbnails now lazy-load; the New account note says both fields are needed. The harness audit measurements then showed no findings on any of the four pages, and the Admins and Settings specs passed (22/22 with the measurements).
 - **CI run 36275201647 on `3a46ce9`: green.** 76/76 E2E with no retries (including the accounts journey and journey 4, and the drag test without a retry), 238/238 pgTAP, integration, and gitleaks "no leaks found".
 - **Evidence for the fix (work laptop):** lint and typecheck pass; `test:coverage` 49 files, **750 tests pass**; a clean build and `check:secrets` pass; harness **74/74**.
 
@@ -413,7 +413,7 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 2. **5c, schedule editor.** Done: 5c-1, 5c-2 (drag and drop, E-45) and 5c-3: "+ Round robin" and "+ Playoff" dialogs (E-63, E-64), with stored resolved playoff teams passed to round robin (Phase 2 handover).
 3. Done: **5d, rules and images.** Tiptap rules editor (E-70, E-71), logo and sponsor uploads with resizing and removal (E-15 to E-18).
 4. Done: **5e, platform admin.** 5e-1 Settings sponsors and the default rules template (S-01, S-02), and 5e-2 the Admins screen (A-09) with set-up links. The dashboard Results action (D-02) moves to Phase 6 with the results inbox; View was already done.
-5. Done: E2E journeys 2, 4, 7 and 8 (4 added 27/09/2026; the others were already covered), and the 5e finish review (audit 18/20, its P2 fixed). **Next:** the audit's P3 layout and copy items, the same audit for the earlier Phase 5 editor surfaces if wanted, then Phase 6 (mobile results inbox).
+5. Done: E2E journeys 2, 4, 7 and 8 (4 added 27/09/2026; the others were already covered), and the 5e finish review (audit 18/20, its P2 fixed). **Next:** the same audit for the earlier Phase 5 editor surfaces if wanted, then Phase 6 (mobile results inbox).
 
 ## Objective
 

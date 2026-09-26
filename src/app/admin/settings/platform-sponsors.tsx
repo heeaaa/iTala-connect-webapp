@@ -99,7 +99,12 @@ export function PlatformSponsors({ sponsors }: { sponsors: Record<PlatformTier, 
             <li key={sponsor.id}>
               {/* Plain img: previews straight from storage, already resized on upload. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={sponsor.url} alt={`${TIERS[t].title.slice(0, -1)} logo ${i + 1}`} className={w.sponsorThumb} />
+              <img
+                src={sponsor.url}
+                alt={`${TIERS[t].title.slice(0, -1)} logo ${i + 1}`}
+                className={w.sponsorThumb}
+                loading="lazy"
+              />
               {/* The name starts with the visible word, so voice control still finds "Remove". */}
               <button
                 type="button"

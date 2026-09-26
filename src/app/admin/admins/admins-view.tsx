@@ -199,8 +199,8 @@ export function AdminsView({
       <section aria-labelledby="new-account" className={w.section}>
         <h2 id="new-account">New account</h2>
         <p className={w.note}>
-          You get a one-time set-up link to send to the person yourself. No email is sent. They open it and choose a
-          password.
+          Enter their name and email, both needed. You get a one-time set-up link to send them yourself; no email is
+          sent. They open it and choose a password.
         </p>
         <form onSubmit={submit} className={w.stack} noValidate>
           <div className={w.fields}>
