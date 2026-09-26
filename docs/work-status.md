@@ -12,7 +12,7 @@ Last updated: 26/09/2026 (Claude, work laptop)
 - This is the first real-Supabase proof of the Phase 3b guard (signed-in Sign out and Back), publish and published editing.
 - The first run failed only on my new publish E2E: `getByRole('alert')` also matched Next's route announcer. That was fixed by scoping to `main`.
 
-Latest green run: 36215576306 on `97c38d9` (5c-1): **62/62 E2E**, 154 pgTAP, 22 integration. Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
+Latest green run: 36216176809 on `68abdaf` (Google sign-in): **64/64 E2E**, 154 pgTAP, 22 integration. Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
 
 **Important for the Docker PC:** 5b adds migration `20260926000500_event_editor.sql` (replaces `save_draft_editor` with `save_event_editor`). Apply it (`npm run db:reset` on the local stack), then run `npm run db:types`. `src/lib/supabase/database.types.ts` was hand-edited for the new function and must come out with **no diff**; if it differs, keep the generated file.
 
@@ -132,10 +132,11 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 - **Setup (you, done in the dashboards):**
   - Google Cloud: a "Web application" OAuth client in the mobile app's Google Cloud project. JavaScript origins: `http://localhost:3000` and the production URL. Redirect URIs: `https://ephhjzrkbjrhcjrwtknn.supabase.co/auth/v1/callback` and `http://127.0.0.1:54321/auth/v1/callback`.
   - Supabase: Google provider with that Client ID and secret; Redirect URLs `http://localhost:3000/auth/callback` and the production `/auth/callback`. Keep sign-ups off.
-- **NOT RUN (manual):** a real Google round trip. It needs the hosted database migrated (not yet authorised) or the local stack with the provider switched on (Docker PC, see the config.toml comment).
-  - To check: create an account with `npm run admin:create` using a Google email, then sign in with Google.
-  - Expected: the dashboard. An uninvited Google account should get the fixed notice.
-  - Also confirm Supabase links the identity while sign-ups are off; the docs do not state this case.
+- **Manual check PASSED (26/09/2026, reported by Aeron, hosted project, `npm run dev` on localhost:3000):**
+  - Google sign-in with an invited account reached the dashboard, so Supabase does link the Google identity to an admin-created account while sign-ups are off.
+  - Password sign-in still works.
+  - A Google account that is not an admin got the fixed "Google sign-in didn't work..." notice.
+  - Hosted state confirmed by read-only checks: Google provider on, **sign-ups disabled**, and the 26/09 migrations applied (`event_image_cleanup` now exists).
 - **For design review:** Google's brand guidelines prefer their "G" mark on the button (it is text-only now).
 
 ### Phase 5 plan (remaining slices)
@@ -156,7 +157,11 @@ Rebuild the iTala Platform scheduler as iTala Connect (Next.js + Supabase) with 
 - New dedicated Supabase project; individual admin accounts with superadmin and admin roles.
 - Platform UI uses the iTala logo palette; organiser-chosen event colours stay in full control of public event pages.
 - Migrate existing Firebase data with a repeatable import, verify, then switch over.
-- Repository https://github.com/heeaaa/iTala-connect-webapp and Supabase project https://ephhjzrkbjrhcjrwtknn.supabase.co are created (25/09/2026). Nothing pushed or applied to either yet.
+- Repository https://github.com/heeaaa/iTala-connect-webapp and Supabase project https://ephhjzrkbjrhcjrwtknn.supabase.co are created (25/09/2026).
+  - 26/09/2026: branch `handoff/codex` pushed with draft PR #1.
+  - Aeron applied all migrations to the hosted project (`supabase db push`, through `20260926000500_event_editor`) and configured Google sign-in (A-11) with public sign-ups off.
+  - Each new migration must be pushed to hosted the same way, after CI passes.
+- `.env` on the work laptop points at the hosted project (Aeron's choice for local runs; git-ignored). Keep the `MOBILE_*` values blank until the real mobile import is authorised; they must be the mobile project's URL and **publishable** key, never a secret key.
 - Mobile integration starts with a simple league import (docs/MOBILE_INTEGRATION.md stage 1), built as the first feature slice (phase 3b). Mobile reader uses a server-side cached anonymous session (O-3 decided).
 - 25/09/2026: Aeron confirmed anonymous sign-ins are switched on in Supabase (needed on the iTala **mobile** project for the O-3 reader). The iTala Connect project itself should keep anonymous sign-ins and public sign-ups **off**; the schema gives anonymous users no profile and no access either way (tested).
 - Phase 1 used the suggested options for open decisions it touches: O-1 superadmin owns legacy events (ownership reassignable by superadmin only), O-2 Admins screen in this migration (read-only list now, `npm run admin:create` meanwhile), O-4 per-event time zone defaulting to `DEFAULT_EVENT_TIMEZONE`.
