@@ -209,9 +209,11 @@ test('moves, swaps and unschedules games by drag and drop, warning about short r
   // Precondition for the rest warning: the second game follows two hours after the first.
   expect(second!.start_time).toBe(`${hour(first!, 2)}:00`);
 
-  // Keyboard: Tab mid-drag cancels rather than dropping.
+  // Keyboard: Tab mid-drag cancels rather than dropping. A keyboard pick-up marks the game's own
+  // cell as the target; wait for that before moving, as a person's next key comes much later.
   await moveButton(first!).focus();
   await page.keyboard.press('Space');
+  await expect(cell(first!.start_time!)).toHaveAttribute('data-drop-target', 'true');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Tab');
   await expect(moveButton(first!)).toBeFocused();
@@ -219,6 +221,7 @@ test('moves, swaps and unschedules games by drag and drop, warning about short r
 
   // Keyboard: pick up, one row down to the free slot an hour later, drop.
   await page.keyboard.press('Space');
+  await expect(cell(first!.start_time!)).toHaveAttribute('data-drop-target', 'true');
   await page.keyboard.press('ArrowDown');
   await expect(cell(oneHourLater)).toHaveAttribute('data-drop-target', 'true');
   await page.keyboard.press('Space');

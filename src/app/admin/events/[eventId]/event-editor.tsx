@@ -144,14 +144,24 @@ export function EventEditor({
   const windowKey = windowOf(data);
   const savedWindow = useRef(windowKey);
   useEffect(() => {
-    if (!published || windowKey === savedWindow.current) return;
+    // A draft's days, hours and courts are saved by Save draft or by Publish (which saves first),
+    // so when the page comes back published there is nothing left to autosave. A stray autosave
+    // then could overwrite what a round robin or playoff had just stored.
+    if (!published) {
+      savedWindow.current = windowKey;
+      return;
+    }
+    if (windowKey === savedWindow.current) return;
     const timer = setTimeout(() => {
       savedWindow.current = windowKey;
       autosave();
     }, 600);
     return () => clearTimeout(timer);
   }, [published, windowKey]);
+  // Save and Publish stay focusable while they run (a disabled button drops keyboard focus to the
+  // page, so the re-publish question would hand it back there); repeat presses are ignored.
   const publish = (clearScores = false) => {
+    if (pending) return;
     setError('');
     setMessage('');
     start(async () => {
@@ -239,23 +249,24 @@ export function EventEditor({
         className={w.form}
         onSubmit={(e) => {
           e.preventDefault();
+          if (pending) return;
           setError('');
           start(async () => void (await save()));
         }}
       >
         <div className={w.actions}>
           {published ? (
-            <button disabled={pending} className={`${s.button} ${s.buttonLive}`}>
+            <button aria-disabled={pending} className={`${s.button} ${s.buttonLive}`}>
               {pending ? 'Saving…' : 'Save'}
             </button>
           ) : (
             <>
-              <button disabled={pending} className={`${s.button} ${s.buttonTeal}`}>
+              <button aria-disabled={pending} className={`${s.button} ${s.buttonTeal}`}>
                 {pending ? 'Saving…' : 'Save draft'}
               </button>
               <button
                 type="button"
-                disabled={pending}
+                aria-disabled={pending}
                 className={`${s.button} ${s.buttonLive}`}
                 onClick={() => publish()}
               >

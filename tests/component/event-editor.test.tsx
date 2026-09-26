@@ -211,6 +211,16 @@ describe('Published editing (E-02, E-05, E-14, E-22, E-23)', () => {
     expect(fake.refresh).toHaveBeenCalled();
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
   });
+  it('publishing does not set off an autosave of the days, hours or courts it has just saved', async () => {
+    // A draft's window changes are saved by Save draft or by Publish (which saves first). When the
+    // page comes back published, nothing is left to autosave; a stray one could undo a round robin's choice.
+    const props = { initial, links: {}, images: NO_IMAGES, games: [] as ScheduleGame[], notice: '' };
+    const { rerender } = render(<EventEditor {...props} published={false} />);
+    fireEvent.change(screen.getByLabelText('Courts'), { target: { value: '2' } });
+    rerender(<EventEditor {...props} published />);
+    await new Promise((r) => setTimeout(r, 900));
+    expect(fake.save).not.toHaveBeenCalled();
+  });
   it('does not autosave team edits: they need Save', async () => {
     const user = userEvent.setup();
     publishedEditor();

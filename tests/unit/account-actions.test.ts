@@ -23,7 +23,8 @@ vi.mock('@/lib/supabase/server', () => ({
 import { changePassword, confirmSetupLink } from '@/server/actions/account';
 
 const ID = '00000000-0000-4000-8000-000000000007';
-const TOKEN = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8';
+// A made-up token in Auth's format (56 hex characters); low-randomness so secret scanners ignore it.
+const TOKEN = 'ab12'.repeat(14);
 const LINK_FAILED = 'This link has expired or has already been used. Ask a superadmin for a new set-up link.';
 const form = (values: Record<string, string>) => {
   const f = new FormData();

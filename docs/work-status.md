@@ -27,7 +27,7 @@ npm run lint && npm run typecheck && npm run test:coverage
 npm run build && npm run check:secrets && npm run test:e2e
 ```
 
-- Expected: **74 E2E tests** (72 green at `562592f` plus the 5e-2 accounts journey at two viewports) and **238 pgTAP assertions** (220 plus 18 in `011_admin_accounts.sql`). Run `npm run db:reset` for the new migration; `npm run db:types` must show no diff.
+- Expected: **76 E2E tests** (72 green at `562592f` plus the 5e-2 accounts journey and the journey 4 re-publish test, each at two viewports) and **238 pgTAP assertions** (220 plus 18 in `011_admin_accounts.sql`, green in CI at `6c627e6`). Run `npm run db:reset` for the new migration; `npm run db:types` must show no diff.
 - Expected: **29 integration tests** (22 plus 7 in `admin-accounts.test.ts`).
 - Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
 
@@ -384,13 +384,25 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
   - On the hosted project, check that sign-ups stay off (Authentication settings) and that the Email OTP expiry is 1 hour, or update the text in `admins-view.tsx`. Netlify needs `SUPABASE_SECRET_KEY` set for Create account to work (it says so when it is missing).
 - **Follow-up:** admins who are not superadmins have no link to `/admin/password` yet (a superadmin can send them a set-up link). Consider a small "Password" link in the header in the Phase 8 polish.
 
+### Phase 5 journeys and the 5e-2 CI follow-up (27/09/2026)
+
+- **CI run 36274414845 on `6c627e6` (5e-2):** 238/238 pgTAP and the Docker job passed, but two things needed work:
+  - **gitleaks failed on two false positives:** made-up 56-character test tokens in `account-actions.test.ts` and `admin-actions.test.ts` matched `generic-api-key`. They are not credentials. The tests now build low-randomness tokens (`'ab12'.repeat(14)`), and `.gitleaksignore` lists exactly those two findings (commit `6c627e6`), because the scan covers every commit in the PR and rewriting history was not authorised.
+  - **Two desktop E2E retries**, investigated:
+    - The round robin test stored `games_per_team` 0 instead of null. **A real race, fixed:** the published editor autosaves days, hours and courts, but it only remembered the saved window from when the page opened. So a date picked on a draft set off a stray autosave about 600 ms after publishing, which could land after a round robin and rewrite the division (0 here; in the other order it could restore the old custom number). Red first: a new component test (a draft window change, then published) saw the stray save; fixed by keeping the saved window current while the event is a draft.
+    - The drag and drop test pressed ArrowDown before the keyboard pick-up had registered. A test timing issue: it now waits for the pick-up (the game's own cell marked as the target), as the harness spec already did.
+- **Bug fixed (accessibility, from 5a):** Save, Save draft and Publish were disabled while they ran. Chromium moves focus from a disabled button to the page, so after declining the re-publish warning, focus was left on the page instead of Publish. Red first in the Chromium harness (`republish-focus.spec.ts`, both viewports), green after: the buttons stay focusable (`aria-disabled`, styled as busy) and ignore repeat presses. jsdom cannot show this, so the harness is the evidence.
+- **Journey 4 added** (`tests/e2e/admin-republish.spec.ts`): an event published before comes back as a draft with a recorded score (as an imported event can). Publish warns that 1 score will be cleared; Cancel changes nothing (same status, games and score) and focus returns to Publish; Continue rebuilds the schedule (3 new games), clears the score and writes an `event.republish` audit row.
+- **Journeys now covered in E2E:** 1 (`admin-publish`), 2 including the keyboard move (`admin-publish`), 3 and 6 (`public-event`), 4 (`admin-republish`, new), 7 (`mobile-import`, another organiser's editor), 8 (`public-event`), 9 (`mobile-import`). Journey 5 is Phase 6.
+- **Evidence (work laptop):** lint and typecheck pass; `test:coverage` 48 files, **748 tests pass**; a clean build and `check:secrets` pass; harness **64/64** at 390 and 1440 px. Not run here: the new and changed E2E (CI runs them).
+
 ### Phase 5 plan (remaining slices)
 
 1. Done: 5b. The Phase 2 handovers still open move to 5c: pass stored resolved playoff teams to round robin; add a distinct-days rule on `events.schedule_days` in the database (zod and the save RPC already de-duplicate).
 2. **5c, schedule editor.** Done: 5c-1, 5c-2 (drag and drop, E-45) and 5c-3: "+ Round robin" and "+ Playoff" dialogs (E-63, E-64), with stored resolved playoff teams passed to round robin (Phase 2 handover).
 3. Done: **5d, rules and images.** Tiptap rules editor (E-70, E-71), logo and sponsor uploads with resizing and removal (E-15 to E-18).
 4. Done: **5e, platform admin.** 5e-1 Settings sponsors and the default rules template (S-01, S-02), and 5e-2 the Admins screen (A-09) with set-up links. The dashboard Results action (D-02) moves to Phase 6 with the results inbox; View was already done.
-5. **Then** E2E journeys 2, 4, 7 and 8, and a finish review per new surface.
+5. Done: E2E journeys 2, 4, 7 and 8 (4 added 27/09/2026; the others were already covered). **Next:** a finish review (Impeccable audit) per new surface, then Phase 6.
 
 ## Objective
 

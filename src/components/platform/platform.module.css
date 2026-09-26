@@ -183,7 +183,9 @@
   background: var(--brand-raised-hover);
 }
 
-.button:disabled {
+/* Busy: disabled, or kept focusable while it runs (aria-disabled) so keyboard focus stays put. */
+.button:disabled,
+.button[aria-disabled='true'] {
   cursor: progress;
   opacity: 0.7;
 }

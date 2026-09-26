@@ -53,7 +53,9 @@ const of = (table: string, op: string) =>
   fake.calls.filter((c: Call) => c.table === table && c.op === op).map((c: Call) => c.args);
 const NOT_SUPER = { ok: false, error: 'Only a superadmin can do this.' };
 const GONE = { ok: false, error: 'That account no longer exists. Refresh the page.' };
-const linked = (user: object | null, token = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8') => ({
+// A made-up token in Auth's format (56 hex characters); low-randomness so secret scanners ignore it.
+const HEX = 'ab12'.repeat(14);
+const linked = (user: object | null, token = HEX) => ({
   data: { user, properties: user ? { hashed_token: token } : null },
   error: null,
 });
@@ -76,7 +78,7 @@ describe('createAdminAccount (A-09)', () => {
       data: {
         name: 'Sam Lee',
         email: 'sam@example.com',
-        link: 'https://connect.example/auth/confirm?token_hash=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8&type=invite',
+        link: `https://connect.example/auth/confirm?token_hash=${HEX}&type=invite`,
       },
     });
     expect(of('rpc', 'record_account_link')).toEqual([[{ p_account: NEW, p_kind: 'invite' }]]);
@@ -185,7 +187,7 @@ describe('newSetupLink (A-09)', () => {
       data: {
         name: 'Sam Lee',
         email: 'sam@example.com',
-        link: 'https://connect.example/auth/confirm?token_hash=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8&type=recovery',
+        link: `https://connect.example/auth/confirm?token_hash=${HEX}&type=recovery`,
       },
     });
     expect(fake.generateLink).toHaveBeenLastCalledWith({ type: 'recovery', email: 'sam@example.com' });
