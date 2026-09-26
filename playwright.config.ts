@@ -34,12 +34,24 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } } },
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
   ],
-  webServer: {
-    // Tests run against the production build (npm run build first).
-    command: `npx next start -p ${PORT}`,
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-    env: { NEXT_PUBLIC_SITE_URL: baseURL, ENABLE_PROTOTYPES: '1' },
-  },
+  webServer: [
+    {
+      command: 'node tests/support/mobile-server.mjs',
+      url: 'http://127.0.0.1:3211/health',
+      reuseExistingServer: false,
+    },
+    {
+      // Tests run against the production build (npm run build first).
+      command: `npx next start -p ${PORT}`,
+      url: baseURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      env: {
+        NEXT_PUBLIC_SITE_URL: baseURL,
+        ENABLE_PROTOTYPES: '1',
+        MOBILE_SUPABASE_URL: 'http://127.0.0.1:3211',
+        MOBILE_SUPABASE_PUBLISHABLE_KEY: 'fixture-mobile-publishable-key-only',
+      },
+    },
+  ],
 });

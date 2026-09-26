@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { PlatformFrame, platformStyles as s } from '@/components/platform/platform-frame';
 import { serverEnv } from '@/env';
 import { type HomeCard } from '@/lib/public-event/home';
+import { DEFAULT_RULES_HTML } from '@/server/event-defaults';
 
 import { DashboardView } from '../../admin/dashboard-view';
 import { SettingsView } from '../../admin/settings/settings-view';
@@ -113,7 +114,12 @@ export default async function PlatformPrototype({ searchParams }: PageProps<'/pr
         ) : null}
         {screen === 'settings' ? (
           <main className={`${s.wrap} pb-12`}>
-            <SettingsView />
+            <SettingsView
+              error={false}
+              sponsors={{ primary: [], secondary: [] }}
+              rules=""
+              builtInRules={DEFAULT_RULES_HTML}
+            />
           </main>
         ) : null}
       </PlatformFrame>

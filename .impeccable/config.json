@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/app/admin/admin-workspace.module.css"
+        ],
+        "createdAt": "2026-09-26T03:40:09.421Z",
+        "reason": "PRD E-42 (docs/PRD.md) specifies game cards with a division colour border and tint, parity with the old game pills; the only remaining side border is .gameCard"
+      }
+    ]
+  }
+}

@@ -181,6 +181,8 @@ spacing:
   platform-column-gap: "2.5rem"
   platform-date-block: "4.75rem"
   platform-field: "3rem"
+  platform-action-gap: "0.75rem"
+  platform-calendar: "24rem"
 components:
   # Event pages
   tab:
@@ -309,6 +311,37 @@ components:
     backgroundColor: "{colors.platform-plate}"
     textColor: "{colors.platform-ink}"
     padding: "1.5rem 1.5rem 1.75rem"
+  # Platform admin workspace (Phase 3b)
+  platform-danger-action:
+    backgroundColor: "transparent"
+    textColor: "{colors.platform-danger}"
+    height: "2.75rem"
+    padding: "0.5rem 0.75rem"
+  platform-dialog:
+    backgroundColor: "{colors.platform-plate}"
+    textColor: "{colors.platform-ink}"
+    rounded: "{rounded.platform-square}"
+    width: "42rem"
+    padding: "1.5rem"
+  platform-calendar-day:
+    backgroundColor: "transparent"
+    textColor: "{colors.platform-ink}"
+    height: "2.75rem"
+  platform-calendar-day-hover:
+    backgroundColor: "{colors.platform-plate-raised}"
+  platform-calendar-day-selected:
+    backgroundColor: "{colors.platform-teal}"
+    textColor: "{colors.platform-on-teal}"
+  platform-date-chip:
+    backgroundColor: "transparent"
+    textColor: "{colors.platform-ink}"
+    rounded: "{rounded.platform-square}"
+    height: "2.75rem"
+    padding: "0.5rem"
+  platform-workspace-notice:
+    backgroundColor: "transparent"
+    textColor: "{colors.platform-ink}"
+    padding: "1rem"
 ---
 
 # Design System: iTala Connect
@@ -331,6 +364,7 @@ Prototype routes (`src/app/prototype/**`) and their lime sample-data banner are 
 - **26/09/2026:** the user chose **Broadcast Package** (candidate 1 of 7, seed a20866ff) over the rolled Season Program Guide for the platform screens. Direction contract: `.impeccable/surfaces/src-app-public-page-tsx.md`. Finish review verdict: ship.
 - **26/09/2026:** the iTala mobile app's colour-role rule was declared **not binding** on iTala Connect. The platform sets its own colour law instead: **teal is identity and plate edges; lime means only LIVE pips and the one primary action on a screen.**
 - **26/09/2026:** the logo mark `public/brand/itala-mark.png` is the mobile app's `favicon.png` (196 by 196) copied unchanged. It is the iTala mark on its own ground, `#0B0F18`, which equals the platform ground, so the mark sits on the page seamlessly. Its provenance is embedded in the file's PNG text metadata. It is not a transparent cut-out; do not describe or treat it as one.
+- **26/09/2026:** the Phase 3b admin workspace (league import, event editor, new event, dashboard event actions) was recorded as an ordinary extension of Broadcast Package: action rows, the danger text action, the confirmation dialog, the players dialog, the multi-date calendar picker, editor collapsible sections and workspace notices. Finish review disposition: ship, after action-row targets reached 2.75rem and the unsaved-changes guard moved to the confirmation dialog.
 
 ### Event pages: Painted Lines
 
@@ -511,7 +545,7 @@ Flat. There are no shadows anywhere in this world. Depth is expressed as paint o
 **The Floor Patch Rule.** Lettering that sits on a drawn court sits on a patch of Floor Tint, so painted lines never cross a name or a score.
 
 ### Platform screens
-Flat, with tonal stacking. Depth is three navy steps: Network Ground, then Bug Plate, then Raised Plate for the element that sits on a plate (date blocks, sub-strips, quiet buttons, notices) or for a hovered row. Hairline Seams separate the bar and label sections. There are no shadows, glows, gradients, blurs or glass. The sticky network bar is opaque ground so content passes under it cleanly.
+Flat, with tonal stacking. Depth is three navy steps: Network Ground, then Bug Plate, then Raised Plate for the element that sits on a plate (date blocks, sub-strips, quiet buttons, notices) or for a hovered row. Hairline Seams separate the bar and label sections. There are no shadows, glows, gradients, blurs or glass. The sticky network bar is opaque ground so content passes under it cleanly. A modal dialog is a Bug Plate over a flat scrim of black at 75% opacity; the scrim dims, it never blurs, and the dialog takes no shadow.
 
 #### Named Rules
 **The Three Steps Rule.** Ground, plate, raised plate. A new surface takes the next step up from what it sits on; it never gets a shadow.
@@ -621,6 +655,69 @@ The rundown row for an event on Home (a link to the event page) and the Dashboar
 #### Tables
 Admin tables keep real table semantics inside a scrollable, labelled region. Headers use the muted Label style; each row's cells are Bug Plate strips separated by 0.375rem of ground, first column at 700.
 
+#### Action rows
+The admin workspace groups the actions for a form, a team, a division or a dialog in one row: a wrapping flex row, vertically centred, 0.75rem apart (`platform-action-gap`), 1rem above and 1.5rem below. Every link and button in a row is at least 2.75rem tall and wraps its label rather than truncating, so a long action never forces sideways scroll at 360 px. The row leads with its filled plate (lime only when it is the screen's one primary action, such as "Save draft" or "Create event"; teal for a retry or a dialog's go-ahead; quiet for add, open and month actions), followed by any danger text action. When a league being imported is already linked, lime moves to "Open existing event" and "Create anyway" drops to quiet, so the one primary action is always the safe one.
+
+#### Danger text action
+Destructive actions outside a dialog ("Delete", "Remove team", "Remove division", "Remove" on a player row) are text, not plates: Alert Red, underlined with a 0.2em offset, 0.5rem by 0.75rem padding, at least 2.75rem tall. Each carries its target in screen-reader text ("Delete Harbour League"). Deleting an event, or removing a team or division, asks through the confirmation dialog first; editor removals only land when the draft is saved.
+
+**The Red Is Words Rule.** A destructive action outside a dialog is Alert Red underlined text, never a filled plate.
+
+#### Confirmation dialog
+A native modal `dialog`, labelled by its title: Bug Plate fill, a 1 px teal edge, square corners, 1.5rem padding, at most 42rem wide (never wider than the viewport less 2rem), at most 85dvh tall with its own scroll. The title is a 1.5rem heading written as the question ("Discard unsaved changes?", "Remove Harbour Hawks?"); the message states the consequence in body text ("This can't be undone."). The action row puts **Cancel** first as a quiet plate that takes focus, then the go-ahead as a teal plate named for the act ("Delete event", "Continue"). While the action runs both buttons are disabled, the go-ahead reads "Please wait…" and Escape does nothing; otherwise Escape is Cancel. Closing any admin dialog, whichever way, gives focus back to the control that opened it (the shared `useModal`); when the confirmed action removed that control (Remove team, Remove division), focus goes to the first control of the nearest part of the page still there. The control a dialog starts on is marked `data-autofocus`. A go-ahead that was disabled while it ran gets focus back when the action is refused.
+
+The same dialog is the unsaved-changes guard in the event editor: in-app links, Sign out and browser Back all ask "Discard unsaved changes?" before edits are lost, and reload or closing the tab falls back to the browser's own prompt. Forms that stay on the page (the editor itself, the players dialog) opt out with `data-keeps-page`.
+
+**The Safe Choice First Rule.** In a confirmation dialog Cancel comes first and takes focus; the go-ahead is teal and names the act. A confirm is never lime.
+
+#### Players dialog
+The same dialog frame, titled "Players · [team]". Each player is a row of a Number field (4.5rem) and a Player name field in the platform field style, with a danger "Remove" text action at the row end; below 40rem the number narrows to 4rem and Remove drops beneath the name, aligned right. The action row holds "Add player" (quiet) and "Done" (teal). The first name field takes focus; edits apply to the draft on Done and are discarded on Cancel or Escape.
+
+#### Multi-date calendar picker
+Event dates are chosen on a month calendar at most 24rem wide (`platform-calendar`), headed "Event dates (n selected)". Previous and Next are quiet plates either side of the month name, which is announced politely as it changes. Weekday initials sit above a seven-column grid of day buttons: 2.75rem tall, tabular numerals, transparent at rest, Raised Plate on hover, and solid teal with On Teal text when chosen (`aria-pressed`), each labelled with its full DD/MM/YYYY date. Arrow keys move focus by a day or a week. Each chosen date is repeated below as a square chip (1 px Seam outline, 2.75rem tall, "02/10/2026 · Remove") that removes it, so the selection can be read and changed without the grid.
+
+#### Editor collapsible sections
+The event editor is a stack of native disclosure sections ("Event details", "Divisions (n)"). Each opens under a 1 px Seam rule with 1.5rem above and 1.25rem of padding; its summary is a 1.5rem condensed heading at least 2.75rem tall. Division sections nest inside with the same rule, and each team sits above a 1 px Seam line with 1rem of padding. Sections start open, each section's open state is remembered for the browser session, and "Expand all" and "Collapse all" sit in the editor's action row.
+
+#### Workspace notices
+Inside the admin workspace a notice is a 1 px teal outline with no fill, 1rem padding and Ink body text that wraps anywhere, running the width of its form. It carries status after an action ("Saved", announced as a status), a league link ("Linked to iTala mobile: Harbour League (2026)"), the read-only note on a published event, the event-colour contrast warning, and pending image clean-up with its own action row. Load failures keep the Alert Red outline.
+
+#### Rules editor
+The Rules section (E-70) holds the old toolbar and nothing more: **Bold**, **Italic**, **Underline**, **Heading 2**, **Heading 3**, **Bullet list** and **Numbered list**.
+- **Toolbar:** a labelled toolbar ("Rules formatting") of toggle buttons (`aria-pressed`), 2.75rem tall, on Raised Plate. A pressed tool is solid teal with On Teal text, and stays teal on hover (the teal hover step). The toolbar is one tab stop: arrow keys, Home and End move between the tools, and Tab returns to the last one used. Clicking a tool with the mouse leaves the cursor in the text, so the next key types there. Bold, Italic and Underline also answer Control+B, I and U (Command on a Mac).
+- **Writing area:** a multi-line text box labelled "Event rules" (clicking the label puts the cursor in it), on Network Ground with a 1 px Seam, at least 12rem tall. Focus draws the 2 px teal outline. A numbered list keeps its starting number ("3. " starts at 3) on the event page too.
+- **Saving:** rules save with the rest of the event (Save or Save draft), cleaned to the allow-list on the way in and again on the event page (E-71). Rules with no text are stored as none, so the page says "No rules."
+- Tiptap's own style injection is off (CSP), so its few layout rules live in the workspace stylesheet.
+
+#### Event images
+The Images section (E-15 to E-18) comes before Rules.
+- **Slots:** **Event logo** and **Major sponsor** each have a preview (on Raised Plate, so transparent logos show), **Upload** or **Replace** (a quiet plate that opens the file picker; its hidden input keeps the focus ring on the plate), and a danger **Remove**. **Minor sponsors** are a grid of thumbnails, each with Remove (naming it for screen readers), plus **Add minor sponsors** (several at once).
+- **Behaviour:** images save as soon as they upload, unlike the rest of the editor, and the section says so. The browser checks the file (PNG, JPEG or WebP up to 5 MB) and resizes it to at most 1600 px before sending.
+- **Focus:** Remove takes the image and its button away, so focus moves to that slot's upload control.
+- **Status:** one polite status line under the section reads "Uploading logo…", "Uploading 2 of 3…", "Logo saved.", "2 minor sponsors added." or "Upload failed: {reason}" (in Alert Red).
+
+#### Platform settings
+Superadmin only (S-01, S-02). Two sections under the title plate, each a Seam-topped section with a section heading.
+- **Platform sponsors:** **Primary sponsors** ("Full size on every event page.") and **Secondary sponsors** ("Half size on every event page."), each a thumbnail grid like minor sponsors, with **Add primary sponsors** or **Add secondary sponsors** (several at once, the same picker plate as event images). Each Remove is named "Remove primary sponsor 2" and so on, starting with its visible word. After a removal, focus moves to that tier's Add control. One polite status line reads "Uploading 1 of 2…", "2 secondary sponsors added.", "Primary sponsor removed." or the reason in Alert Red.
+- **Default rules:** the rules editor labelled "Default rules", starting from the stored template or, when there is none, the built-in iTala rules (the note then adds "These are the built-in rules."). **Save default rules** is the live button; it stays focusable while it saves. "Unsaved changes" sits beside it, and leaving with unsaved edits asks first, as in the event editor.
+
+#### Round robin and playoff dialogs
+Once an event is published, each division's action row reads **+ Add team**, **+ Round robin**, **+ Playoff** (quiet plates, each carrying the division name in screen-reader text), then the danger **Remove division**. The pre-publish **Custom games/team** setting leaves the card and lives in the round robin dialog (E-21).
+- **Frame:** the confirmation dialog's frame, titled "Add round robin · [division]" or "Add playoff · [division]". Cancel comes first as a quiet plate; the go-ahead is teal and names the act ("Add games", "Add playoff"), reading "Adding…" while it runs.
+- **Round robin:** the old editor's sentence ("4 teams. A full round robin is 6 games (3 per team). Matchups already on the schedule are skipped, and new games take whatever slots are still free."), the **Custom games/team** check, and when ticked a **Games per team** field whose range note ("Between 1 and 3. Leave the box unticked for a full round robin.") is its description, not part of its label.
+- **Playoff:** one field, "How many teams advance to the playoff bracket? (max N)", starting at min(N, 4), with a note on where the games go.
+- **Saving first:** like Publish, an addition saves unsaved edits first, so it uses what is on screen.
+- **Outcome:** the dialog turns into its result ("4 games added. 1 could not fit and is in the Unscheduled row.", "3 playoff games added!") as a status with a teal **Done** that takes focus and is described by the result, so the outcome is seen and heard wherever the organiser is on the page. Existing games the event's days, hours or courts no longer fit go to Unscheduled first (as the old editor did), and the result says how many. A division with too few teams, or an event with no dates, gets the reason and only **Close**.
+
+#### Schedule drag and drop
+The published event's schedule grid moves games by drag and drop (E-45).
+- **Move handle:** each game card ends in an action row of **Move** (a six-dot grip in Muted Ink, then the word, `cursor: grab`) and **Edit** (underlined text). Both are at least 2.75rem tall and carry the matchup in screen-reader text ("Move Hawks vs Owls"). Only the handle starts a drag: a mouse drags at once, touch needs a press and hold (250 ms), so a swipe on a card still scrolls the table on a phone.
+- **Keyboard:** Space or Enter picks the game up, arrow keys step one cell at a time (across courts, through the times, on into the next day, and up into the Unscheduled row and its games), Space or Enter drops, and Escape or Tab cancels, so leaving the grid never moves a game. Focus stays on the game's Move button, in its new cell after a drop.
+- **Drop target:** the cell, Unscheduled game or Unscheduled row under the game gets a 2 px teal outline drawn inside its edge (the current place, The Teal Is Identity Rule).
+- **Lifted card:** the dragged card keeps its look on Raised Plate with a 2 px teal outline; no shadow. It lands instantly: no drop animation and no keyboard glide, because platform screens have no motion beyond colour transitions.
+- **Outcome:** the card shows in its new place at once and settles when the save returns; a refused save puts it back. Dragging and Edit wait while a move saves.
+- **Schedule notice:** the result sits in a notice pinned to the foot of the viewport while the schedule is on screen (`position: sticky`): Raised Plate, 1 px teal outline (Alert Red when refused), at most 40rem wide, with a **Dismiss** text action that hands focus back to the game. It clears when the next drag starts, so it never sits over drop targets. It names the move ("Moved Hawks vs Owls (Open) to Sat 03/10/2026 10:00 am, Court 1.") and adds a **Rest warning:** line for each team left with two games under 2 hours apart. The warning never blocks the move. "Saving…" shows while the save runs.
+
 #### Motion
 One easing, `cubic-bezier(0.16, 1, 0.3, 1)`. Colour transitions 150ms (nav links, buttons, rows, date blocks, input underlines). The title plate wipe (420ms, sub-strip delayed 120ms) is the signature and runs once. The LIVE pip (1.6s ease-in-out, infinite) is the only repeating motion. Under `prefers-reduced-motion` the wipe, the pip and every transition are off.
 
@@ -657,6 +754,9 @@ One easing, `cubic-bezier(0.16, 1, 0.3, 1)`. Colour transitions 150ms (nav links
 - **Do** say every status in words on its bug; colour only reinforces it.
 - **Do** keep "iTala" in its own casing inside capitalised plates.
 - **Do** place the iTala mark directly on Network Ground, unaltered.
+- **Do** keep every link and button in an action row at least 2.75rem tall, wrapping rather than truncating.
+- **Do** ask through the confirmation dialog, Cancel first, before an event, team or division is removed or unsaved edits are lost.
+- **Do** repeat every chosen calendar date as a removable chip beneath the calendar.
 
 ### Platform screens - Don't:
 - **Don't** use lime for headings, decoration, hovers or a second button on the same screen.
@@ -664,3 +764,5 @@ One easing, `cubic-bezier(0.16, 1, 0.3, 1)`. Colour transitions 150ms (nav links
 - **Don't** add motion beyond the one-time title plate wipe, the LIVE pip and 150ms colour transitions.
 - **Don't** describe or treat the iTala mark as transparent, or recolour, crop or re-ground it.
 - **Don't** apply the iTala mobile app's colour-role rule here; it was declared not binding on 26/09/2026.
+- **Don't** put a destructive action on a filled plate, or make a dialog's go-ahead lime.
+- **Don't** use the browser's native confirm prompt for in-app questions; the only native prompt left is the reload and close-tab fallback.

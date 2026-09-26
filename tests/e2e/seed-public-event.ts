@@ -73,12 +73,11 @@ export async function seedPublicEvent(
       .select('id, name'),
   );
   const id = (n: string) => teams.find((x) => x.name === n)!.id;
-  must(
-    await admin.from('players').insert([
-      { team_id: id('Hawks'), name: 'Ari', number: '4', sort_order: 0 },
-      { team_id: id('Hawks'), name: 'Bea', number: '7', sort_order: 1 },
-    ]),
-  );
+  const playersResult = await admin.from('players').insert([
+    { team_id: id('Hawks'), name: 'Ari', number: '4', sort_order: 0 },
+    { team_id: id('Hawks'), name: 'Bea', number: '7', sort_order: 1 },
+  ]);
+  if (playersResult.error) throw playersResult.error;
   const games = must(
     await admin
       .from('games')
@@ -92,6 +91,8 @@ export async function seedPublicEvent(
           team1_id: id('Hawks'),
           team2_id: id('Bolts'),
           label: 'Open',
+          type: 'group',
+          is_playoff: false,
           position: 0,
         },
         {
@@ -103,6 +104,8 @@ export async function seedPublicEvent(
           team1_id: id('Owls'),
           team2_id: id('Lynx'),
           label: 'Open',
+          type: 'group',
+          is_playoff: false,
           position: 1,
         },
         {
@@ -124,6 +127,7 @@ export async function seedPublicEvent(
       .select('id, position'),
   );
   const first = games.find((g) => g.position === 0)!;
-  must(await admin.from('game_scores').insert({ game_id: first.id, event_id: event.id, s1: 50, s2: 40 }));
+  const scoreResult = await admin.from('game_scores').insert({ game_id: first.id, event_id: event.id, s1: 50, s2: 40 });
+  if (scoreResult.error) throw scoreResult.error;
   return { id: event.id, name, legacyId, today, tomorrow };
 }

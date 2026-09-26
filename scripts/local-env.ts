@@ -7,10 +7,10 @@
  * --force is given, so real values are never clobbered.
  * --stdout prints KEY=value lines instead (used by CI to fill $GITHUB_ENV).
  */
-import { execFileSync } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
 
-const raw = execFileSync('npx', ['supabase', 'status', '-o', 'env'], { encoding: 'utf8' });
+const raw = execSync('npx supabase status -o env', { encoding: 'utf8' });
 const status = Object.fromEntries(
   raw
     .split('\n')

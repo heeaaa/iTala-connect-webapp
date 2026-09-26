@@ -1,16 +1,15 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
-import { NO_ACCESS_MESSAGES, safeNextPath } from '@/server/access';
+import { loginNoticeMessage, safeNextPath } from '@/server/access';
 import { BrandName, platformStyles as st, TitlePlate } from '@/components/platform/platform-frame';
 import { getAccess } from '@/server/auth';
+import { googleSignInEnabled } from '@/server/auth-providers';
 
 import { PlatformChrome } from '../../platform-chrome';
 import { LoginForm } from './login-form';
 
 export const metadata: Metadata = { title: 'Sign in' };
-
-const NOTICE_KEYS = ['no-profile', 'no-role', 'disabled'] as const;
 
 export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
   const params = await searchParams;
@@ -20,8 +19,8 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
   const access = await getAccess();
   if (access.kind === 'admin') redirect(next);
 
-  const errorKey = NOTICE_KEYS.find((k) => k === params.error);
-  const notice = errorKey ? NO_ACCESS_MESSAGES[errorKey] : undefined;
+  const notice = loginNoticeMessage(params.error);
+  const google = await googleSignInEnabled();
 
   return (
     <PlatformChrome current="login">
@@ -41,6 +40,15 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
             </p>
           ) : null}
           <LoginForm next={next} />
+          {google ? (
+            <div className={st.formPanel}>
+              <p className="text-brand-muted">Or use the Google account you use in the iTala app.</p>
+              {/* A plain link: a prefetching Link would start a Google sign-in on its own. */}
+              <a href={`/auth/google?next=${encodeURIComponent(next)}`} className={`${st.button} ${st.buttonQuiet}`}>
+                Continue with Google
+              </a>
+            </div>
+          ) : null}
         </div>
       </main>
     </PlatformChrome>

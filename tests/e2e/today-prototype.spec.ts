@@ -17,8 +17,9 @@ async function expectNoSeriousA11yViolations(page: Page) {
 }
 
 async function noSidewaysScroll(page: Page) {
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  expect(overflow).toBeLessThanOrEqual(0);
+  // Compare with the configured viewport: mobile emulation widens innerWidth to fit overflowing content.
+  const width = await page.evaluate(() => document.documentElement.scrollWidth);
+  expect(width).toBeLessThanOrEqual(page.viewportSize()!.width);
 }
 
 test.describe('Today screen prototype (sample data)', () => {

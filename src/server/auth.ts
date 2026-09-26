@@ -51,6 +51,14 @@ export async function authorizeAdmin(): Promise<ActionResult<Admin>> {
   return { ok: true, data: access.profile };
 }
 
+/** For superadmin-only Server Actions (settings, admins). RLS checks the same role again. */
+export async function authorizeSuperadmin(): Promise<ActionResult<Admin>> {
+  const auth = await authorizeAdmin();
+  if (!auth.ok) return auth;
+  if (auth.data.role !== 'superadmin') return { ok: false, error: 'Only a superadmin can do this.' };
+  return auth;
+}
+
 /** Event ownership check, same rule as the RLS helper (A-03, A-05). */
 export async function canEditEvent(eventId: string): Promise<boolean> {
   const access = await getAccess();
