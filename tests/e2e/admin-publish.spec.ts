@@ -306,7 +306,9 @@ test('adds a round robin and a playoff to a published schedule', async ({ page }
     (a, b) => Number(!a.day) - Number(!b.day) || `${a.day} ${a.start_time}`.localeCompare(`${b.day} ${b.start_time}`),
   );
   expect(inOrder.filter((g) => g.day).map((g) => g.id)).toEqual(byTime.filter((g) => g.day).map((g) => g.id));
-  expect(inOrder.findIndex((g) => !g.day)).not.toBeLessThan(inOrder.filter((g) => g.day).length);
+  // Every scheduled game comes before every unscheduled one (there may be none).
+  const scheduledFirst = inOrder.map((g) => Boolean(g.day));
+  expect(scheduledFirst).toEqual([...scheduledFirst].sort((x, y) => Number(y) - Number(x)));
   const { data: open } = await db
     .from('divisions')
     .select('custom_games_per_team, games_per_team')

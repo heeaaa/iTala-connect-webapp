@@ -268,9 +268,11 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
     - focus back to the opener for all four dialog kinds, and into the division after Remove team;
     - axe with no serious or critical issues, and no sideways scroll.
   - Captures: `.impeccable/review/phase5c3/{mobile,desktop}/` (division actions, both dialogs, both results).
-- **Runs in CI on push, NOT RUN here (Docker):**
-  - pgTAP `008_schedule_additions.sql` (26).
-  - The E2E "adds a round robin and a playoff to a published schedule", at two viewports.
+- **CI run 36234344462 on `cc1a035`:**
+  - The migration applied cleanly, and **pgTAP passed 180/180** (154 plus the 26 in `008_schedule_additions.sql`).
+  - Integration and every other E2E passed.
+  - The new additions E2E failed at both viewports on a **test bug**. Its "unscheduled games come last" check used `findIndex`, which is -1 when every game fits, as it did here. The stronger check just before it (stored order follows day and time) passed.
+  - The check now compares the scheduled and unscheduled pattern with its sorted form, which holds with or without unscheduled games. It was checked on none unscheduled, some at the end, and one out of place.
 - **You, after CI passes:** push migration `20260926000600_schedule_additions.sql` to the hosted project (`supabase db push`), as with the earlier migrations.
 - **For the finish review:** `.impeccable/design.json` is not updated; DESIGN.md is ("Round robin and playoff dialogs", and the dialog focus rule).
 
