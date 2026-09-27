@@ -467,6 +467,19 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 - **Not run:** the E2E on the laptop (CI runs it), and the check against the real mobile app, which waits for your go.
 - **CI run 36306373610 on `1433fff` failed** only in the new E2E, at both sizes: the test expected Night Owls to have 1 player, but in the fixture it is a team-only mobile team (no roster), so the import brought none and the page rightly said "Same in both (no players). The mobile app keeps no roster for this team (team only)." Everything before that step passed. Test corrected; the page was right.
 
+### Live on Netlify (27/09/2026)
+
+- **PR #1 merged** into `main` (merge commit `5f1e187`); the site is live at **https://itala-connect.netlify.app/** from `main`. Netlify site protection was on at first (every page answered 401); Aeron turned it off.
+- **Checked from outside (read only):**
+  - the home, sign-in and set-up pages load, `/admin` sends you to sign in and keeps where you were going, an unknown event is a 404, and the prototypes are off (404);
+  - the security headers are all present (nonce CSP, HSTS, DENY framing, nosniff, referrer and permissions policies, no `X-Powered-By`);
+  - the served pages and scripts hold no `sb_secret_` or service-role pattern;
+  - "Continue with Google" goes to the hosted project, set to come back to `https://itala-connect.netlify.app/auth/callback` (so `NEXT_PUBLIC_SITE_URL` is right and Google is on).
+- **Signing in:** email and password works for Aeron's superadmin account. Google sign-in only works for an account created with the same email as the Google account (invite-only).
+- **Console note:** the blocked `/.netlify/scripts/hud` script is Netlify's own toolbar, which Netlify injects for signed-in team members; the app's CSP blocks it. Harmless; turn the toolbar off in Netlify rather than loosen the CSP.
+- **Brand casing (Aeron):** a lowercase "iTala" inside a capitalised title looked broken. Capitalised titles, headings and buttons are now worded without it ("Sign in", "Organisers only", "Running a league or tournament?", "Import from the mobile app"); the `BrandName` component is gone, and DESIGN.md's rule is revised. PR #2.
+- **Next:** merge PR #2, create the admin's account on the Admins screen (keep the set-up link), run the real import with his email as `--owner`, check the events, then send him the link.
+
 ### Deploying to Netlify: prepared (27/09/2026)
 
 - **Decision (Aeron):** deploy first, create the admin's account on the Admins screen, run the real import with his email as `--owner`, then send him the set-up link. There is no owner-reassign screen yet (O-1 planned it), so the owner is set at import.

@@ -15,7 +15,7 @@ test.describe('Sign in and roles (PRD A-01 to A-08)', () => {
   test('signed-out visitors are sent from /admin to sign in, keeping where they were going', async ({ page }) => {
     await page.goto('/admin/admins');
     await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Fadmins$/);
-    await expect(page.getByRole('heading', { name: 'Sign in to iTala Connect' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sign in', exact: true, level: 1 })).toBeVisible();
   });
 
   test('wrong credentials show the generic message (A-07, A-10)', async ({ page }) => {

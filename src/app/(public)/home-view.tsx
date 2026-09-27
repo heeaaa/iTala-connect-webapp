@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { BrandName, platformStyles as s, StatusBug, TitlePlate } from '@/components/platform/platform-frame';
+import { platformStyles as s, StatusBug, TitlePlate } from '@/components/platform/platform-frame';
 import { formatDate } from '@/lib/format';
 import { divisionsLabel, type HomeCard } from '@/lib/public-event/home';
 
@@ -40,9 +40,7 @@ export function HomeView({ events }: { events: HomeCard[] }) {
           <aside className={s.promo} aria-labelledby="organisers-heading">
             <h2 id="organisers-heading">
               <span className={s.key} aria-hidden="true" />
-              <span>
-                Run your league on <BrandName /> Connect
-              </span>
+              <span>Running a league or tournament?</span>
             </h2>
             <ul>
               <li>
@@ -55,9 +53,7 @@ export function HomeView({ events }: { events: HomeCard[] }) {
               </li>
               <li>
                 <span className={s.tick} aria-hidden="true" />
-                <span>
-                  Final scores straight from the <BrandName /> scorekeeper app.
-                </span>
+                <span>Final scores straight from the iTala scorekeeper app.</span>
               </li>
             </ul>
             <p>Organiser accounts are set up by the iTala team.</p>

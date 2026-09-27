@@ -16,7 +16,7 @@ export default async function PreviewPage({ params }: PageProps<'/admin/import/[
   } catch {
     return (
       <>
-        <TitlePlate title="League preview" sub="Import from iTala mobile" />
+        <TitlePlate title="League preview" sub="Import from the mobile app" />
         <p role="alert" className={s.error}>
           Can&apos;t load this mobile league right now. It may have changed. Try again.
         </p>

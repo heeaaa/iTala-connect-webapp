@@ -38,7 +38,7 @@ test('imports teams and ordered players, edits a linked draft, warns before a se
   const path = `.impeccable/review/phase3b/${info.project.name}`;
   mkdirSync(path, { recursive: true });
   await signInAndWait(page, organiser);
-  await page.getByRole('link', { name: 'Import from iTala mobile', exact: true }).click();
+  await page.getByRole('link', { name: 'Import from the mobile app', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Harbour League' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Friday Drop-in' })).toHaveCount(0);
   await expect(page.getByText('Archived', { exact: true })).toBeVisible();
