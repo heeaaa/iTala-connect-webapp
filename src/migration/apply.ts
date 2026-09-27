@@ -79,6 +79,8 @@ export interface AppliedEvent {
   result?: ImportResult;
   /** The diff again, on the rows as stored. */
   differences?: Difference[];
+  /** The web address as stored (P-14), from the read back; it works once the event is published. */
+  address?: { slug: string; published: boolean };
   images?: ImageOutcome;
 }
 
@@ -108,8 +110,17 @@ const reason = (error: unknown) => (error instanceof Error ? error.message : Str
 
 type Place = Parameters<typeof storedImage>[1];
 
-/** One image into the bucket: decoded or fetched, checked, uploaded. */
-async function copyImage(target: ImportTarget, source: ImageSource, place: Place, hosts: readonly string[]) {
+/**
+ * One image into the bucket: decoded or fetched, checked, uploaded. The result type is written
+ * out: inferred, it widened with the check order (an incremental build found `path` possibly
+ * undefined behind `'path' in r`, 28/09/2026).
+ */
+async function copyImage(
+  target: ImportTarget,
+  source: ImageSource,
+  place: Place,
+  hosts: readonly string[],
+): Promise<{ problem: string } | { path: string }> {
   const origin = imageOrigin(source, hosts);
   if ('problem' in origin) return { problem: origin.problem };
   let bytes: Uint8Array;
@@ -244,7 +255,9 @@ export async function applyImport(
     }
     const written: AppliedEvent = { ...base, outcome: 'written', result };
     try {
-      const keyed = legacyKeyedRows(await target.readBack(result.event_id), planned.legacyId);
+      const stored = await target.readBack(result.event_id);
+      if (stored.slug) written.address = { slug: stored.slug, published: stored.event.status === 'published' };
+      const keyed = legacyKeyedRows(stored, planned.legacyId);
       written.differences = compareRows(planned.raw, keyed.rows, keyed.oldIndex, legacy);
     } catch (error) {
       written.reason = `written, but it could not be read back: ${reason(error)}`;
@@ -282,6 +295,10 @@ export function formatApplied(result: ApplyResult): string {
       out.push(
         `  ${r.created ? 'CREATED' : 'UPDATED'}  ${label}: ${r.divisions} division(s), ${r.teams} team(s), ${r.players} player(s), ${r.games} game(s), ${r.scores} score(s), ${r.approvals} approval(s), ${r.mobile_links} mobile link(s)`,
       );
+      if (e.address)
+        out.push(
+          `    web address: /events/${e.address.slug}${e.address.published ? '' : ' (works once the event is published)'}`,
+        );
       if (!e.differences) out.push(`    ${e.reason}`);
       else if (e.differences.length)
         for (const d of e.differences)

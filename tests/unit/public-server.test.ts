@@ -40,7 +40,8 @@ vi.mock('@/server/auth', () => ({
 }));
 vi.mock('@/env', () => ({ serverEnv: () => ({ NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321' }) }));
 
-const { findEventByLegacyId, loadHomeEvents, loadPublicEvent, LoadError } = await import('@/server/public/load-event');
+const { findEventByLegacyId, findPublicEvent, loadHomeEvents, loadPublicEvent, LoadError } =
+  await import('@/server/public/load-event');
 const { saveScore } = await import('@/server/actions/scores');
 const { SAVE_SCORE_FAILED } = await import('@/server/actions/score-messages');
 
@@ -133,12 +134,58 @@ describe('loadPublicEvent', () => {
   });
 });
 
+describe('findPublicEvent (P-14): an id, a web address or an old one', () => {
+  const ref = { id: EVENT_ID, slug: 'spring-hoops-2026' };
+
+  it('finds an event by its id', async () => {
+    db.tables.set('events', { data: ref, error: null });
+    expect(await findPublicEvent(EVENT_ID)).toEqual(ref);
+    expect(db.calls[0]!.ops).toContainEqual(['eq', 'id', EVENT_ID]);
+  });
+
+  it('finds an event by its address, as typed with capitals', async () => {
+    db.tables.set('events', { data: ref, error: null });
+    expect(await findPublicEvent('Spring-Hoops-2026')).toEqual(ref);
+    expect(db.calls[0]!.ops).toContainEqual(['eq', 'slug', 'spring-hoops-2026']);
+    expect(db.calls.some((c) => c.table === 'event_slugs')).toBe(false);
+  });
+
+  it('follows an old address to the current one', async () => {
+    db.tables.set('events', { data: null, error: null });
+    db.tables.set('event_slugs', { data: { events: ref }, error: null });
+    expect(await findPublicEvent('spring-2026')).toEqual(ref);
+    expect(db.calls.find((c) => c.table === 'event_slugs')!.ops).toContainEqual(['eq', 'slug', 'spring-2026']);
+  });
+
+  it('is null when nothing visible has that address (a draft to the public, N-04)', async () => {
+    db.tables.set('events', { data: null, error: null });
+    db.tables.set('event_slugs', { data: null, error: null });
+    expect(await findPublicEvent('secret-draft-2026')).toBeNull();
+  });
+
+  it('is null for an address that cannot exist, without querying', async () => {
+    expect(await findPublicEvent('!!!')).toBeNull();
+    expect(await findPublicEvent('---')).toBeNull();
+    expect(db.calls).toHaveLength(0);
+  });
+
+  it('throws a LoadError when a lookup fails', async () => {
+    db.tables.set('events', { data: null, error: { message: 'down' } });
+    await expect(findPublicEvent(EVENT_ID)).rejects.toBeInstanceOf(LoadError);
+    await expect(findPublicEvent('spring-2026')).rejects.toBeInstanceOf(LoadError);
+    db.tables.set('events', { data: null, error: null });
+    db.tables.set('event_slugs', { data: null, error: { message: 'down' } });
+    await expect(findPublicEvent('spring-2026')).rejects.toBeInstanceOf(LoadError);
+  });
+});
+
 describe('loadHomeEvents (H-03)', () => {
   it('asks the database for published events only and maps cards', async () => {
     db.tables.set('events', {
       data: [
         {
           id: 'e',
+          slug: 'spring-2026',
           name: 'Spring',
           schedule_days: [],
           timezone: 'Pacific/Auckland',
@@ -150,7 +197,9 @@ describe('loadHomeEvents (H-03)', () => {
     });
     const cards = await loadHomeEvents(new Date('2026-09-26T00:00:00Z'));
     expect(db.calls[0]!.ops).toContainEqual(['eq', 'status', 'published']);
-    expect(cards).toEqual([expect.objectContaining({ id: 'e', divisionCount: 3, when: 'undated' })]);
+    expect(cards).toEqual([
+      expect.objectContaining({ id: 'e', slug: 'spring-2026', divisionCount: 3, when: 'undated' }),
+    ]);
   });
 
   it('throws when the list cannot load', async () => {
@@ -168,9 +217,9 @@ describe('legacy links', () => {
     expect(legacyTarget('')).toBeNull();
   });
 
-  it('looks up the Firebase id and rejects odd ids without querying', async () => {
-    db.tables.set('events', { data: { id: EVENT_ID }, error: null });
-    expect(await findEventByLegacyId('-Nabc')).toBe(EVENT_ID);
+  it('looks up the Firebase id, giving the web address, and rejects odd ids without querying', async () => {
+    db.tables.set('events', { data: { slug: 'spring-hoops-2026' }, error: null });
+    expect(await findEventByLegacyId('-Nabc')).toBe('spring-hoops-2026');
     expect(db.calls[0]!.ops).toContainEqual(['eq', 'legacy_firebase_id', '-Nabc']);
     db.calls.length = 0;
     expect(await findEventByLegacyId('../etc')).toBeNull();

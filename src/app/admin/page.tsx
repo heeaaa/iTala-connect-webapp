@@ -16,7 +16,7 @@ export default async function AdminDashboardPage() {
 
   let query = supabase
     .from('events')
-    .select('id, name, status, schedule_days, divisions(count)')
+    .select('id, slug, name, status, schedule_days, divisions(count)')
     .order('created_at', { ascending: false });
   // RLS also lets admins read other people's published events; the
   // dashboard shows only their own (D-01). Superadmins see everything.

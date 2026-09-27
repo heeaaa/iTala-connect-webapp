@@ -27,7 +27,7 @@ npm run lint && npm run typecheck && npm run test:coverage
 npm run build && npm run check:secrets && npm run test:e2e
 ```
 
-- Expected: **80 E2E tests**, **329 pgTAP assertions** (302 green in CI at `1db64c5` plus 27 in `016_legacy_import_guards.sql`) and **37 integration tests** (36 plus the Connect-change guard). Run `npm run db:reset` for the new migrations; `npm run db:types` must show no diff.
+- Expected: **86 E2E tests** (82 green in CI at `cc8e949` plus 4 in `event-address.spec.ts`), **360 pgTAP assertions** (329 plus 31 in `017_event_slugs.sql`) and **37 integration tests**. Run `npm run db:reset` for the new migrations; `npm run db:types` must show no diff.
 - Expected: **29 integration tests** (22 plus 7 in `admin-accounts.test.ts`).
 - Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
 
@@ -444,6 +444,51 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 - **Evidence (work laptop):** lint and typecheck pass; `test:coverage` 55 files, **800 tests pass**; a clean build and `check:secrets` pass. Harness (link wizard, sample data) at 390 and 1440 px: axe clean, no sideways scroll, 44 px targets, duplicate marked and refused with focus kept, a server refusal with focus kept, the clash note and the unreachable state; the results inbox specs still pass (6/6). Captures `.impeccable/review/phase6/{mobile,desktop}/link-*.png`.
 - **CI run 36289258765 on `aee70e4`: green.** 80/80 E2E (the new link journey at both viewports), 257/257 pgTAP (with `013`), 29/29 integration, 800 unit and component tests, gitleaks clean.
 - **You, now that CI has passed:** push `20260927000400_division_mobile_link.sql` with the other 27/09 migrations (`npx supabase migration list`, then `npx supabase db push --dry-run`, then `npx supabase db push`).
+
+### Event web addresses (PRD P-14, New, 27/09/2026)
+
+- **Asked for by Aeron:** a readable address per event, by default its name and year, editable when an event is created, unique across events. **Decisions:**
+  - renaming is in (recommended, and little extra work): the address changes only with Change address, never with the event name, and old addresses keep forwarding;
+  - `/events/{id}` keeps working and forwards to the address;
+  - drafts stay private, and the forms say the link works once published;
+  - existing events (and the two to import) get the default.
+- **Database, `20260927000800_event_slugs.sql`:**
+  - `events.slug` (not null, unique, format checked, never shaped like an id), with `event_slugs` keeping every address an event has had. An old address forwards and is never given to another event; deleting an event frees them.
+  - Defaults: `default_event_slug` (the same rules as `src/lib/event-slug.ts`), made by a trigger for inserts without a slug (the Firebase import, seeds), `-2` and so on when taken, one at a time under an advisory lock. Existing events were backfilled oldest first without moving their version.
+  - `free_event_slug` (admins; says only whether an address is taken), `set_event_slug` (editors; returns the version, which moves only on a real change), and `create_draft_event` / `import_mobile_league` with an optional `p_slug` (old callers still work). A change is audited as `event.address`.
+  - `event_slugs` is readable as far as its event is (`can_read_event`), and writable only through the trigger.
+- **App:**
+  - one web address field (`src/app/admin/_components/slug-field.tsx`) on New event, the league import and the editor (`event-address.tsx`), checked as you type;
+  - a taken default that follows the name quietly becomes the first free one;
+  - Change address queues behind saves like the image uploads.
+  - `/events/[eventId]` resolves an id, an address (capitals allowed) or an old address through `findPublicEvent`, and redirects anything but the current address to it, keeping the query.
+  - Home cards, the dashboard View link, the editor's public link and `/l/{firebaseId}` all use the address.
+- **Importer:** the dry run shows each event's first-import address, and `--apply` prints the stored one (with "works once the event is published" for a draft).
+- **Tests:**
+  - unit tests: `event-slug` (36, with 25 names holding TypeScript to the SQL results), `slug-actions` (16), and updates to the public loader, import and migrate tests;
+  - component tests: `slug-field` (11);
+  - pgTAP `017_event_slugs.sql` (31 assertions: defaults, clashes with current and old addresses, RLS for the public, owner and another admin, audit, grants, deletion). The first CI run stopped at check 20: the test called `create_draft_event` inside a `WHERE`, which runs once per row, so the second call found its own address taken. Each create now runs in its own statement and is checked in the next;
+  - E2E `event-address.spec.ts` (2 journeys at 2 sizes); `public-event.spec.ts` now expects the old link to land on the address.
+- **Evidence (work laptop):**
+  - lint and typecheck pass; `test:coverage` 65 files, **957 tests pass** (97.5% lines, 94.9% branches); a clean build and `check:secrets` pass;
+  - the migration run on PGlite (Postgres 17, scratchpad only, with stubs for the Supabase parts): backfill order and versions, defaults, suffixes at 80 characters, clashes, renames and going back, audit, grants and deletion, all as expected;
+  - harness at 390 and 1440 px (New event states, editor change): axe clean, no sideways scroll, 44 px buttons.
+  - Captures: `.impeccable/review/address/{mobile,desktop}/`. After the first look, two fixes: the "Use …" suggestion became a lower-case text button (as a plate it was upper case and too wide for a phone), and the confirmation shortened to "Address changed." (the note already says old addresses forward).
+  - One real bug found there and fixed: typing in the middle of the address sent the caret to the end.
+- **Not run on the laptop:** pgTAP, integration and E2E (CI runs them).
+- **The first push (`7262648`, run 36314325944) was red twice, both fixed:**
+  - pgTAP 017 stopped at check 20 (see Tests above), so integration and E2E did not run.
+  - Netlify's deploy preview failed in `next build`'s TypeScript step: `src/migration/apply.ts` saw `path` as possibly undefined behind `'path' in r`. Netlify restores the previous build's cache, and with that cache the inferred result type of `copyImage` widened. A fresh check (CI's Typecheck, the laptop without a cache) passed, which is why I first took it for a stale cache.
+  - Reproduced in a worktree: a typecheck of `origin/main` to build the cache, then this branch gave the same 5 errors as the Netlify log. Fixed by writing out `copyImage`'s result type; the same sequence then gave 0 errors.
+- **Before merging:** push `20260927000800_event_slugs.sql` to the hosted project first (`npx supabase db push`). The new code reads `events.slug`; the old code keeps working with the migration in place.
+
+### Hand cursor and README (28/09/2026)
+
+- **Hand cursor (The Hand Rule, DESIGN.md):** asked whether the hand was intended. A probe of every point on the home page, the editor, New event and the public game-day page found no hand over anything that cannot be clicked. The home event rows are whole-row links, which is why the hand covers most of the page. But many clickable controls showed the arrow: Expand all and Collapse all, date picker days and Remove chips, Remove team and division, game Edit, colour pickers and dropdowns.
+  - One base-layer rule in `src/app/globals.css` now gives every enabled button, disclosure heading, dropdown and picker the hand, and disabled ones the arrow.
+  - A component's own cursor still wins: busy plates show progress, and the Move handle shows grab.
+  - Re-probed: no hand without a target, and no target without a hand (bar the Move handle's grab). The probe (`test-results/guard/cursor.spec.ts`) is not committed.
+- **README:** "Deploying to Netlify" became a short "Deploying" section: where it builds, migrations first, the variable names, the Supabase URL settings and the cutover note. The one-off first-deploy steps are in "Live on Netlify" and "Deploying to Netlify: prepared" below.
 
 ### Compare rosters, read only (PRD M-11, New, 27/09/2026)
 

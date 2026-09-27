@@ -783,6 +783,9 @@ describe('the report', () => {
     expect(out).toContain('4 event(s): 1 ready, 2 error(s), 16 warning(s), 3 difference(s)');
     expect(out).toContain('READY  Harbour Spring Cup');
     expect(out).toContain('CHECK  Winter Social');
+    // The address a first import gets (P-14), from the name and first day, as the database makes it.
+    expect(out).toContain('web address for a first import: /events/harbour-spring-cup-2026');
+    expect(out).toContain('web address for a first import: /events/winter-social-2026');
     expect(out).toContain('DIFFERENCE score at game 2 ("Mixed"): old [30,-5], new [30,0]');
     expect(out).not.toContain('—');
     expect(formatReport(report, { applying: true })).toContain('checked before writing');

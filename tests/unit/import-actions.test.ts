@@ -22,7 +22,13 @@ vi.mock('@/lib/supabase/server', () => ({
 import { deleteEvent } from '@/server/actions/events';
 import { importLeague } from '@/server/actions/mobile-import';
 const id = '10000000-0000-4000-8000-000000000001';
-const choice = { leagueId: 'league', eventName: 'Event', divisionName: 'Open', allowDuplicate: false };
+const choice = {
+  leagueId: 'league',
+  eventName: 'Event',
+  divisionName: 'Open',
+  slug: 'event-2026',
+  allowDuplicate: false,
+};
 beforeEach(() => {
   vi.clearAllMocks();
   fake.authorize.mockResolvedValue({ ok: true });
@@ -62,7 +68,7 @@ describe('Import and deletion server boundaries', () => {
     expect(fake.preview).toHaveBeenCalledWith('league');
     expect(fake.rpc).toHaveBeenCalledWith(
       'import_mobile_league',
-      expect.objectContaining({ p_teams: [], p_allow_duplicate: false }),
+      expect.objectContaining({ p_teams: [], p_allow_duplicate: false, p_slug: 'event-2026' }),
     );
   });
   it('returns safe recovery errors without creating anything on mobile failure', async () => {

@@ -18,6 +18,7 @@ export const metadata: Metadata = { title: 'Platform prototype', robots: { index
 const SAMPLE_EVENTS: HomeCard[] = [
   {
     id: 'sample-1',
+    slug: 'sample-1-2026',
     name: 'Eastside Friday League',
     logoUrl: null,
     divisionCount: 2,
@@ -27,6 +28,7 @@ const SAMPLE_EVENTS: HomeCard[] = [
   },
   {
     id: 'sample-2',
+    slug: 'sample-2-2026',
     name: 'Harbour Fall Classic',
     logoUrl: null,
     divisionCount: 4,
@@ -36,6 +38,7 @@ const SAMPLE_EVENTS: HomeCard[] = [
   },
   {
     id: 'sample-3',
+    slug: 'sample-3-2026',
     name: 'Kits Youth Shootout',
     logoUrl: '/brand/itala-mark.png',
     divisionCount: 1,
@@ -45,6 +48,7 @@ const SAMPLE_EVENTS: HomeCard[] = [
   },
   {
     id: 'sample-4',
+    slug: 'sample-4-2026',
     name: 'Summer Hoops Invitational',
     logoUrl: null,
     divisionCount: 3,
@@ -54,6 +58,7 @@ const SAMPLE_EVENTS: HomeCard[] = [
   },
   {
     id: 'sample-5',
+    slug: 'sample-5-2026',
     name: 'Co-ed Winter League',
     logoUrl: null,
     divisionCount: 2,
@@ -102,12 +107,19 @@ export default async function PlatformPrototype({ searchParams }: PageProps<'/pr
               events={[
                 {
                   id: 'a',
+                  slug: 'a-2026',
                   name: 'Eastside Friday League',
                   status: 'published',
                   schedule_days: ['2026-09-11', '2026-10-09'],
                 },
-                { id: 'b', name: 'Harbour Fall Classic', status: 'draft', schedule_days: ['2026-10-17'] },
-                { id: 'c', name: '', status: 'draft', schedule_days: [] },
+                {
+                  id: 'b',
+                  slug: 'b-2026',
+                  name: 'Harbour Fall Classic',
+                  status: 'draft',
+                  schedule_days: ['2026-10-17'],
+                },
+                { id: 'c', slug: 'c-2026', name: '', status: 'draft', schedule_days: [] },
               ]}
             />
           </main>

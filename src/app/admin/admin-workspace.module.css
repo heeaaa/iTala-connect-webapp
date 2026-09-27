@@ -102,6 +102,71 @@
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
+/* Web address field (P-14): the link as it will read, then whether the address is free. */
+.slugLink {
+  margin: 0;
+  color: var(--brand-muted);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.slugLink strong {
+  color: var(--brand-text);
+  font-weight: 600;
+}
+.slugStatus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  min-width: 0;
+}
+/* "Use {address}": underlined text in the accent, lower case like the address, wrapping on a phone. */
+.slugUse {
+  min-height: 2.75rem;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand-accent);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-align: start;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.slugUse:hover {
+  color: var(--brand-accent-hover);
+}
+.slugUse:focus-visible {
+  outline: 2px solid var(--brand-focus);
+  outline-offset: 2px;
+}
+.slugStatus p {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+.slugQuiet {
+  color: var(--brand-muted);
+}
+.slugFree {
+  color: var(--brand-accent);
+  font-weight: 600;
+}
+.slugProblem {
+  color: var(--brand-danger);
+  font-weight: 600;
+}
+.slugNote {
+  margin: 0;
+  max-width: 65ch;
+  color: var(--brand-muted);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
 /* Compare rosters (M-11): iTala Connect beside the mobile app, stacked on phones. */
 .rosterPair {
   display: grid;

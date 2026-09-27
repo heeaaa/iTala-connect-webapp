@@ -7,6 +7,7 @@ import { useEffect, useEffectEvent, useRef, useState, useTransition } from 'reac
 import { resolveAllPlayoffs } from '@/domain/playoffs';
 import { republishWarning } from '@/domain/publish';
 import { DIVISION_COLOURS, type EditorInput, type EditorDivision, type EditorTeam } from '@/lib/event-editor';
+import { eventPath } from '@/lib/event-slug';
 import { saveEvent } from '@/server/actions/events';
 import { publishEvent } from '@/server/actions/publish';
 import { platformStyles as s, TitlePlate } from '@/components/platform/platform-frame';
@@ -15,6 +16,7 @@ import { PlayersDialog } from '../../_components/players-dialog';
 import { DatePicker } from '../../_components/date-picker';
 import { useUnsavedGuard } from '../../_components/use-unsaved-guard';
 import w from '../../admin-workspace.module.css';
+import { EventAddress, type RunAddressTask } from './event-address';
 import { MatchupReport, repeatedMatchups } from './matchup-report';
 import { EventImages, type EventImagesData, type RunImageTask } from './event-images';
 import { PlayoffDialog, RoundRobinDialog } from './schedule-additions';
@@ -33,6 +35,8 @@ const windowOf = (d: EditorInput) => JSON.stringify([d.schedule_days, d.time_sta
 
 export function EventEditor({
   initial,
+  slug: storedSlug,
+  siteUrl,
   links,
   games,
   images,
@@ -41,6 +45,10 @@ export function EventEditor({
   mobileEnabled = false,
 }: {
   initial: EditorInput;
+  /** The web address (P-14); it changes with Change address, not with Save. */
+  slug: string;
+  /** The site's own address, for the link preview. */
+  siteUrl: string;
   /** The event logo and sponsors as stored (E-15 to E-17); they save on upload, not with Save. */
   images: EventImagesData;
   /** Stored games with their scores, so playoff cards can show resolved teams (E-42). */
@@ -52,6 +60,7 @@ export function EventEditor({
   mobileEnabled?: boolean;
 }) {
   const [data, setData] = useState(initial);
+  const [slug, setSlug] = useState(storedSlug);
   const [saved, setSaved] = useState(JSON.stringify(initial));
   const [message, setMessage] = useState(notice);
   const [error, setError] = useState('');
@@ -130,8 +139,10 @@ export function EventEditor({
     setData((v) => ({ ...v, version: next }));
     setSaved((json) => JSON.stringify({ ...(JSON.parse(json) as EditorInput), version: next }));
   };
-  // Image changes queue behind any save, so a save never runs on a stale version.
-  const runImage: RunImageTask = (task) => {
+  // Image and address changes queue behind any save, so a save never runs on a stale version.
+  const runQueued = <R extends { ok: true; data: { version?: string } } | { ok: false; error: string }>(
+    task: (version: string) => Promise<R>,
+  ): Promise<R> => {
     const done = queue.current.then(async () => {
       const result = await task(version.current);
       if (result.ok && result.data.version) adoptVersion(result.data.version);
@@ -143,6 +154,8 @@ export function EventEditor({
     );
     return done;
   };
+  const runImage: RunImageTask = runQueued;
+  const runAddress: RunAddressTask = runQueued;
   const autosave = useEffectEvent(() => start(async () => void (await save())));
   const windowKey = windowOf(data);
   const savedWindow = useRef(windowKey);
@@ -242,8 +255,8 @@ export function EventEditor({
       )}
       {published && (
         <p className={w.notice}>
-          This event is published. <Link href={`/events/${data.id}`}>Open its public page to enter scores.</Link>{' '}
-          Changes to days, hours and courts save automatically; other edits need Save.
+          This event is published. <Link href={eventPath(slug)}>Open its public page to enter scores.</Link> Changes to
+          days, hours and courts save automatically; other edits need Save.
         </p>
       )}
       <form
@@ -300,6 +313,14 @@ export function EventEditor({
             <summary>Event details</summary>
             <div className={w.stack}>
               {field('name', 'Event name')}
+              <EventAddress
+                eventId={initial.id}
+                slug={slug}
+                siteUrl={siteUrl}
+                published={published}
+                run={runAddress}
+                onChanged={setSlug}
+              />
               <DatePicker value={data.schedule_days} onChange={(v) => change('schedule_days', v)} />
               <div className={w.fields}>
                 {field('time_start', 'Daily start time', 'time')}

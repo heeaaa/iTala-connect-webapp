@@ -3,6 +3,7 @@ import 'server-only';
 import { cache } from 'react';
 
 import { serverEnv } from '@/env';
+import { isEventId, normaliseSlug, validSlug } from '@/lib/event-slug';
 import { toHomeCards, type HomeCard, type HomeEventRow } from '@/lib/public-event/home';
 import { toEventModel, type EventModel, type TeamRow, type PlayerRow } from '@/lib/public-event/model';
 import { sanitizeRulesHtml } from '@/lib/rules-html';
@@ -14,8 +15,6 @@ import { canEditEvent } from '@/server/auth';
  * visible: published events for everyone, drafts only for their editors
  * (PRD A-06). Nothing here uses the secret key.
  */
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class LoadError extends Error {
   constructor(what: string) {
@@ -41,9 +40,38 @@ const GAME_COLUMNS =
 
 type TeamWithPlayers = TeamRow & { players: PlayerRow[] };
 
+/** An event's id and its current web address (P-14). */
+export interface EventRef {
+  id: string;
+  slug: string;
+}
+
+/**
+ * The event behind /events/{ref}: an event id, its web address or one it had
+ * before (P-14). Through the visitor's session, so a draft is found only by its
+ * editors, whichever form is used; null is a real 404 (N-04).
+ */
+export const findPublicEvent = cache(async (ref: string): Promise<EventRef | null> => {
+  const supabase = await createClient();
+  if (isEventId(ref)) {
+    const { data, error } = await supabase.from('events').select('id, slug').eq('id', ref).maybeSingle();
+    if (error) throw new LoadError('this event');
+    return data;
+  }
+  // Capitals or spaces typed into the address bar still find the event.
+  const slug = normaliseSlug(ref);
+  if (!validSlug(slug)) return null;
+  const current = await supabase.from('events').select('id, slug').eq('slug', slug).maybeSingle();
+  if (current.error) throw new LoadError('this event');
+  if (current.data) return current.data;
+  const old = await supabase.from('event_slugs').select('events(id, slug)').eq('slug', slug).maybeSingle();
+  if (old.error) throw new LoadError('this event');
+  return old.data?.events ?? null;
+});
+
 /** Null when the id is malformed or RLS hides the event (real 404, N-04). */
 export const loadPublicEvent = cache(async (eventId: string): Promise<PublicEvent | null> => {
-  if (!UUID.test(eventId)) return null;
+  if (!isEventId(eventId)) return null;
   const supabase = await createClient();
 
   const { data: event, error } = await supabase.from('events').select(EVENT_COLUMNS).eq('id', eventId).maybeSingle();
@@ -96,7 +124,7 @@ export async function loadHomeEvents(now = new Date()): Promise<HomeCard[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('events')
-    .select('id, name, schedule_days, timezone, logo_path, divisions(count)')
+    .select('id, slug, name, schedule_days, timezone, logo_path, divisions(count)')
     .eq('status', 'published');
   if (error) throw new LoadError('events');
   return toHomeCards((data ?? []) as HomeEventRow[], serverEnv().NEXT_PUBLIC_SUPABASE_URL, now);
@@ -104,11 +132,11 @@ export async function loadHomeEvents(now = new Date()): Promise<HomeCard[]> {
 
 const LEGACY_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
-/** Old shared links (#/event/{firebaseId}): the new event id, or null. */
+/** Old shared links (#/event/{firebaseId}): the event's current web address, or null. */
 export async function findEventByLegacyId(legacyId: string): Promise<string | null> {
   if (!LEGACY_ID.test(legacyId)) return null;
   const supabase = await createClient();
-  const { data, error } = await supabase.from('events').select('id').eq('legacy_firebase_id', legacyId).maybeSingle();
+  const { data, error } = await supabase.from('events').select('slug').eq('legacy_firebase_id', legacyId).maybeSingle();
   if (error) throw new LoadError('this event');
-  return data?.id ?? null;
+  return data?.slug ?? null;
 }

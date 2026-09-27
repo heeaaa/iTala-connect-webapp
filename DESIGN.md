@@ -357,6 +357,8 @@ iTala Connect has **two scoped visual worlds**. Each owns its routes, its tokens
 
 **The Two Worlds Rule.** Brand tokens never apply inside an event page. The only iTala element on an event page is the small "Powered by iTala Connect" footer, and even that is painted in the event's own tokens (Muted Ink over a Quiet Rule), never in `--brand-*`. Event tokens never appear on a platform screen. When `/events/[eventId]` has no published event to show, the route renders the platform "Event not found" screen: there is no organiser palette to paint, so it is a platform screen, not an event page.
 
+**The Hand Rule.** The hand (pointer) cursor shows on everything that acts when clicked, in both worlds, and nowhere else: links, plate and plain buttons, disclosure headings, chips, pickers, dropdowns and checkboxes. A whole row that opens something (a home event row) is one link, so the hand covers the row. Disabled controls show the arrow; a busy plate shows the progress cursor; the schedule Move handle shows grab. Text, panels and headings keep the arrow. The rule lives in `src/app/globals.css` (base layer, so a component's own cursor wins). Decided 28/09/2026: the web convention, and a useful cue here because the angled plates and collapsible headings do not look like buttons to everyone; phones have no cursor.
+
 Prototype routes (`src/app/prototype/**`) and their lime sample-data banner are review chrome and belong to neither world.
 
 ### Decision history
@@ -724,6 +726,14 @@ Owner or superadmin, only with the mobile integration on (M-03). Reached from a 
 - **Saving:** a live **Save link** plate (stays focusable, "Saving…" while it runs). Two teams on one mobile team is refused in the page: the alert line under the table gives the old message, and the clashing selects are marked invalid (the error underline) and described by it until fixed. A refusal from the server uses the same alert line and focus stays on the button. Success goes to Pending results.
 - **States:** with the mobile app unreachable, "Could not reach the mobile app" and a note, with no form.
 
+#### Web address field
+The event's address (P-14), on New event and the league import (under Event name, filled from the name and year and following it until the organiser types their own) and in the editor's Event details (under Event name).
+- **Anatomy:** the standard label ("Web address") and input, then the link as it will read: the host and `/events/` in Muted Ink, the address in Chalk semibold, wrapping anywhere. Then one status line, a polite live region (not `role="status"`, which stays the page's own), and a note in Muted Ink.
+- **Typing:** capitals, spaces and accents become the address as they are typed, and the caret stays where it was; a trailing hyphen waits for the next word and is trimmed on blur.
+- **Status:** "Checking…" (Muted Ink); "Free to use." (accent, semibold); "Free to use. Another event already uses {address}." when a default that follows the name was taken and moved to `-2`; "Another event already uses this address." (danger) with **Use {free address}** as an underlined accent text button (lower case like the address, wraps on a phone, 44 px tall); problems in danger ("Enter a web address, such as summer-league-2026."); in the editor "This is the current address." (Muted Ink), then "Address changed." (accent).
+- **Editor:** **Change address** (teal plate) and **Cancel** (quiet plate) appear only when the address differs from the stored one; Enter applies it; Save and autosave never change it. Failures show in the status line.
+- **Notes:** a draft, "The link works once the event is published. While it is a draft, only you and superadmins can open it."; a published event, "Anyone can open this link. If you change the address, the old one keeps leading here."
+
 #### Compare rosters
 Owner or superadmin, only with the mobile integration on (M-11). Read only. Reached from a linked division's card in the editor: a quiet **Compare rosters** plate beside its **Mobile: {league}** plate (the division name is screen-reader text).
 - **Header:** title plate 'Compare "{division}" rosters' with the event name, then **Refresh** (quiet, "Reading the mobile app…" while it runs, stays focusable) and **Back to event**. A note says it is read only, names the league and the order; one status line sums up ("2 of 10 paired teams differ. 1 not paired.", in a notice box when anything differs, a plain note when all are the same).
@@ -758,6 +768,7 @@ One easing, `cubic-bezier(0.16, 1, 0.3, 1)`. Colour transitions 150ms (nav links
 - **Do** keep the worlds apart: `--ev-*` and division tokens inside event pages, `--brand-*` on platform screens, and never one in the other.
 - **Do** write dates as DD/MM/YYYY and times as "7:00 pm", in NZ English, with "-" as the only dash.
 - **Do** keep touch targets at least 2.75rem, make wide grids and tables scroll inside themselves, and check the layout at 360 px.
+- **Do** show the hand cursor on everything that acts when clicked, and only there (The Hand Rule).
 - **Don't** add shadows, glows, gradients, blurs, glass or textures in either world.
 
 ### Event pages - Do:

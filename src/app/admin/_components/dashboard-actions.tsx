@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { eventPath } from '@/lib/event-slug';
 import { deleteEvent } from '@/server/actions/events';
 import { platformStyles as s } from '@/components/platform/platform-frame';
 import { ConfirmDialog } from './confirm-dialog';
@@ -9,11 +10,13 @@ import w from '../admin-workspace.module.css';
 /** D-02: Edit, View (published only), Results (only with the mobile integration on), Delete. */
 export function EventActions({
   id,
+  slug,
   name,
   published,
   results = false,
 }: {
   id: string;
+  slug: string;
   name: string;
   published: boolean;
   results?: boolean;
@@ -29,7 +32,7 @@ export function EventActions({
           Edit<span className="sr-only"> {name}</span>
         </Link>
         {published && (
-          <Link className={`${s.button} ${s.buttonQuiet}`} href={`/events/${id}`}>
+          <Link className={`${s.button} ${s.buttonQuiet}`} href={eventPath(slug)}>
             View<span className="sr-only"> {name}</span>
           </Link>
         )}

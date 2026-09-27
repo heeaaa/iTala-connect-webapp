@@ -1,4 +1,4 @@
-# Netlify build for iTala Connect (docs/MIGRATION_PLAN.md sections 3 and 5; README "Deploying to Netlify").
+# Netlify build for iTala Connect (docs/MIGRATION_PLAN.md sections 3 and 5; README "Deploying").
 #
 # - Git-linked deploys only: never drag and drop a folder, so no .env file can be published.
 # - Next.js runs through Netlify's automatic OpenNext adapter; there is no plugin to list or pin.

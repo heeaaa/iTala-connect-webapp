@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { eventSlugSchema } from './event-slug';
 
 const mobileId = z.string().min(1).max(200);
 const name = z.string().trim().min(1).max(120);
@@ -75,6 +76,7 @@ export const importChoiceSchema = z.object({
   leagueId: mobileId,
   eventName: z.string().trim().min(1, 'Enter an event name.').max(200),
   divisionName: name,
+  slug: eventSlugSchema,
   allowDuplicate: z.boolean(),
 });
 export type ImportChoice = z.infer<typeof importChoiceSchema>;

@@ -1,3 +1,5 @@
+import { defaultEventSlug, slugYear } from '@/lib/event-slug';
+
 import type { ImportPlan, PlannedEvent } from './import-plan';
 import type { ImageSource, Issue, IssueLevel } from './map-event';
 import type { Difference } from './verify';
@@ -19,6 +21,12 @@ export interface IssueGroup {
 export interface EventReport {
   legacyId: string;
   name: string;
+  /**
+   * The web address a first import gives it (P-14): the database makes the same
+   * default, or adds -2 and so on when another event has it. A re-import keeps
+   * the address the event has.
+   */
+  slug: string;
   status: string;
   counts: {
     divisions: number;
@@ -73,6 +81,16 @@ export function eventReport(e: PlannedEvent, differences: Difference[]): EventRe
   return {
     legacyId: e.legacyId,
     name: p?.event.name ?? '',
+    slug: p
+      ? defaultEventSlug(
+          p.event.name,
+          slugYear(
+            p.event.schedule_days,
+            p.event.created_at ? new Date(p.event.created_at) : new Date(),
+            p.event.timezone,
+          ),
+        )
+      : '',
     status: p?.event.status ?? 'not imported',
     counts: {
       divisions: p?.divisions.length ?? 0,
@@ -136,6 +154,8 @@ export function formatReport(report: ImportReport, options: { applying?: boolean
     out.push(
       `  ${c.divisions} division(s), ${c.teams} team(s), ${c.players} player(s); ${c.games} game(s): ${c.scheduled} scheduled, ${c.unscheduled} unscheduled, ${c.playoff} playoff, ${c.scored} scored, ${c.approvals} mobile approval(s); ${c.mobileLinks} mobile link(s); images: ${c.images.url} to copy, ${c.images.embedded} embedded`,
     );
+    if (e.slug)
+      out.push(`  web address for a first import: /events/${e.slug} (with -2 and so on if another event has it)`);
     for (const g of e.issues) {
       out.push(`  ${LEVEL_WORD[g.level]} ${g.code} x${g.count}`);
       for (const ex of g.examples) out.push(`    - ${ex}`);

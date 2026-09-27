@@ -70,6 +70,8 @@ export default async function EventEditorPage({ params, searchParams }: PageProp
   return (
     <EventEditor
       initial={input}
+      slug={event.slug}
+      siteUrl={clientEnv().NEXT_PUBLIC_SITE_URL}
       links={links}
       images={{
         logo: imageUrl(supabaseUrl, event.logo_path),

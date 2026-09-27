@@ -14,6 +14,8 @@ import { type Database } from '@/lib/supabase/database.types';
  */
 export interface PublicEventFixture {
   id: string;
+  /** Its web address (P-14), the database default from the name and first day. */
+  slug: string;
   name: string;
   legacyId: string;
   today: string;
@@ -53,7 +55,7 @@ export async function seedPublicEvent(
         legacy_firebase_id: legacyId,
         rules_html: '<h2>Timing</h2><p>Four quarters.</p><script>window.__xss = true</script>',
       })
-      .select('id')
+      .select('id, slug')
       .single(),
   );
   const division = must(
@@ -129,5 +131,5 @@ export async function seedPublicEvent(
   const first = games.find((g) => g.position === 0)!;
   const scoreResult = await admin.from('game_scores').insert({ game_id: first.id, event_id: event.id, s1: 50, s2: 40 });
   if (scoreResult.error) throw scoreResult.error;
-  return { id: event.id, name, legacyId, today, tomorrow };
+  return { id: event.id, slug: event.slug, name, legacyId, today, tomorrow };
 }
