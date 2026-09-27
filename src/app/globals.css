@@ -64,3 +64,26 @@ body {
   outline: 3px solid var(--brand-focus);
   outline-offset: 2px;
 }
+
+/*
+ * Cursor (DESIGN.md, The Hand Rule): the hand on everything that acts when clicked, the arrow on
+ * everything else. Links have it from the browser; buttons, disclosure headings and pickers get it
+ * here, so a plain button reads the same as a plate. Disabled controls keep the arrow; a busy
+ * plate button keeps its progress cursor (platform.module.css). In the base layer, so a component's own
+ * cursor (the Move handle's grab) still wins.
+ */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  summary,
+  select:not(:disabled),
+  input:is([type='checkbox'], [type='radio'], [type='color'], [type='file']):not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled,
+  button[aria-disabled='true'],
+  select:disabled,
+  input:disabled {
+    cursor: default;
+  }
+}

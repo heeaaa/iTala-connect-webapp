@@ -357,6 +357,8 @@ iTala Connect has **two scoped visual worlds**. Each owns its routes, its tokens
 
 **The Two Worlds Rule.** Brand tokens never apply inside an event page. The only iTala element on an event page is the small "Powered by iTala Connect" footer, and even that is painted in the event's own tokens (Muted Ink over a Quiet Rule), never in `--brand-*`. Event tokens never appear on a platform screen. When `/events/[eventId]` has no published event to show, the route renders the platform "Event not found" screen: there is no organiser palette to paint, so it is a platform screen, not an event page.
 
+**The Hand Rule.** The hand (pointer) cursor shows on everything that acts when clicked, in both worlds, and nowhere else: links, plate and plain buttons, disclosure headings, chips, pickers, dropdowns and checkboxes. A whole row that opens something (a home event row) is one link, so the hand covers the row. Disabled controls show the arrow; a busy plate shows the progress cursor; the schedule Move handle shows grab. Text, panels and headings keep the arrow. The rule lives in `src/app/globals.css` (base layer, so a component's own cursor wins). Decided 28/09/2026: the web convention, and a useful cue here because the angled plates and collapsible headings do not look like buttons to everyone; phones have no cursor.
+
 Prototype routes (`src/app/prototype/**`) and their lime sample-data banner are review chrome and belong to neither world.
 
 ### Decision history
@@ -766,6 +768,7 @@ One easing, `cubic-bezier(0.16, 1, 0.3, 1)`. Colour transitions 150ms (nav links
 - **Do** keep the worlds apart: `--ev-*` and division tokens inside event pages, `--brand-*` on platform screens, and never one in the other.
 - **Do** write dates as DD/MM/YYYY and times as "7:00 pm", in NZ English, with "-" as the only dash.
 - **Do** keep touch targets at least 2.75rem, make wide grids and tables scroll inside themselves, and check the layout at 360 px.
+- **Do** show the hand cursor on everything that acts when clicked, and only there (The Hand Rule).
 - **Don't** add shadows, glows, gradients, blurs, glass or textures in either world.
 
 ### Event pages - Do:
