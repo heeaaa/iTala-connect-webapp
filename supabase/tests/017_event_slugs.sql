@@ -2,7 +2,7 @@
 -- drafts private, and only an event's editors change its address.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(28);
+select plan(31);
 
 create function pg_temp.login(p_uid uuid) returns void language plpgsql as $$
 begin
@@ -90,18 +90,26 @@ select is(public.free_event_slug('harbour-2026', '10000000-0000-0000-0000-000000
   'only an event''s editors can count its addresses as free');
 select is((select count(*)::int from public.event_slugs where event_id = '10000000-0000-0000-0000-0000000000d2'), 0,
   'another admin does not see the draft''s address');
-select is(
-  (select slug from public.events where id = public.create_draft_event('Kea Cup', 'Pacific/Auckland', '', 'kea-cup')),
-  'kea-cup', 'a new event takes the address the organiser chose');
-select is(
-  (select slug from public.events where id = public.import_mobile_league(
+-- Each create runs in its own statement and is checked in the next: a volatile call inside a
+-- WHERE runs once per row, and a query in the same statement would not see the new event.
+select lives_ok($$select public.create_draft_event('Kea Cup', 'Pacific/Auckland', '', 'kea-cup')$$,
+  'a new event can take the address the organiser chose');
+select is((select name from public.events where slug = 'kea-cup'), 'Kea Cup',
+  'the new event has that address');
+select lives_ok(
+  $$select public.import_mobile_league(
     p_event_name => 'Mobile Harbour', p_division_name => 'Open', p_timezone => 'Pacific/Auckland', p_rules => '',
-    p_league => '{"id": "slug-league", "name": "Slug League"}', p_teams => '[]', p_slug => 'mobile-harbour')),
-  'mobile-harbour', 'a league import takes the address the organiser chose');
+    p_league => '{"id": "slug-league", "name": "Slug League"}', p_teams => '[]', p_slug => 'mobile-harbour')$$,
+  'a league import can take the address the organiser chose');
+select is((select name from public.events where slug = 'mobile-harbour'), 'Mobile Harbour',
+  'the imported event has that address');
+select lives_ok($$select public.create_draft_event('Kea Cup', 'Pacific/Auckland', '')$$,
+  'a new event can be created without an address');
 select is(
-  (select slug from public.events where id = public.create_draft_event('Kea Cup', 'Pacific/Auckland', '')),
-  public.default_event_slug('Kea Cup', extract(year from now() at time zone 'Pacific/Auckland')::int),
-  'without a chosen address a new event gets the default');
+  (select count(*)::int from public.events
+   where name = 'Kea Cup'
+     and slug = public.default_event_slug('Kea Cup', extract(year from now() at time zone 'Pacific/Auckland')::int)),
+  1, 'without a chosen address a new event gets the default');
 
 -- The public: a published event's addresses, never a draft's; no address functions.
 select pg_temp.anon();
