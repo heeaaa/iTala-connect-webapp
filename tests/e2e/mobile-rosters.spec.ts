@@ -65,7 +65,10 @@ test('compares a linked division’s rosters with the mobile app, read only', as
   await expect(main.getByRole('status')).toHaveText('1 of 2 paired teams differs.');
   await expect(hawks).toContainText('The lists differ (2 in iTala Connect, 2 in the mobile app)');
   await expect(hawks.getByRole('table').first().getByRole('row')).toHaveText(['NumberPlayer', '04Ari', '8Bea']);
-  await expect(main.getByRole('region', { name: 'Night Owls' })).toContainText('Same in both (1 player)');
+  // Night Owls is a team-only team in the mobile app (no roster), so the import brought no players either.
+  await expect(main.getByRole('region', { name: 'Night Owls' })).toContainText(
+    'Same in both (no players). The mobile app keeps no roster for this team (team only).',
+  );
 
   // Zero writes to the mobile project, and the browser never talks to it (M-02).
   const requests = (await (await request.get(`${mobile}/__requests`)).json()) as { method: string; path: string }[];

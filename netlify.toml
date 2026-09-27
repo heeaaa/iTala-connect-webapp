@@ -1,0 +1,15 @@
+# Netlify build for iTala Connect (docs/MIGRATION_PLAN.md sections 3 and 5; README "Deploying to Netlify").
+#
+# - Git-linked deploys only: never drag and drop a folder, so no .env file can be published.
+# - Next.js runs through Netlify's automatic OpenNext adapter; there is no plugin to list or pin.
+# - Node comes from .nvmrc (24), the same major version CI uses.
+# - Environment values are set in the Netlify UI (Project configuration > Environment variables),
+#   never in this file or anywhere else in the repository.
+# - Security headers come from next.config.ts, and the per-request CSP from src/proxy.ts, so none
+#   are repeated here.
+
+[build]
+  # The secret scan runs on every build (CLAUDE.md): it fails the deploy if a server-only value,
+  # or anything shaped like a Supabase secret key, reaches the browser bundle or served pages.
+  # The publish directory is left to the adapter, which sets it for Next.js without configuration.
+  command = "npm run build && npm run check:secrets"

@@ -465,6 +465,15 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
   - harness (sample rosters) at 390 and 1440 px: axe clean, no sideways scroll, 44 px buttons, lists side by side on desktop and stacked on the phone;
   - captures `.impeccable/review/rosters/{mobile,desktop}/`; after the first look, the list headings went to sentence case ("ITALA" was losing its brand casing), the team-only note gained its full stop, and the text links were underlined.
 - **Not run:** the E2E on the laptop (CI runs it), and the check against the real mobile app, which waits for your go.
+- **CI run 36306373610 on `1433fff` failed** only in the new E2E, at both sizes: the test expected Night Owls to have 1 player, but in the fixture it is a team-only mobile team (no roster), so the import brought none and the page rightly said "Same in both (no players). The mobile app keeps no roster for this team (team only)." Everything before that step passed. Test corrected; the page was right.
+
+### Deploying to Netlify: prepared (27/09/2026)
+
+- **Decision (Aeron):** deploy first, create the admin's account on the Admins screen, run the real import with his email as `--owner`, then send him the set-up link. There is no owner-reassign screen yet (O-1 planned it), so the owner is set at import.
+- **Merge plan:** `main` is 40 commits behind `handoff/codex` with none of its own; merge PR #1 with a merge commit once CI is green, then set Netlify's production branch to `main`. Work continues on `handoff/codex` and reaches the site through pull requests.
+- **`netlify.toml`:** build command `npm run build && npm run check:secrets` (the secret scan on every build); Node 24 from `.nvmrc`; the Next.js adapter is automatic and sets the publish directory (not set, since it could not be confirmed from Netlify's docs). Checked against Netlify's current docs (Next.js overview, Node version order, secret scanning).
+- **README "Deploying to Netlify":** the Supabase checks, the Netlify variables (which to mark secret; mobile values left unset until the real mobile check; never `ENABLE_PROTOTYPES` or `FIREBASE_*`), fork previews behind approval, Supabase Site URL and Redirect URLs, what to check after the first deploy, and what to do if Netlify's smart detection flags the publishable key.
+- **Not run:** a Netlify build (none exists yet); the first deploy is the check.
 
 ### Phase 7: the first dry run on the real export (27/09/2026)
 
