@@ -110,8 +110,17 @@ const reason = (error: unknown) => (error instanceof Error ? error.message : Str
 
 type Place = Parameters<typeof storedImage>[1];
 
-/** One image into the bucket: decoded or fetched, checked, uploaded. */
-async function copyImage(target: ImportTarget, source: ImageSource, place: Place, hosts: readonly string[]) {
+/**
+ * One image into the bucket: decoded or fetched, checked, uploaded. The result type is written
+ * out: inferred, it widened with the check order (an incremental build found `path` possibly
+ * undefined behind `'path' in r`, 28/09/2026).
+ */
+async function copyImage(
+  target: ImportTarget,
+  source: ImageSource,
+  place: Place,
+  hosts: readonly string[],
+): Promise<{ problem: string } | { path: string }> {
   const origin = imageOrigin(source, hosts);
   if ('problem' in origin) return { problem: origin.problem };
   let bytes: Uint8Array;
