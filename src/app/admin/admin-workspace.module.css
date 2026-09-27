@@ -240,6 +240,30 @@
   align-items: end;
   margin-bottom: 0.75rem;
 }
+.rosterPaste {
+  display: grid;
+  justify-items: start;
+  gap: 0.625rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--brand-border);
+}
+.rosterPaste .field {
+  width: 100%;
+}
+.rosterPaste textarea {
+  width: 100%;
+  min-height: 7rem;
+  resize: vertical;
+}
+.rosterPaste .note {
+  margin: 0;
+}
+.rosterFlag {
+  margin: -0.4rem 0 0.75rem;
+  color: var(--brand-danger);
+  font-size: 0.875rem;
+}
 .dates {
   display: flex;
   flex-wrap: wrap;
