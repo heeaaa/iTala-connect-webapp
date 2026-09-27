@@ -101,10 +101,18 @@ describe('Import mapping', () => {
       leagueId: league.id,
       eventName: ' Event ',
       divisionName: ' Open ',
+      slug: 'Harbour League 2026 ',
       allowDuplicate: false,
       ownerId: 'attacker',
     });
-    expect(choice).toEqual({ leagueId: league.id, eventName: 'Event', divisionName: 'Open', allowDuplicate: false });
+    expect(choice).toEqual({
+      leagueId: league.id,
+      eventName: 'Event',
+      divisionName: 'Open',
+      slug: 'harbour-league-2026',
+      allowDuplicate: false,
+    });
+    expect(importChoiceSchema.safeParse({ ...choice, slug: '' }).success).toBe(false);
     expect(importChoiceSchema.safeParse({ ...choice, eventName: '  ' }).success).toBe(false);
   });
 });

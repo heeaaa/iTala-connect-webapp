@@ -6,8 +6,22 @@ vi.mock('@/server/actions/events', () => ({ deleteEvent: vi.fn() }));
 import { DashboardView, type DashboardEvent } from '@/app/admin/dashboard-view';
 
 const EVENTS: DashboardEvent[] = [
-  { id: 'e1', name: 'League Night', status: 'published', schedule_days: ['2026-10-03'], divisions: [{ count: 2 }] },
-  { id: 'e2', name: 'Draft Cup', status: 'draft', schedule_days: [], divisions: [{ count: 0 }] },
+  {
+    id: 'e1',
+    slug: 'league-night-2026',
+    name: 'League Night',
+    status: 'published',
+    schedule_days: ['2026-10-03'],
+    divisions: [{ count: 2 }],
+  },
+  {
+    id: 'e2',
+    slug: 'draft-cup-2026',
+    name: 'Draft Cup',
+    status: 'draft',
+    schedule_days: [],
+    divisions: [{ count: 0 }],
+  },
 ];
 const row = (name: string) => screen.getByRole('row', { name: new RegExp(name) });
 // jsdom drops the space before the visually hidden event name that Chromium keeps ("Edit League Night").
@@ -23,7 +37,7 @@ describe('Dashboard actions (D-02)', () => {
     );
     expect(within(published).getByRole('link', { name: named('View', 'League Night') })).toHaveAttribute(
       'href',
-      '/events/e1',
+      '/events/league-night-2026',
     );
     expect(within(row('Draft Cup')).queryByRole('link', { name: /^View/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /^Results/ })).not.toBeInTheDocument();

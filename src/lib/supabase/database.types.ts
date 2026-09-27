@@ -207,6 +207,32 @@ export type Database = {
         }
         Relationships: []
       }
+      event_slugs: {
+        Row: {
+          created_at: string
+          event_id: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_slugs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_sponsors: {
         Row: {
           created_at: string
@@ -256,6 +282,7 @@ export type Database = {
           published_at: string | null
           rules_html: string
           schedule_days: string[]
+          slug: string
           status: string
           theme_bg: string
           theme_heading: string
@@ -280,6 +307,7 @@ export type Database = {
           published_at?: string | null
           rules_html?: string
           schedule_days?: string[]
+          slug?: string
           status?: string
           theme_bg?: string
           theme_heading?: string
@@ -304,6 +332,7 @@ export type Database = {
           published_at?: string | null
           rules_html?: string
           schedule_days?: string[]
+          slug?: string
           status?: string
           theme_bg?: string
           theme_heading?: string
@@ -734,15 +763,33 @@ export type Database = {
       can_read_event: { Args: { p_event_id: string }; Returns: boolean }
       can_write_image_path: { Args: { p_name: string }; Returns: boolean }
       create_draft_event: {
-        Args: { p_name: string; p_rules: string; p_timezone: string }
+        Args: {
+          p_name: string
+          p_rules: string
+          p_slug?: string
+          p_timezone: string
+        }
         Returns: string
       }
       dates_are_distinct: { Args: { p_days: string[] }; Returns: boolean }
+      default_event_slug: {
+        Args: { p_name: string; p_year: number }
+        Returns: string
+      }
       dismiss_mobile_result: {
         Args: { p_game_id: string; p_source: Json }
         Returns: undefined
       }
       division_event_id: { Args: { p_division_id: string }; Returns: string }
+      event_slug_words: { Args: { p_text: string }; Returns: string }
+      first_free_event_slug: {
+        Args: { p_event_id: string; p_slug: string }
+        Returns: string
+      }
+      free_event_slug: {
+        Args: { p_event_id?: string; p_slug: string }
+        Returns: string
+      }
       game_event_id: { Args: { p_game_id: string }; Returns: string }
       import_legacy_event: {
         Args: { p_event: Json; p_force?: boolean; p_owner: string }
@@ -759,6 +806,7 @@ export type Database = {
           p_event_name: string
           p_league: Json
           p_rules: string
+          p_slug?: string
           p_teams: Json
           p_timezone: string
         }
@@ -831,6 +879,10 @@ export type Database = {
           version: string
         }[]
       }
+      set_event_slug: {
+        Args: { p_event_id: string; p_slug: string }
+        Returns: string
+      }
       set_legacy_event_images: {
         Args: {
           p_event_id: string
@@ -853,6 +905,7 @@ export type Database = {
       team_event_id: { Args: { p_team_id: string }; Returns: string }
       try_uuid: { Args: { p: string }; Returns: string }
       unschedule_game: { Args: { p_game_id: string }; Returns: undefined }
+      valid_event_slug: { Args: { p_slug: string }; Returns: boolean }
     }
     Enums: {
       app_role: "superadmin" | "admin"

@@ -52,13 +52,13 @@ Organisers create basketball events (tournaments or leagues), define divisions a
 | `#/admin/new` | `/admin/events/new` | Admin, superadmin | Keep |
 | `#/admin/edit/:id` | `/admin/events/[eventId]` | Owner or superadmin | Fix (A-05) |
 | `#/admin/settings` | `/admin/settings` | Superadmin | Keep |
-| `#/event/:id` | `/events/[eventId]` with `?tab=schedule\|standings\|teams\|rules` | Public (published), owner (draft) | Improve (tab in URL) |
+| `#/event/:id` | `/events/{web address}` (P-14) with `?tab=schedule\|standings\|teams\|rules`; `/events/{event id}` and old addresses forward to it | Public (published), owner (draft) | Improve (tab in URL, readable address) |
 | `#/admin/link/:id/:div` | `/admin/events/[eventId]/divisions/[divisionId]/mobile-link` | Owner or superadmin, integration configured | Keep |
 | `#/admin/results/:id` | `/admin/events/[eventId]/results` | Owner or superadmin, integration configured | Keep |
 | (none) | `/admin/admins` | Superadmin | New (A-09) |
 | (none) | `/auth/google`, `/auth/callback` | Public (start and finish Google sign-in, A-11) | New |
 | (none) | `/admin/import-mobile` | Admin, superadmin, integration configured | New (MI-01) |
-| Legacy links `https://connect.itala.fyi/#/event/{firebaseId}` | Client redirect on `/` reads the hash, looks up `events.legacy_firebase_id`, redirects to `/events/[eventId]` | Public | New (keeps shared links working) |
+| Legacy links `https://connect.itala.fyi/#/event/{firebaseId}` | Client redirect on `/` reads the hash, looks up `events.legacy_firebase_id` (`/l/{firebaseId}`), redirects to the event's web address | Public | New (keeps shared links working) |
 
 ## 4. Navigation and shell
 
@@ -194,6 +194,7 @@ Organisers create basketball events (tournaments or leagues), define divisions a
 | P-10 | Teams: per division, expandable team cards with name, "Coach: X", "N players", and a player list (index, #number, name). "No teams." | `renderPublicTeams` app.js:1963 | Keep |
 | P-11 | Rules: sanitised rules HTML. "No rules." | `renderPublicRules` app.js:1979 | Keep + Fix |
 | P-12 | Page is server-rendered (fast first load, shareable link previews with event name and logo). | Client-rendered | Improve |
+| P-14 | **Web addresses**: every event has its own address, `/events/{slug}`, made by default from its name and year (the first event day, else the year it was made), such as `/events/batang-pinoy-basketball-2026`. New event and the league import show it filled in and following the name until the organiser types their own; the editor changes it with Change address (never with Save), and renaming the event does not change it. Lower-case letters, numbers and single hyphens, up to 80 characters, never shaped like an event id. Unique: no event can take another event's current or old address; a taken default moves to the first free one (-2, -3 ...), and a typed one that is taken is refused with that suggestion. Old addresses and `/events/{id}` keep working and forward to the current address, keeping `?tab=` and `?day=`. A draft's address is a 404 to the public, as its id is, and the forms say the link works once the event is published. Existing and imported events get the default. Requested 27/09/2026. | None (links used the Firebase id) | New |
 | P-13 | Game day ("Today" screen): when the chosen day is today in the event time zone, each court shows Final, On court and Up next above the grid, with a "now" line across the grid. On court = the 60-minute slot is in progress; Final = the slot has passed and both scores are in; otherwise "Awaiting score". Opens on today, else the next event day, else the last. Design: Today surface brief (Painted Lines). | None | New |
 
 ## 10. Mobile scorekeeper integration

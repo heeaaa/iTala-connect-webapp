@@ -190,6 +190,7 @@ describe('public event model (PRD P-01 to P-10)', () => {
 describe('home cards (PRD H-01 to H-05)', () => {
   const row = (id: string, days: string[], tz = 'Pacific/Auckland', count = 2): HomeEventRow => ({
     id,
+    slug: `${id}-2026`,
     name: id,
     schedule_days: days,
     timezone: tz,

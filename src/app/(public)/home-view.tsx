@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { platformStyles as s, StatusBug, TitlePlate } from '@/components/platform/platform-frame';
+import { eventPath } from '@/lib/event-slug';
 import { formatDate } from '@/lib/format';
 import { divisionsLabel, type HomeCard } from '@/lib/public-event/home';
 
@@ -78,7 +79,7 @@ function EventBug({ event: e }: { event: HomeCard }) {
       : 'dates to be confirmed';
   const first = e.firstDay ? formatDate(e.firstDay) : null;
   return (
-    <Link href={`/events/${e.id}`} className={s.bug}>
+    <Link href={eventPath(e.slug)} className={s.bug}>
       <span className={s.bugDate} aria-hidden="true">
         {first ? (
           <>

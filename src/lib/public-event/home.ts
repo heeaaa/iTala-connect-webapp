@@ -5,6 +5,7 @@ import { imageUrl } from './model';
 /** Home (PRD H-01 to H-05): published events as cards. */
 export interface HomeEventRow {
   id: string;
+  slug: string;
   name: string;
   schedule_days: string[];
   timezone: string;
@@ -16,6 +17,8 @@ export type HomeWhen = 'current' | 'upcoming' | 'past' | 'undated';
 
 export interface HomeCard {
   id: string;
+  /** The web address (P-14): cards link to /events/{slug}. */
+  slug: string;
   name: string;
   logoUrl: string | null;
   divisionCount: number;
@@ -43,6 +46,7 @@ export function toHomeCards(rows: readonly HomeEventRow[], supabaseUrl: string, 
     }
     return {
       id: r.id,
+      slug: r.slug,
       name: r.name,
       logoUrl: imageUrl(supabaseUrl, r.logo_path),
       divisionCount: r.divisions[0]?.count ?? 0,

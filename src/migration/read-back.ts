@@ -8,6 +8,8 @@ import type { DivisionRow, EventRow, EventRows, GameRow, ScoreRow, TeamRow } fro
 
 export interface StoredEvent {
   event: EventRow;
+  /** The event's web address as stored (P-14). */
+  slug?: string;
   divisions: (DivisionRow & { legacy_key: string | null })[];
   teams: (TeamRow & { legacy_code: string | null })[];
   games: (GameRow & { legacy_gid: string | null; legacy_index: number | null })[];

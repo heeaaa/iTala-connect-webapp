@@ -1,5 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { serverEnv } from '@/env';
+import { clientEnv } from '@/env.client';
+import { slugYear } from '@/lib/event-slug';
 import { requireAdmin } from '@/server/auth';
 import { mobileConfigured, mobileReader } from '@/server/mobile/reader';
 import { linkedMobileEvents } from '@/server/mobile/links';
@@ -36,7 +39,12 @@ export default async function PreviewPage({ params }: PageProps<'/admin/import/[
         {preview.league.season || 'No season'} · {preview.teams.length} teams ·{' '}
         {preview.teams.reduce((n, t) => n + t.players.length, 0)} players
       </p>
-      <ImportForm league={preview.league} links={links} />
+      <ImportForm
+        league={preview.league}
+        links={links}
+        year={slugYear([], new Date(), serverEnv().DEFAULT_EVENT_TIMEZONE)}
+        siteUrl={clientEnv().NEXT_PUBLIC_SITE_URL}
+      />
       {preview.teams.length < 2 && (
         <p className={w.notice}>You&apos;ll need at least 2 teams before you can publish.</p>
       )}

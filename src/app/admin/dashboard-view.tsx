@@ -6,6 +6,8 @@ import w from './admin-workspace.module.css';
 
 export interface DashboardEvent {
   id: string;
+  /** The web address (P-14): View opens /events/{slug}. */
+  slug: string;
   name: string;
   status: string;
   schedule_days: string[];
@@ -92,7 +94,13 @@ export function DashboardView({
                     </td>
                     <td>{event.divisions?.[0]?.count ?? 0}</td>
                     <td>
-                      <EventActions id={event.id} name={event.name} published={published} results={mobileEnabled} />
+                      <EventActions
+                        id={event.id}
+                        slug={event.slug}
+                        name={event.name}
+                        published={published}
+                        results={mobileEnabled}
+                      />
                     </td>
                   </tr>
                 );

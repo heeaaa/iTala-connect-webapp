@@ -724,6 +724,14 @@ Owner or superadmin, only with the mobile integration on (M-03). Reached from a 
 - **Saving:** a live **Save link** plate (stays focusable, "Saving…" while it runs). Two teams on one mobile team is refused in the page: the alert line under the table gives the old message, and the clashing selects are marked invalid (the error underline) and described by it until fixed. A refusal from the server uses the same alert line and focus stays on the button. Success goes to Pending results.
 - **States:** with the mobile app unreachable, "Could not reach the mobile app" and a note, with no form.
 
+#### Web address field
+The event's address (P-14), on New event and the league import (under Event name, filled from the name and year and following it until the organiser types their own) and in the editor's Event details (under Event name).
+- **Anatomy:** the standard label ("Web address") and input, then the link as it will read: the host and `/events/` in Muted Ink, the address in Chalk semibold, wrapping anywhere. Then one status line, a polite live region (not `role="status"`, which stays the page's own), and a note in Muted Ink.
+- **Typing:** capitals, spaces and accents become the address as they are typed, and the caret stays where it was; a trailing hyphen waits for the next word and is trimmed on blur.
+- **Status:** "Checking…" (Muted Ink); "Free to use." (accent, semibold); "Free to use. Another event already uses {address}." when a default that follows the name was taken and moved to `-2`; "Another event already uses this address." (danger) with **Use {free address}** as an underlined accent text button (lower case like the address, wraps on a phone, 44 px tall); problems in danger ("Enter a web address, such as summer-league-2026."); in the editor "This is the current address." (Muted Ink), then "Address changed." (accent).
+- **Editor:** **Change address** (teal plate) and **Cancel** (quiet plate) appear only when the address differs from the stored one; Enter applies it; Save and autosave never change it. Failures show in the status line.
+- **Notes:** a draft, "The link works once the event is published. While it is a draft, only you and superadmins can open it."; a published event, "Anyone can open this link. If you change the address, the old one keeps leading here."
+
 #### Compare rosters
 Owner or superadmin, only with the mobile integration on (M-11). Read only. Reached from a linked division's card in the editor: a quiet **Compare rosters** plate beside its **Mobile: {league}** plate (the division name is screen-reader text).
 - **Header:** title plate 'Compare "{division}" rosters' with the event name, then **Refresh** (quiet, "Reading the mobile app…" while it runs, stays focusable) and **Back to event**. A note says it is read only, names the league and the order; one status line sums up ("2 of 10 paired teams differ. 1 not paired.", in a notice box when anything differs, a plain note when all are the same).

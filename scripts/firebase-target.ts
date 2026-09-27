@@ -52,7 +52,7 @@ export function supabaseTarget(url: string, secretKey: string): ImportTarget {
       return data as unknown as ImportResult;
     },
     async readBack(eventId) {
-      const event = must(await db.from('events').select(EVENT_COLUMNS).eq('id', eventId).single());
+      const event = must(await db.from('events').select(`${EVENT_COLUMNS}, slug`).eq('id', eventId).single());
       const divisions = must(
         await db
           .from('divisions')
@@ -70,7 +70,7 @@ export function supabaseTarget(url: string, secretKey: string): ImportTarget {
         : [];
       const games = must(await db.from('games').select(GAME_COLUMNS).eq('event_id', eventId));
       const scores = must(await db.from('game_scores').select('game_id, s1, s2').eq('event_id', eventId));
-      return { event, divisions, teams, games, scores } satisfies StoredEvent;
+      return { event, slug: event.slug, divisions, teams, games, scores } satisfies StoredEvent;
     },
     async importPlatform(rules) {
       return Boolean(must(await db.rpc('import_legacy_platform', { p_default_rules_html: rules ?? '' })));

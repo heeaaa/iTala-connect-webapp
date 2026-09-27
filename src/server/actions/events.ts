@@ -4,27 +4,91 @@ import { z } from 'zod';
 import { serverEnv } from '@/env';
 import { reconcileSchedule } from '@/domain/schedule-edit';
 import { editorSchema, type EditorInput } from '@/lib/event-editor';
+import { eventSlugSchema } from '@/lib/event-slug';
 import { gamesFromRows } from '@/lib/public-event/model';
 import { createClient } from '@/lib/supabase/server';
 import { isEmptyRules, sanitizeRulesHtml } from '@/lib/rules-html';
 import { authorizeAdmin, canEditEvent, type ActionResult } from '@/server/auth';
 import { DEFAULT_RULES_HTML } from '@/server/event-defaults';
+import { slugTaken, slugTakenMessage } from '@/server/event-slug';
 import { cleanDeletedEventImages } from '@/server/image-cleanup';
 
-export async function createEvent(name: string): Promise<ActionResult<string>> {
+const slugError = (issues: { message: string }[]) => issues[0]?.message ?? 'Check the web address.';
+
+/** A new draft with its name and web address (P-14); the address must be free. */
+export async function createEvent(input: { name: string; slug: string }): Promise<ActionResult<string>> {
   const auth = await authorizeAdmin();
   if (!auth.ok) return auth;
-  const parsed = z.string().trim().min(1).max(200).safeParse(name);
-  if (!parsed.success) return { ok: false, error: 'Enter an event name, up to 200 characters.' };
+  const name = z.string().trim().min(1).max(200).safeParse(input?.name);
+  if (!name.success) return { ok: false, error: 'Enter an event name, up to 200 characters.' };
+  const slug = eventSlugSchema.safeParse(input?.slug);
+  if (!slug.success) return { ok: false, error: slugError(slug.error.issues) };
   const db = await createClient();
   const { data, error } = await db.rpc('create_draft_event', {
-    p_name: parsed.data,
+    p_name: name.data,
     p_timezone: serverEnv().DEFAULT_EVENT_TIMEZONE,
     p_rules: DEFAULT_RULES_HTML,
+    p_slug: slug.data,
   });
-  if (error) return { ok: false, error: 'Could not create the event. Please try again.' };
+  if (error)
+    return {
+      ok: false,
+      error: slugTaken(error) ? await slugTakenMessage(db, slug.data) : 'Could not create the event. Please try again.',
+    };
   revalidatePath('/admin');
   return { ok: true, data };
+}
+
+export type SlugCheck = {
+  /** The address as it would be stored. */
+  slug: string;
+  /** Free, or already this event's. */
+  free: boolean;
+  /** The address itself when free, otherwise the first free one with a number added. */
+  suggestion: string;
+};
+
+/** For the web address field: is this address free (for this event, when editing)? */
+export async function checkEventSlug(slug: string, eventId?: string): Promise<ActionResult<SlugCheck>> {
+  const auth = await authorizeAdmin();
+  if (!auth.ok) return auth;
+  const parsed = eventSlugSchema.safeParse(slug);
+  if (!parsed.success) return { ok: false, error: slugError(parsed.error.issues) };
+  if (eventId !== undefined && !z.uuid().safeParse(eventId).success) return { ok: false, error: 'Unknown event.' };
+  const db = await createClient();
+  const { data, error } = await db.rpc('free_event_slug', { p_slug: parsed.data, p_event_id: eventId });
+  if (error || !data) return { ok: false, error: 'Could not check the web address. Try again.' };
+  return { ok: true, data: { slug: parsed.data, free: data === parsed.data, suggestion: data } };
+}
+
+/**
+ * A new web address for an event (owner or superadmin). The old one keeps
+ * leading to the event. Returns the event's new version for the editor.
+ */
+export async function changeEventSlug(
+  eventId: string,
+  slug: string,
+): Promise<ActionResult<{ slug: string; version: string }>> {
+  const auth = await authorizeAdmin();
+  if (!auth.ok) return auth;
+  const parsed = eventSlugSchema.safeParse(slug);
+  if (!parsed.success) return { ok: false, error: slugError(parsed.error.issues) };
+  if (!z.uuid().safeParse(eventId).success || !(await canEditEvent(eventId)))
+    return { ok: false, error: 'You can only change your own events.' };
+  const db = await createClient();
+  const { data, error } = await db.rpc('set_event_slug', { p_event_id: eventId, p_slug: parsed.data });
+  if (error || !data)
+    return {
+      ok: false,
+      error:
+        error && slugTaken(error)
+          ? await slugTakenMessage(db, parsed.data, eventId)
+          : 'Could not change the web address. Please try again.',
+    };
+  revalidatePath('/');
+  revalidatePath('/admin');
+  revalidatePath(`/admin/events/${eventId}`);
+  return { ok: true, data: { slug: parsed.data, version: data } };
 }
 
 export type SaveOutcome = {

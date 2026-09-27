@@ -30,6 +30,7 @@ function stored(plan: EventPlan, tamper: (s: StoredEvent) => void = () => {}): S
   const id = (kind: string, key: string) => `${kind}:${key}`;
   const s: StoredEvent = {
     event: { ...r.event, id: 'event-uuid' },
+    slug: 'stored-address-2026',
     divisions: r.divisions.map((d) => ({ ...d, id: id('d', d.id), legacy_key: d.id })),
     teams: r.teams.map((t) => ({ ...t, id: id('t', t.id), division_id: id('d', t.division_id), legacy_code: t.id })),
     games: r.games.map((g) => ({
@@ -249,6 +250,8 @@ describe('applying an import', () => {
     expect(result.defaultRules).toBeNull();
     const text = formatApplied(result);
     expect(text).toContain('CREATED  Winter Social');
+    // The address as stored; Winter Social is a draft, so its link waits for Publish (P-14).
+    expect(text).toContain('web address: /events/stored-address-2026 (works once the event is published)');
     expect(text).toContain('AFTER WRITING, DIFFERENCE score at game 2 ("Mixed")');
     expect(text).toContain('FAILED  Harbour Spring Cup');
     expect(text).toContain('1 written, 0 skipped, 1 failed.');
@@ -289,6 +292,8 @@ describe('applying an import', () => {
     expect(result.platformError).toBe('platform_settings is locked');
     const text = formatApplied(result);
     expect(text).toContain('CREATED  Harbour Spring Cup');
+    expect(text).toContain('web address: /events/stored-address-2026');
+    expect(text).not.toContain('works once the event is published');
     expect(text).toContain('PLATFORM STEP FAILED: platform_settings is locked');
   });
 

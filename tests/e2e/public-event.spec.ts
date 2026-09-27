@@ -81,10 +81,10 @@ test.describe('Public event page (journey 6)', () => {
     await expect(page.getByRole('heading', { name: 'Your team: Hawks' })).toBeVisible();
   });
 
-  test('old #/event links redirect, unknown ones are a 404', async ({ page }) => {
+  test('old #/event links redirect to the web address, unknown ones are a 404', async ({ page }) => {
     const { publicEvent } = fixtures();
     await page.goto(`/#/event/${publicEvent.legacyId}`);
-    await expect(page).toHaveURL(new RegExp(`/events/${publicEvent.id}$`));
+    await expect(page).toHaveURL(new RegExp(`/events/${publicEvent.slug}$`));
     const missing = await page.goto('/l/-NdoesNotExist');
     expect(missing?.status()).toBe(404);
     await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();

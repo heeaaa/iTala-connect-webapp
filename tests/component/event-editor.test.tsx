@@ -13,9 +13,15 @@ const fake = vi.hoisted(() => ({
   po: vi.fn(),
   upload: vi.fn(),
   removeImage: vi.fn(),
+  checkSlug: vi.fn(),
+  changeSlug: vi.fn(),
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: fake.refresh, push: vi.fn(), replace: vi.fn() }) }));
-vi.mock('@/server/actions/events', () => ({ saveEvent: fake.save }));
+vi.mock('@/server/actions/events', () => ({
+  saveEvent: fake.save,
+  checkEventSlug: fake.checkSlug,
+  changeEventSlug: fake.changeSlug,
+}));
 vi.mock('@/server/actions/publish', () => ({ publishEvent: fake.publish }));
 vi.mock('@/lib/compress-image', () => ({
   ImageProblem: class ImageProblem extends Error {},
@@ -83,7 +89,18 @@ const game = (a: number, b: number, extra: Partial<Game> = {}): ScheduleGame => 
   ...extra,
 });
 const editor = (games: ScheduleGame[] = []) =>
-  render(<EventEditor initial={initial} links={{}} images={NO_IMAGES} games={games} published={false} notice="" />);
+  render(
+    <EventEditor
+      slug="league-night-2026"
+      siteUrl="https://connect.example"
+      initial={initial}
+      links={{}}
+      images={NO_IMAGES}
+      games={games}
+      published={false}
+      notice=""
+    />,
+  );
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -190,7 +207,18 @@ describe('Publish (E-02, E-60 to E-62)', () => {
 
 describe('Published editing (E-02, E-05, E-14, E-22, E-23)', () => {
   const publishedEditor = (games: ScheduleGame[] = []) =>
-    render(<EventEditor initial={initial} links={{}} images={NO_IMAGES} games={games} published notice="" />);
+    render(
+      <EventEditor
+        slug="league-night-2026"
+        siteUrl="https://connect.example"
+        initial={initial}
+        links={{}}
+        images={NO_IMAGES}
+        games={games}
+        published
+        notice=""
+      />,
+    );
   it('offers Save instead of Save draft and Publish', () => {
     publishedEditor();
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
@@ -215,9 +243,11 @@ describe('Published editing (E-02, E-05, E-14, E-22, E-23)', () => {
     // A draft's window changes are saved by Save draft or by Publish (which saves first). When the
     // page comes back published, nothing is left to autosave; a stray one could undo a round robin's choice.
     const props = { initial, links: {}, images: NO_IMAGES, games: [] as ScheduleGame[], notice: '' };
-    const { rerender } = render(<EventEditor {...props} published={false} />);
+    const { rerender } = render(
+      <EventEditor slug="league-night-2026" siteUrl="https://connect.example" {...props} published={false} />,
+    );
     fireEvent.change(screen.getByLabelText('Courts'), { target: { value: '2' } });
-    rerender(<EventEditor {...props} published />);
+    rerender(<EventEditor slug="league-night-2026" siteUrl="https://connect.example" {...props} published />);
     await new Promise((r) => setTimeout(r, 900));
     expect(fake.save).not.toHaveBeenCalled();
   });
@@ -279,7 +309,18 @@ describe('Published editing (E-02, E-05, E-14, E-22, E-23)', () => {
 
 describe('Round robin and playoff on a published event (E-21, E-63, E-64)', () => {
   const publishedEditor = (value: EditorInput = initial) =>
-    render(<EventEditor initial={value} links={{}} images={NO_IMAGES} games={[]} published notice="" />);
+    render(
+      <EventEditor
+        slug="league-night-2026"
+        siteUrl="https://connect.example"
+        initial={value}
+        links={{}}
+        images={NO_IMAGES}
+        games={[]}
+        published
+        notice=""
+      />,
+    );
   const dialog = (name: RegExp) => screen.getByRole('dialog', { name });
 
   it('shows Custom games/team before publishing, and the two additions after', () => {
@@ -449,7 +490,18 @@ describe('Round robin and playoff on a published event (E-21, E-63, E-64)', () =
 
 describe('Images and rules in the editor (E-15, E-70)', () => {
   const publishedEditor = () =>
-    render(<EventEditor initial={initial} links={{}} images={NO_IMAGES} games={[]} published notice="" />);
+    render(
+      <EventEditor
+        slug="league-night-2026"
+        siteUrl="https://connect.example"
+        initial={initial}
+        links={{}}
+        images={NO_IMAGES}
+        games={[]}
+        published
+        notice=""
+      />,
+    );
 
   it('a logo upload moves the save token on, and unsaved edits stay unsaved', async () => {
     const user = userEvent.setup();
@@ -505,6 +557,8 @@ describe('Images and rules in the editor (E-15, E-70)', () => {
     fake.save.mockResolvedValueOnce({ ok: true, data: { version: 'v2', moved: 0 } });
     render(
       <EventEditor
+        slug="league-night-2026"
+        siteUrl="https://connect.example"
         initial={{ ...initial, rules_html: '<p>Two halves</p>' }}
         links={{}}
         images={NO_IMAGES}
@@ -537,6 +591,8 @@ describe('Mobile link button (M-03)', () => {
     unmount();
     render(
       <EventEditor
+        slug="league-night-2026"
+        siteUrl="https://connect.example"
         initial={initial}
         links={{}}
         images={NO_IMAGES}
@@ -558,6 +614,8 @@ describe('Mobile link button (M-03)', () => {
   it('names the league a linked division is on', () => {
     render(
       <EventEditor
+        slug="league-night-2026"
+        siteUrl="https://connect.example"
         initial={initial}
         links={{ [uuid(10)]: { league_name: 'Harbour League', season: '2026' } }}
         images={NO_IMAGES}
@@ -580,6 +638,8 @@ describe('Mobile link button (M-03)', () => {
   it('offers no roster comparison for a division that is not linked', () => {
     render(
       <EventEditor
+        slug="league-night-2026"
+        siteUrl="https://connect.example"
         initial={initial}
         links={{}}
         images={NO_IMAGES}

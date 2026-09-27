@@ -5,6 +5,7 @@ import { importChoiceSchema, type ImportChoice } from '@/lib/mobile-import';
 import { createClient } from '@/lib/supabase/server';
 import { authorizeAdmin, type ActionResult } from '@/server/auth';
 import { DEFAULT_RULES_HTML } from '@/server/event-defaults';
+import { slugTaken, slugTakenMessage } from '@/server/event-slug';
 import { mobileConfigured, mobileReader } from '@/server/mobile/reader';
 
 export async function importLeague(
@@ -14,7 +15,12 @@ export async function importLeague(
   if (!access.ok) return access;
   const parsed = importChoiceSchema.safeParse(input);
   if (!parsed.success)
-    return { ok: false, error: 'Enter an event name (up to 200 characters) and division name (up to 120 characters).' };
+    return {
+      ok: false,
+      error: parsed.error.issues.some((i) => i.path[0] === 'slug')
+        ? parsed.error.issues.find((i) => i.path[0] === 'slug')!.message
+        : 'Enter an event name (up to 200 characters) and division name (up to 120 characters).',
+    };
   if (!mobileConfigured) return { ok: false, error: 'The mobile integration is not configured.' };
   let preview;
   try {
@@ -31,7 +37,9 @@ export async function importLeague(
     p_league: preview.league,
     p_teams: preview.teams,
     p_allow_duplicate: parsed.data.allowDuplicate,
+    p_slug: parsed.data.slug,
   });
+  if (error && slugTaken(error)) return { ok: false, error: await slugTakenMessage(db, parsed.data.slug) };
   if (error)
     return {
       ok: false,
