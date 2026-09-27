@@ -231,7 +231,9 @@ export function imageSource(value: unknown): ImageSource | 'none' | 'unknown' | 
     }
     // Old uploads kept their own extension; a known other type cannot go in the bucket.
     const ext = /\.([A-Za-z0-9]+)$/.exec(pathname)?.[1]?.toLowerCase();
-    if (ext && !['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return 'unsupported';
+    // .jfif and .jpe are JPEG under other names (Windows saves JPEGs as .jfif);
+    // the downloaded bytes are checked either way.
+    if (ext && !['png', 'jpg', 'jpeg', 'jfif', 'jpe', 'webp'].includes(ext)) return 'unsupported';
     return { kind: 'url', url: v };
   }
   return 'unknown';

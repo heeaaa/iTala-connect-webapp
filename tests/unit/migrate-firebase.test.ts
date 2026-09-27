@@ -107,6 +107,9 @@ describe('reading the Firebase export', () => {
   it('takes only images the bucket can hold: PNG, JPEG and WebP', () => {
     expect(imageSource('https://x.test/a.png')).toEqual({ kind: 'url', url: 'https://x.test/a.png' });
     expect(imageSource('https://x.test/a.JPG?v=2')).toMatchObject({ kind: 'url' });
+    // Windows names JPEGs .jfif; the old live data has sponsors saved that way.
+    expect(imageSource('https://x.test/sponsor_1.jfif')).toMatchObject({ kind: 'url' });
+    expect(imageSource('https://x.test/sponsor_2.JPE')).toMatchObject({ kind: 'url' });
     expect(imageSource('https://x.test/no-extension')).toMatchObject({ kind: 'url' });
     expect(imageSource('data:image/PNG;base64,AAAA')).toMatchObject({ kind: 'data', mime: 'image/png', bytes: 3 });
     expect(imageSource('data:image/jpg;base64,AAAA')).toMatchObject({ kind: 'data', mime: 'image/jpeg' });
