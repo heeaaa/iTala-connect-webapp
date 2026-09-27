@@ -459,7 +459,8 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
   - **Aeron's decision:** link them to the current division. New option `--relink-division=<event id>:<old key>=<new key>` (refused when the old division still exists or the new one does not; the report notes the games moved).
   - With it, the dry run shows both events READY, 0 errors, 1 warning (`event.newer_build`), 0 differences. There are no differences yet because that round robin is unfinished; when it is complete the new page fills the bracket in, and a later check would list that as a difference to accept.
 - **Also decided:** the OPEN division's two finals on 12/12 ("DIVISION 2 - Finals" 3:30 PM, "DIVISION 1 - Finals" 5:30 PM, the same match-up) are both kept; delete one in the editor if it is a mistake.
-- **Next:** CI on the relink commit, then the real import into the hosted project with `--apply`.
+- **CI run 36305157195 on `5379170`: green with one flaky test.** 874 unit and component tests, 329/329 pgTAP, 37/37 integration, 79 E2E passed plus **1 flaky**: `admin-publish.spec.ts:163` (drag and drop, phone size) failed its first try at line 224 (after Space, the pick-up cell never showed `data-drop-target`) and passed on the retry. Not caused by this change (no app UI touched); probably keyboard focus not settled before Space. **To fix in Phase 8**: wait for the handle to have focus before pressing Space, then run it repeatedly to prove it steady.
+- **Next:** the real import into the hosted project with `--apply`.
 
 ### Phase 7: the writer review and its guards (27/09/2026)
 
