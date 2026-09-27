@@ -1,6 +1,7 @@
 /**
  * npm run migrate:firebase -- --file <export.json> [--event=<id>]... [--timezone Pacific/Auckland] [--report <out.json>]
- * npm run migrate:firebase -- --file <export.json> --apply --owner <email> [--env <file>] [--accept-differences] [--skip-images]
+ * npm run migrate:firebase -- --file <export.json> --apply --owner <email> --env <file> --to <host>
+ *     [--accept-differences=<id>]... [--overwrite=<id>]... [--skip-images] [--image-host <host>]...
  *
  * Imports the old Firebase database into iTala Connect (MIGRATION_PLAN.md
  * 12.1) from a JSON export made in the Firebase console. The old database is
@@ -8,23 +9,34 @@
  *
  * Without --apply it is a dry run: it prints the verification report and
  * writes nothing. With --apply it prints the same report, then writes each
- * ready event through import_legacy_event with SUPABASE_SECRET_KEY (from the
- * environment, or --env <file>), owned by the --owner admin, reads each one
- * back and compares it with the old page again, then copies its images
- * (unless --skip-images). Events with errors are never written; events with
- * differences only with --accept-differences.
+ * ready event through import_legacy_event with the secret key, owned by the
+ * --owner admin, reads each one back and compares it with the old page
+ * again, then copies its images (unless --skip-images).
+ *
+ * Safety:
+ * - --to must name the host of the project being written to, so a key for
+ *   another project is never used by mistake. With --env, only that file's
+ *   values are used (not ones already set in the shell).
+ * - Events with errors are never written. An event with differences is
+ *   written only when named with --accept-differences=<id> after checking.
+ * - An event changed in iTala Connect since its last import, deleted there,
+ *   or with far fewer games or scores in the export, is refused by the
+ *   database unless named with --overwrite=<id>.
+ * - Old images are fetched only from the old Supabase bucket (*.supabase.co),
+ *   over https, without redirects; --image-host adds a host.
  *
  * Firebase event ids start with "-", so give them as --event=<id>.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
-import { parseArgs } from 'node:util';
+import { parseArgs, parseEnv } from 'node:util';
 
 import { applyImport, formatApplied } from '../src/migration/apply';
+import { OLD_IMAGE_HOSTS } from '../src/migration/images';
 import { planImport } from '../src/migration/import-plan';
 import { canonicalTimeZone } from '../src/migration/map-event';
 import { formatReport, importReport } from '../src/migration/report';
-import { verifyEvent, type Difference } from '../src/migration/verify';
+import { verifyAll } from '../src/migration/verify';
 import { loadLegacyCode } from './firebase-legacy';
 import { supabaseTarget } from './firebase-target';
 
@@ -43,8 +55,11 @@ const OPTIONS = {
   apply: { type: 'boolean', default: false },
   owner: { type: 'string' },
   env: { type: 'string' },
-  'accept-differences': { type: 'boolean', default: false },
+  to: { type: 'string' },
+  'accept-differences': { type: 'string', multiple: true },
+  overwrite: { type: 'string', multiple: true },
   'skip-images': { type: 'boolean', default: false },
+  'image-host': { type: 'string', multiple: true },
 } as const;
 
 function stop(message: string): never {
@@ -62,6 +77,8 @@ async function main() {
   if (!values.file) stop('Give the Firebase JSON export with --file <path>.');
   if (values.apply && values['dry-run']) stop('Choose --apply or --dry-run, not both.');
   if (values.apply && !values.owner) stop('Give the admin who will own the imported events with --owner <email>.');
+  if (values.apply && !values.to)
+    stop('Give the host you mean to write to with --to <host> (for example abcd.supabase.co).');
   const timezone = canonicalTimeZone(values.timezone);
   if (!timezone) stop(`"${values.timezone}" is not a time zone.`);
   for (const path of [values.file, values.report].filter(Boolean) as string[])
@@ -70,9 +87,7 @@ async function main() {
   const tree: unknown = JSON.parse(readFileSync(values.file, 'utf8'));
   const plan = planImport(tree, { timezone, only: values.event });
   const legacy = loadLegacyCode();
-  const differences = new Map<string, Difference[]>();
-  for (const e of plan.events) if (e.plan) differences.set(e.legacyId, verifyEvent(e.raw, e.plan, legacy));
-  const report = importReport(plan, differences);
+  const report = importReport(plan, verifyAll(plan, legacy));
 
   console.log(formatReport(report, { applying: values.apply }));
   if (values.report) {
@@ -81,26 +96,33 @@ async function main() {
   }
   if (!values.apply) process.exit(report.totals.errors || report.totals.differences ? 1 : 0);
 
-  if (values.env) process.loadEnvFile(values.env);
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
+  // The keys: from --env only when given (never mixed with the shell's), else the environment.
+  const env = values.env ? parseEnv(readFileSync(values.env, 'utf8')) : process.env;
+  const url = env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = env.SUPABASE_SECRET_KEY;
   if (!url || !key) stop('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY are needed to write (use --env <file>).');
+  const host = new URL(url).host;
+  if (host !== values.to) stop(`The keys are for ${host}, not ${values.to}. Nothing was written.`);
+  if (env.SUPABASE_STORAGE_BUCKET) process.env.SUPABASE_STORAGE_BUCKET = env.SUPABASE_STORAGE_BUCKET;
   // The address only, never the key.
-  console.log(`\nWriting to ${new URL(url).host} as the migration import, owner ${values.owner}.`);
+  console.log(`\nWriting to ${host} as the migration import, owner ${values.owner}.`);
   const result = await applyImport(plan, report, supabaseTarget(url, key), legacy, {
     ownerEmail: values.owner!,
-    acceptDifferences: values['accept-differences'],
-    // The default rules template is platform-wide: only on a whole import.
+    acceptDifferences: values['accept-differences'] ?? [],
+    overwrite: values.overwrite ?? [],
+    // The default rules template and platform sponsors are platform-wide: only on a whole import.
     platform: !values.event?.length,
     images: !values['skip-images'],
+    imageHosts: [...OLD_IMAGE_HOSTS, ...(values['image-host'] ?? [])],
   });
   console.log(formatApplied(result));
+  // Success only when every event was written and its stored rows match what was planned.
   const planned = new Map(report.events.map((e) => [e.legacyId, JSON.stringify(e.differences)]));
-  const unexpected = result.events.some(
-    (e) =>
-      e.outcome === 'failed' || (e.outcome === 'written' && JSON.stringify(e.differences) !== planned.get(e.legacyId)),
-  );
-  process.exit(unexpected ? 1 : 0);
+  const complete =
+    !report.issues.some((i) => i.level === 'error') &&
+    !result.platformError &&
+    result.events.every((e) => e.outcome === 'written' && JSON.stringify(e.differences) === planned.get(e.legacyId));
+  process.exit(complete ? 0 : 1);
 }
 
 main().catch((error: unknown) => {

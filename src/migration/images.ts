@@ -43,9 +43,42 @@ export function storedImage(
   return { bytes, type, path };
 }
 
+/** The old app kept its images in a Supabase bucket; only those hosts are fetched from. */
+export const OLD_IMAGE_HOSTS = ['*.supabase.co'];
+
+const IP_V4 = /^\d{1,3}(\.\d{1,3}){3}$/;
+
+/**
+ * Whether an old image's address may be fetched: https, a host on the list
+ * ("*.example" matches any subdomain), and never a raw IP address. Anyone
+ * could write to the old database, so an address pointing inside the
+ * owner's network must not be followed (the fetch refuses redirects too).
+ */
+export function allowedImageUrl(address: string, hosts: readonly string[] = OLD_IMAGE_HOSTS): boolean {
+  let url: URL;
+  try {
+    url = new URL(address);
+  } catch {
+    return false;
+  }
+  const host = url.hostname.toLowerCase();
+  if (url.protocol !== 'https:' || url.username || url.password || IP_V4.test(host) || host.startsWith('['))
+    return false;
+  return hosts.some((h) => {
+    const want = h.toLowerCase();
+    return want.startsWith('*.') ? host.endsWith(want.slice(1)) && host.length > want.length - 1 : host === want;
+  });
+}
+
 /** Where to get an image's bytes: decoded here, or fetched by the caller. */
-export function imageOrigin(source: ImageSource): { bytes: Uint8Array } | { url: string } | { problem: string } {
-  if (source.kind === 'url') return { url: source.url };
+export function imageOrigin(
+  source: ImageSource,
+  hosts: readonly string[] = OLD_IMAGE_HOSTS,
+): { bytes: Uint8Array } | { url: string } | { problem: string } {
+  if (source.kind === 'url')
+    return allowedImageUrl(source.url, hosts)
+      ? { url: source.url }
+      : { problem: `its address is not in the old image store (${hosts.join(', ')}), so it was not fetched` };
   const bytes = decodeDataUri(source.dataUri);
   return bytes ? { bytes } : { problem: 'the embedded image cannot be read' };
 }

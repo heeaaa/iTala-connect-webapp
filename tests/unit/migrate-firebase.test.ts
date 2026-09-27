@@ -1,4 +1,7 @@
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import exportJson from '../fixtures/firebase-export.json';
 import { loadLegacyCode } from '../../scripts/firebase-legacy';
@@ -14,7 +17,7 @@ import {
 import { planImport } from '@/migration/import-plan';
 import { canonicalTimeZone, imageSource, mapEvent, parseOldTime, type EventPlan } from '@/migration/map-event';
 import { formatReport, groupIssues, importReport } from '@/migration/report';
-import { verifyEvent, type Difference } from '@/migration/verify';
+import { verifyAll, verifyEvent, type Difference } from '@/migration/verify';
 
 /*
  * Phase 7 (MIGRATION_PLAN.md 12.1): the Firebase export planned as an
@@ -784,6 +787,41 @@ describe('the report', () => {
   });
 });
 
+describe('one broken event does not stop the rest', () => {
+  it('reports an event that cannot be read, and still plans the others', () => {
+    const unreadable = Object.defineProperty({}, 'scheduleDays', {
+      enumerable: true,
+      get() {
+        throw new Error('bad node');
+      },
+    });
+    const plan = planImport({ events: { a: unreadable, b: { name: 'Fine' } } }, opts);
+    expect(plan.events.map((e) => [e.legacyId, e.plan === null, codes(e.issues)])).toEqual([
+      ['a', true, ['event.unreadable']],
+      ['b', false, []],
+    ]);
+    expect(plan.events[0]!.issues[0]!.message).toBe('The event could not be read (bad node).');
+    expect(imageSource('http://[')).toBe('unknown');
+  });
+
+  it('marks an event the old code cannot work out as an error, and checks the others', () => {
+    // A team list exported as an array with a gap: the old page itself stopped on it.
+    const plan = planImport(
+      {
+        events: {
+          a: { name: 'Gap', divisions: { d: { name: 'D', teams: [null, { name: 'A' }] } } },
+          b: { name: 'Fine' },
+        },
+      },
+      opts,
+    );
+    const diffs = verifyAll(plan, legacy);
+    expect([...diffs.keys()]).toEqual(['b']);
+    expect(plan.events[0]!.issues.map((i) => [i.level, i.code])).toContainEqual(['error', 'verify.failed']);
+    expect(importReport(plan, diffs).events.map((e) => e.ready)).toEqual([false, true]);
+  });
+});
+
 describe('npm run migrate:firebase', () => {
   // Never a database here: the keys are blanked, so an apply stops before connecting.
   const run = (...args: string[]) =>
@@ -806,14 +844,42 @@ describe('npm run migrate:firebase', () => {
     expect(run(...file, '--event', A).stderr).toContain('--event=<id>');
   }, 60_000);
 
-  it('refuses to write without an owner or the keys, and to run without an export or a real time zone', () => {
+  it('refuses to write without an owner, a named host or the keys, and to run without an export or a real time zone', () => {
     expect(run(...file, '--apply').stderr).toContain('--owner <email>');
+    expect(run(...file, '--apply', '--owner', 'a@b.test').stderr).toContain('--to <host>');
     expect(run(...file, '--apply', '--dry-run', '--owner', 'a@b.test').stderr).toContain('not both');
-    const keys = run(...file, `--event=${A}`, '--apply', '--owner', 'a@b.test');
+    const keys = run(...file, `--event=${A}`, '--apply', '--owner', 'a@b.test', '--to', 'abcd.supabase.co');
     expect(keys.stdout).toContain('checked before writing');
     expect(keys.stderr).toContain('SUPABASE_SECRET_KEY are needed');
     expect(keys.status).toBe(2);
     expect(run().status).toBe(2);
     expect(run('--file', 'x.json', '--timezone', 'Mars/Base').stderr).toContain('is not a time zone');
+  }, 60_000);
+
+  it('takes the keys from --env alone, and writes nowhere but the host named with --to', () => {
+    // A file for a port nothing listens on; the shell holds a different project's values.
+    const dir = mkdtempSync(join(tmpdir(), 'itala-env-'));
+    const envFile = join(dir, 'target.env');
+    writeFileSync(envFile, 'NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:9\nSUPABASE_SECRET_KEY=file-key\n');
+    const withShell = (...args: string[]) =>
+      spawnSync(process.execPath, ['--import', 'tsx', 'scripts/migrate-firebase.ts', ...args], {
+        encoding: 'utf8',
+        timeout: 60_000,
+        env: {
+          ...process.env,
+          NEXT_PUBLIC_SUPABASE_URL: 'https://shell.supabase.co',
+          SUPABASE_SECRET_KEY: 'shell-key',
+        },
+      });
+    const apply = [...file, `--event=${A}`, '--apply', '--owner', 'a@b.test', '--env', envFile, '--skip-images'];
+    const wrongHost = withShell(...apply, '--to', 'shell.supabase.co');
+    expect(wrongHost.stderr).toContain('The keys are for 127.0.0.1:9, not shell.supabase.co. Nothing was written.');
+    expect(wrongHost.status).toBe(2);
+    const fileHost = withShell(...apply, '--to', '127.0.0.1:9');
+    expect(fileHost.stdout).toContain('Writing to 127.0.0.1:9 as the migration import');
+    expect(fileHost.stdout).not.toContain('shell.supabase.co');
+    // Nothing answers there, so the run stops before writing and says so.
+    expect(fileHost.status).toBe(1);
+    rmSync(dir, { recursive: true, force: true });
   }, 60_000);
 });

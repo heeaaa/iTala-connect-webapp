@@ -223,8 +223,14 @@ export function imageSource(value: unknown): ImageSource | 'none' | 'unknown' | 
     return { kind: 'data', mime, bytes: Math.floor(((v.length - data[0].length) * 3) / 4), dataUri: v };
   }
   if (/^https?:\/\//i.test(v)) {
+    let pathname: string;
+    try {
+      pathname = new URL(v).pathname;
+    } catch {
+      return 'unknown';
+    }
     // Old uploads kept their own extension; a known other type cannot go in the bucket.
-    const ext = /\.([A-Za-z0-9]+)(?:[?#].*)?$/.exec(new URL(v, 'https://x').pathname)?.[1]?.toLowerCase();
+    const ext = /\.([A-Za-z0-9]+)$/.exec(pathname)?.[1]?.toLowerCase();
     if (ext && !['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return 'unsupported';
     return { kind: 'url', url: v };
   }

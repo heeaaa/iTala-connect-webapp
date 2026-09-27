@@ -191,20 +191,22 @@ describe('applying an import', () => {
     const target = fakeTarget();
     const result = await applyImport(plan, report, target, legacy, {
       ownerEmail: ' Owner@itala.test ',
-      acceptDifferences: false,
+      acceptDifferences: [],
+      overwrite: [],
       platform: true,
       images: false,
     });
     expect(target.ownerId).toHaveBeenCalledWith('owner@itala.test');
     expect(result.ownerId).toBe('owner-uuid');
     expect(result.events.map((e) => [e.name, e.outcome, e.reason ?? e.differences])).toEqual([
-      ['Winter Social', 'skipped', 'has differences (check them, then use --accept-differences)'],
+      ['Winter Social', 'skipped', `has differences (check them, then use --accept-differences=${B})`],
       ['Harbour Spring Cup', 'written', []],
       ['Club Night', 'skipped', 'has errors'],
       ['', 'skipped', 'not an event'],
     ]);
     expect(target.importEvent).toHaveBeenCalledTimes(1);
-    expect(target.importEvent).toHaveBeenCalledWith('owner-uuid', importPayload(plan.events[1]!.plan!));
+    // Not forced: the database refuses to write over changes made in Connect.
+    expect(target.importEvent).toHaveBeenCalledWith('owner-uuid', importPayload(plan.events[1]!.plan!), false);
     expect(result.defaultRules).toBe(true);
     expect(target.importPlatform).toHaveBeenCalledWith('<p>Be kind</p>');
   });
@@ -219,22 +221,31 @@ describe('applying an import', () => {
     const { plan, report } = planned([B, A]);
     const target = fakeTarget();
     const write = target.importEvent;
-    target.importEvent = vi.fn(async (owner, payload) => {
-      if (payload.event.name === 'Harbour Spring Cup') throw new Error('The owner must be an active admin');
-      return write(owner, payload);
+    target.importEvent = vi.fn(async (owner, payload, force) => {
+      if (payload.event.name === 'Harbour Spring Cup')
+        throw new Error('This event was changed in iTala Connect since its last import (a score was entered)');
+      return write(owner, payload, force);
     });
+    // Accepted by id after checking; the overwrite names only Winter Social.
     const result = await applyImport(plan, report, target, legacy, {
       ownerEmail: 'owner@itala.test',
-      acceptDifferences: true,
+      acceptDifferences: [B],
+      overwrite: [B],
       platform: false,
       images: false,
     });
+    expect(vi.mocked(target.importEvent).mock.calls.map((c) => [c[1].event.name, c[2]])).toEqual([
+      ['Winter Social', true],
+      ['Harbour Spring Cup', false],
+    ]);
     expect(result.events.map((e) => [e.name, e.outcome])).toEqual([
       ['Winter Social', 'written'],
       ['Harbour Spring Cup', 'failed'],
     ]);
     expect(result.events[0]!.differences).toEqual(report.events[0]!.differences);
-    expect(result.events[1]!.reason).toBe('The owner must be an active admin');
+    expect(result.events[1]!.reason).toBe(
+      'This event was changed in iTala Connect since its last import (a score was entered)',
+    );
     expect(result.defaultRules).toBeNull();
     const text = formatApplied(result);
     expect(text).toContain('CREATED  Winter Social');
@@ -249,7 +260,8 @@ describe('applying an import', () => {
     await expect(
       applyImport(plan, report, target, legacy, {
         ownerEmail: 'someone@itala.test',
-        acceptDifferences: false,
+        acceptDifferences: [],
+        overwrite: [],
         platform: true,
         images: true,
       }),
@@ -257,6 +269,27 @@ describe('applying an import', () => {
     expect(target.importEvent).not.toHaveBeenCalled();
     expect(target.importPlatform).not.toHaveBeenCalled();
     expect(target.uploadImage).not.toHaveBeenCalled();
+  });
+
+  it('still reports every event when a platform step fails afterwards', async () => {
+    const { plan, report } = planned([A]);
+    const target = fakeTarget({
+      importPlatform: vi.fn(async () => {
+        throw new Error('platform_settings is locked');
+      }),
+    });
+    const result = await applyImport(plan, report, target, legacy, {
+      ownerEmail: 'owner@itala.test',
+      acceptDifferences: [],
+      overwrite: [],
+      platform: true,
+      images: false,
+    });
+    expect(result.events[0]!.outcome).toBe('written');
+    expect(result.platformError).toBe('platform_settings is locked');
+    const text = formatApplied(result);
+    expect(text).toContain('CREATED  Harbour Spring Cup');
+    expect(text).toContain('PLATFORM STEP FAILED: platform_settings is locked');
   });
 
   it('says what happened in words', () => {

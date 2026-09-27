@@ -49,7 +49,7 @@ describe('Firebase import writer', () => {
   it('writes a clean event, and the stored rows match the old page exactly', async () => {
     const { plan } = planned([A]);
     const e = plan.events[0]!;
-    const result = await target().importEvent(owner.id, importPayload(e.plan!));
+    const result = await target().importEvent(owner.id, importPayload(e.plan!), false);
     expect(result).toMatchObject({
       created: true,
       divisions: 1,
@@ -72,7 +72,7 @@ describe('Firebase import writer', () => {
     const eventId = await eventIdOf(A);
     const before = (await db.from('games').select('id, legacy_gid').eq('event_id', eventId).order('position')).data;
     const { plan } = planned([A]);
-    const result = await target().importEvent(owner.id, importPayload(plan.events[0]!.plan!));
+    const result = await target().importEvent(owner.id, importPayload(plan.events[0]!.plan!), false);
     expect(result).toMatchObject({ event_id: eventId, created: false, games: 6 });
     expect((await db.from('games').select('id, legacy_gid').eq('event_id', eventId).order('position')).data).toEqual(
       before,
@@ -85,12 +85,13 @@ describe('Firebase import writer', () => {
     const { plan, report } = planned([]);
     const result = await applyImport(plan, report, target(), legacy, {
       ownerEmail: owner.email,
-      acceptDifferences: false,
+      acceptDifferences: [],
+      overwrite: [],
       platform: false,
       images: false,
     });
     expect(result.events.map((e) => [e.legacyId, e.outcome, e.differences ?? e.reason])).toEqual([
-      [B, 'skipped', 'has differences (check them, then use --accept-differences)'],
+      [B, 'skipped', `has differences (check them, then use --accept-differences=${B})`],
       [A, 'written', []],
       [C, 'skipped', 'has errors'],
       ['broken', 'skipped', 'not an event'],
@@ -101,7 +102,8 @@ describe('Firebase import writer', () => {
     const accepted = planned([B]);
     const written = await applyImport(accepted.plan, accepted.report, target(), legacy, {
       ownerEmail: owner.email,
-      acceptDifferences: true,
+      acceptDifferences: [B],
+      overwrite: [],
       platform: false,
       images: false,
     });
@@ -115,7 +117,7 @@ describe('Firebase import writer', () => {
     try {
       await db.from('platform_settings').update({ default_rules_html: '' }).eq('id', true);
       const { plan, report } = planned([A]);
-      const options = { ownerEmail: owner.email, acceptDifferences: false, platform: true, images: false };
+      const options = { ownerEmail: owner.email, acceptDifferences: [], overwrite: [], platform: true, images: false };
       expect((await applyImport(plan, report, target(), legacy, options)).defaultRules).toBe(true);
       expect((await applyImport(plan, report, target(), legacy, options)).defaultRules).toBe(false);
       expect((await db.from('platform_settings').select('default_rules_html').single()).data!.default_rules_html).toBe(
@@ -129,9 +131,9 @@ describe('Firebase import writer', () => {
   it('copies the old images into the bucket, sets their rows, and reuses the same file next time', async () => {
     const db = adminClient();
     const { plan, report } = planned([A]);
-    const options = { ownerEmail: owner.email, acceptDifferences: false, platform: false, images: true };
+    const options = { ownerEmail: owner.email, acceptDifferences: [], overwrite: [], platform: false, images: true };
     const first = await applyImport(plan, report, target(), legacy, options);
-    // The embedded minor sponsor is copied; the old addresses (example.test) cannot be reached.
+    // The embedded minor sponsor is copied; the old addresses are not in the old image store, so they are not fetched.
     expect(first.events[0]!.images!.copied).toBe(1);
     expect(first.events[0]!.images!.left.map((l) => l.what)).toEqual([
       'the logo',
@@ -168,7 +170,8 @@ describe('Firebase import writer', () => {
     await expect(
       applyImport(plan, report, target(), legacy, {
         ownerEmail: 'nobody@itala.test',
-        acceptDifferences: false,
+        acceptDifferences: [],
+        overwrite: [],
         platform: false,
         images: false,
       }),
@@ -179,6 +182,28 @@ describe('Firebase import writer', () => {
       p_event: importPayload(plan.events[0]!.plan!) as unknown as Json,
     });
     expect(error?.code).toBe('42501');
+  });
+
+  it('refuses to undo a score entered in Connect since the import, unless that event is named to overwrite', async () => {
+    const db = adminClient();
+    const eventId = await eventIdOf(A);
+    const game = (await db.from('games').select('id').eq('event_id', eventId).eq('legacy_gid', 'g_a3').single()).data!;
+    const scoreOf = async () => (await db.from('game_scores').select('s1, s2').eq('game_id', game.id).single()).data;
+    const signedIn = await signedInClient(owner);
+    expect((await signedIn.rpc('set_score', { p_game_id: game.id, p_s1: 99, p_s2: 1 })).error).toBeNull();
+
+    const { plan, report } = planned([A]);
+    const options = { ownerEmail: owner.email, acceptDifferences: [], overwrite: [], platform: false, images: false };
+    const refused = await applyImport(plan, report, target(), legacy, options);
+    expect(refused.events[0]).toMatchObject({
+      outcome: 'failed',
+      reason: 'This event was changed in iTala Connect since its last import (it has a change recorded as score.set)',
+    });
+    expect(await scoreOf()).toEqual({ s1: 99, s2: 1 });
+
+    const forced = await applyImport(plan, report, target(), legacy, { ...options, overwrite: [A] });
+    expect(forced.events[0]!.outcome).toBe('written');
+    expect(await scoreOf()).toEqual({ s1: 60, s2: 55 });
   });
 
   it('runs end to end from the command line: report first, then the write, its read-back and its images', () => {
@@ -194,6 +219,8 @@ describe('Firebase import writer', () => {
         '--apply',
         '--owner',
         admin.email,
+        '--to',
+        new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).host,
       ],
       { encoding: 'utf8', timeout: 60_000, env: process.env },
     );

@@ -45,8 +45,10 @@ export function supabaseTarget(url: string, secretKey: string): ImportTarget {
         if (data.users.length < 200) return null;
       }
     },
-    async importEvent(ownerId, payload) {
-      const data = must(await db.rpc('import_legacy_event', { p_owner: ownerId, p_event: payload as unknown as Json }));
+    async importEvent(ownerId, payload, force) {
+      const data = must(
+        await db.rpc('import_legacy_event', { p_owner: ownerId, p_event: payload as unknown as Json, p_force: force }),
+      );
       return data as unknown as ImportResult;
     },
     async readBack(eventId) {
@@ -75,7 +77,8 @@ export function supabaseTarget(url: string, secretKey: string): ImportTarget {
     },
     async fetchImage(address) {
       // Read only: a GET of the old image, with a time limit, stopping past 5 MB.
-      const res = await fetch(address, { signal: AbortSignal.timeout(20_000) });
+      // No redirects: an address may only lead to the host it names (checked before the fetch).
+      const res = await fetch(address, { signal: AbortSignal.timeout(20_000), redirect: 'error' });
       if (!res.ok) throw new Error(`the old address answered ${res.status}`);
       if (Number(res.headers.get('content-length') ?? 0) > IMAGE_LIMIT) throw new Error('it is larger than 5 MB');
       const chunks: Uint8Array[] = [];
@@ -95,12 +98,13 @@ export function supabaseTarget(url: string, secretKey: string): ImportTarget {
       const { error } = await db.storage.from(BUCKET).remove(paths);
       if (error) throw new Error(error.message);
     },
-    async setEventImages(eventId, logoPath, sponsors) {
+    async setEventImages(eventId, logoPath, sponsors, replace) {
       const unused = may(
         await db.rpc('set_legacy_event_images', {
           p_event_id: eventId,
           p_logo_path: logoPath as string,
           p_sponsors: sponsors as unknown as Json,
+          p_replace: replace,
         }),
       );
       return unused ?? [];

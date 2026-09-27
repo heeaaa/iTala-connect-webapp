@@ -50,7 +50,15 @@ export function planImport(tree: unknown, options: MapOptions & { only?: readonl
   const wanted = options.only?.length ? new Set(options.only) : null;
   const events = entries(tree.events)
     .filter(([key]) => !wanted || wanted.has(key))
-    .map(([legacyId, raw]) => ({ legacyId, raw, ...mapEvent(legacyId, raw, options) }));
+    .map(([legacyId, raw]) => {
+      try {
+        return { legacyId, raw, ...mapEvent(legacyId, raw, options) };
+      } catch (error) {
+        // One unreadable event is reported; the rest of the export still plans.
+        const message = `The event could not be read (${error instanceof Error ? error.message : String(error)}).`;
+        return { legacyId, raw, plan: null, issues: [{ level: 'error' as const, code: 'event.unreadable', message }] };
+      }
+    });
   if (wanted)
     for (const id of wanted)
       if (!events.some((e) => e.legacyId === id))

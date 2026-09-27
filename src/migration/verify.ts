@@ -2,6 +2,7 @@ import { computeStandings } from '@/domain/standings';
 import { scoredGames, toEventModel, type EventRows } from '@/lib/public-event/model';
 
 import { entries, inFirebaseOrder, isRecord } from './firebase-tree';
+import type { ImportPlan } from './import-plan';
 import { parseOldTime, type EventPlan } from './map-event';
 
 /**
@@ -201,4 +202,25 @@ export function compareRows(
 /** The diff on the plan, before anything is written. */
 export function verifyEvent(raw: unknown, plan: EventPlan, legacy: LegacyCode): Difference[] {
   return compareRows(raw, rowsOf(plan), new Map(plan.games.map((g) => [g.legacy_gid, g.legacy_index])), legacy);
+}
+
+/**
+ * The diff for every planned event. An event the old code cannot work out
+ * gets an error (so it is not written) and the rest are still checked.
+ */
+export function verifyAll(plan: ImportPlan, legacy: LegacyCode): Map<string, Difference[]> {
+  const diffs = new Map<string, Difference[]>();
+  for (const e of plan.events) {
+    if (!e.plan) continue;
+    try {
+      diffs.set(e.legacyId, verifyEvent(e.raw, e.plan, legacy));
+    } catch (error) {
+      e.issues.push({
+        level: 'error',
+        code: 'verify.failed',
+        message: `The old code could not work this event out (${error instanceof Error ? error.message : String(error)}), so it cannot be checked.`,
+      });
+    }
+  }
+  return diffs;
 }

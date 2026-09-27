@@ -745,7 +745,7 @@ export type Database = {
       division_event_id: { Args: { p_division_id: string }; Returns: string }
       game_event_id: { Args: { p_game_id: string }; Returns: string }
       import_legacy_event: {
-        Args: { p_event: Json; p_owner: string }
+        Args: { p_event: Json; p_force?: boolean; p_owner: string }
         Returns: Json
       }
       import_legacy_platform: {
@@ -773,6 +773,8 @@ export type Database = {
       is_event_published: { Args: { p_event_id: string }; Returns: boolean }
       is_privileged_role: { Args: never; Returns: boolean }
       is_superadmin: { Args: never; Returns: boolean }
+      legacy_import_baseline: { Args: { p_event_id: string }; Returns: string }
+      legacy_import_changes: { Args: { p_event_id: string }; Returns: string }
       legacy_import_running: { Args: never; Returns: boolean }
       list_admin_accounts: {
         Args: never
@@ -830,7 +832,12 @@ export type Database = {
         }[]
       }
       set_legacy_event_images: {
-        Args: { p_event_id: string; p_logo_path: string; p_sponsors: Json }
+        Args: {
+          p_event_id: string
+          p_logo_path: string
+          p_replace?: boolean
+          p_sponsors: Json
+        }
         Returns: string[]
       }
       set_legacy_platform_sponsors: { Args: { p_sponsors: Json }; Returns: boolean }
