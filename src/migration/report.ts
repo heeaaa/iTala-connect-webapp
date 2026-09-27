@@ -116,10 +116,12 @@ export function importReport(plan: ImportPlan, differences: ReadonlyMap<string, 
 const LEVEL_WORD: Record<IssueLevel, string> = { error: 'ERROR', warning: 'warning', info: 'note' };
 
 /** The report as plain text for the terminal. */
-export function formatReport(report: ImportReport): string {
+export function formatReport(report: ImportReport, options: { applying?: boolean } = {}): string {
   const out: string[] = [];
   const t = report.totals;
-  out.push(`iTala Connect import report (dry run: nothing was written)`);
+  out.push(
+    `iTala Connect import report (${options.applying ? 'checked before writing' : 'dry run: nothing was written'})`,
+  );
   out.push(
     `${t.events} event(s): ${t.ready} ready, ${t.errors} error(s), ${t.warnings} warning(s), ${t.differences} difference(s)`,
   );

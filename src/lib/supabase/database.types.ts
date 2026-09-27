@@ -744,6 +744,14 @@ export type Database = {
       }
       division_event_id: { Args: { p_division_id: string }; Returns: string }
       game_event_id: { Args: { p_game_id: string }; Returns: string }
+      import_legacy_event: {
+        Args: { p_event: Json; p_owner: string }
+        Returns: Json
+      }
+      import_legacy_platform: {
+        Args: { p_default_rules_html: string }
+        Returns: boolean
+      }
       import_mobile_league: {
         Args: {
           p_allow_duplicate?: boolean
@@ -765,6 +773,7 @@ export type Database = {
       is_event_published: { Args: { p_event_id: string }; Returns: boolean }
       is_privileged_role: { Args: never; Returns: boolean }
       is_superadmin: { Args: never; Returns: boolean }
+      legacy_import_running: { Args: never; Returns: boolean }
       list_admin_accounts: {
         Args: never
         Returns: {

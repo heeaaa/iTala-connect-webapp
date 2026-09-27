@@ -12,15 +12,22 @@ export function isRecord(value: unknown): value is Tree {
 }
 
 const INT_KEY = /^-?(0|[1-9]\d*)$/;
+/** Firebase sorts keys that read as 32-bit integers by number, before the rest. */
 const isIntKey = (key: string) => INT_KEY.test(key) && Math.abs(Number(key)) <= 2 ** 31 - 1;
+/** JavaScript lists whole-number keys up to 2^32 - 2 first, in number order, whatever order they came in. */
+const isArrayIndex = (key: string) => /^(0|[1-9]\d*)$/.test(key) && Number(key) <= 2 ** 32 - 2;
 
 /**
- * Firebase's key order: keys that read as 32-bit integers first, in number
- * order, then the rest in string order. The old app looped with
- * Object.keys over what Firebase returned, so this order decided group
- * splits, pairings and standings ties.
+ * The key order the old app's Object.keys loops saw: the Firebase SDK builds
+ * each object in Firebase order (32-bit integer keys by number, then the
+ * rest as text), and JavaScript then lists whole-number keys first. This
+ * order decided group splits, pairings and standings ties.
  */
 export function firebaseKeyCompare(a: string, b: string): number {
+  const ax = isArrayIndex(a);
+  const bx = isArrayIndex(b);
+  if (ax && bx) return Number(a) - Number(b);
+  if (ax !== bx) return ax ? -1 : 1;
   const ai = isIntKey(a);
   const bi = isIntKey(b);
   if (ai && bi) return Number(a) - Number(b);
@@ -28,7 +35,7 @@ export function firebaseKeyCompare(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-/** A node's children in Firebase order, skipping nulls (Firebase stores none). */
+/** A node's children in that order, skipping nulls (Firebase stores none). */
 export function entries(value: unknown): [string, unknown][] {
   let pairs: [string, unknown][];
   if (Array.isArray(value)) pairs = value.map((v, i) => [String(i), v]);
@@ -37,22 +44,23 @@ export function entries(value: unknown): [string, unknown][] {
   return pairs.filter(([, v]) => v !== null && v !== undefined).sort(([a], [b]) => firebaseKeyCompare(a, b));
 }
 
-/** A list stored as an array or an object, in Firebase order. */
+/** A list stored as an array or an object, in that order. */
 export function values(value: unknown): unknown[] {
   return entries(value).map(([, v]) => v);
 }
 
 /** A child by key, whether the node is an array or an object. */
 export function child(value: unknown, key: string | number): unknown {
-  if (Array.isArray(value)) return typeof key === 'number' || isIntKey(key) ? value[Number(key)] : undefined;
+  if (Array.isArray(value)) return typeof key === 'number' || isArrayIndex(key) ? value[Number(key)] : undefined;
   return isRecord(value) ? value[String(key)] : undefined;
 }
 
+/** Text as stored; a broken character (a lone surrogate) becomes U+FFFD, which Postgres can store. */
 export const text = (value: unknown): string =>
-  typeof value === 'string' ? value : typeof value === 'number' ? String(value) : '';
+  typeof value === 'string' ? value.toWellFormed() : typeof value === 'number' ? String(value) : '';
 
 /**
- * A copy of a node rebuilt in Firebase order, so old code that loops with
+ * A copy of a node rebuilt in that order, so old code that loops with
  * Object.keys sees what it saw in the browser. Arrays stay arrays.
  */
 export function inFirebaseOrder(value: unknown): unknown {

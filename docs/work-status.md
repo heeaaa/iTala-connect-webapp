@@ -4,7 +4,7 @@ Last updated: 26/09/2026 (Claude, work laptop)
 
 ## Current handoff (27/09/2026, Claude on the work laptop)
 
-**Where things are:** Phase 3b is code complete. Phase 5 is done (5a to 5e, its journeys and the 5e finish review), and so is Google sign-in (A-11). **Phase 6 is code complete against the recorded mobile fixtures:** 6a (read-only inbox, dashboard Results), 6b (approve, re-approve, keep, attach) and 6c (link wizard for divisions made by hand), all pushed on branch `handoff/codex`. Its one manual check against the real mobile project stays **NOT RUN** until you say go. **Phase 7 is IN PROGRESS:** 7a (the dry-run planner and verification report) is done; next is 7b (the idempotent writer), then 7c (images). **Migrations to push to the hosted project after CI passes, in order:** `20260927000100_platform_sponsor_paths.sql`, `20260927000200_admin_accounts.sql`, `20260927000300_keep_published_score.sql` and `20260927000400_division_mobile_link.sql` (and 5d's `20260926000700_rules_and_images.sql` if that is not pushed yet).
+**Where things are:** Phase 3b is code complete. Phase 5 is done (5a to 5e, its journeys and the 5e finish review), and so is Google sign-in (A-11). **Phase 6 is code complete against the recorded mobile fixtures:** 6a (read-only inbox, dashboard Results), 6b (approve, re-approve, keep, attach) and 6c (link wizard for divisions made by hand), all pushed on branch `handoff/codex`. Its one manual check against the real mobile project stays **NOT RUN** until you say go. **Phase 7 is IN PROGRESS:** 7a (the dry-run planner and verification report) and 7b (the writer, `--apply`) are done; next is 7c (images). **The old site runs the older build** (scores by position); the import follows it (7b section). **Migrations to push to the hosted project after CI passes, in order:** `20260927000100_platform_sponsor_paths.sql`, `20260927000200_admin_accounts.sql`, `20260927000300_keep_published_score.sql`, `20260927000400_division_mobile_link.sql` and `20260927000500_legacy_import.sql` (and 5d's `20260926000700_rules_and_images.sql` if that is not pushed yet).
 
 **Old app down (27/09/2026):** connect.itala.fyi shows `permission_denied at /events` because the old Firebase database's "test mode" rules expired at 00:00 today (Auckland). Nothing in this project changed them; the data is still there. The fix is yours in the Firebase console (Realtime Database, Rules): move the expiry date forward and Publish, knowing the rules stay open to anyone with the address. For Phase 7, the importer should read with proper credentials rather than rely on open rules.
 
@@ -27,7 +27,7 @@ npm run lint && npm run typecheck && npm run test:coverage
 npm run build && npm run check:secrets && npm run test:e2e
 ```
 
-- Expected: **80 E2E tests** and **257 pgTAP assertions** (both green in CI at `aee70e4`). Run `npm run db:reset` for the new migrations; `npm run db:types` must show no diff.
+- Expected: **80 E2E tests**, **290 pgTAP assertions** (257 green in CI plus 33 in `014_legacy_import.sql`) and **35 integration tests** (29 plus 6 in `legacy-import.test.ts`). Run `npm run db:reset` for the new migrations; `npm run db:types` must show no diff.
 - Expected: **29 integration tests** (22 plus 7 in `admin-accounts.test.ts`).
 - Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
 
@@ -444,6 +444,42 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 - **Evidence (work laptop):** lint and typecheck pass; `test:coverage` 55 files, **800 tests pass**; a clean build and `check:secrets` pass. Harness (link wizard, sample data) at 390 and 1440 px: axe clean, no sideways scroll, 44 px targets, duplicate marked and refused with focus kept, a server refusal with focus kept, the clash note and the unreachable state; the results inbox specs still pass (6/6). Captures `.impeccable/review/phase6/{mobile,desktop}/link-*.png`.
 - **CI run 36289258765 on `aee70e4`: green.** 80/80 E2E (the new link journey at both viewports), 257/257 pgTAP (with `013`), 29/29 integration, 800 unit and component tests, gitleaks clean.
 - **You, now that CI has passed:** push `20260927000400_division_mobile_link.sql` with the other 27/09 migrations (`npx supabase migration list`, then `npx supabase db push --dry-run`, then `npx supabase db push`).
+
+### Phase 7b: the writer, and the 7a review (27/09/2026)
+
+- **CI run 36290669825 on `c3a6511` (7a): green**, 832 unit and component tests, 257/257 pgTAP, 29/29 integration, 80/80 E2E.
+- **Independent review of 7a** (read-only agent, probes run outside the repository): 1 high, 3 medium, 4 low findings, all fixed here.
+  - **High:** a game on a day that was not an event day disappeared from the new page (it shows only event days) while the check said READY. Such days are now added to the event (warning `event.day_added`), as the old page showed every day with games.
+  - The check now also compares **where each game appears** (slot, Unscheduled or hidden), and reports games missing or extra.
+  - **Values Postgres would refuse** are kept in range: courts, scores and counts, the time zone's exact name (`pacific/auckland` passed the old check), characters cut whole (an emoji is not split), and a broken character repaired.
+  - **Images** other than PNG, JPEG or WebP (SVG, GIF) are left out with a warning.
+  - **Court names** are read by position.
+  - **A repeated gid** no longer copies a mobile approval.
+  - **Key order** now follows what JavaScript's `Object.keys` gave the old code.
+  - **Display fallbacks** as the old page: a team without a name is named by its code, and a division without a colour is grey.
+  - **Seeding messages** now say when a deleted or same-team game can change seeding.
+  - **Playoff winners** that point at a later game get a warning.
+- **Which old build is live (found in the review):** connect.itala.fyi serves `deploy/src/app.js` (its `/src/app.js` has hash `08a5396751b31f74`, the same as the local deploy folder), not `src/app.js`. That build shows scores **by position**, and keeps the rows' own `s1`/`s2` when an event has no score store. The import and the check follow it: `scripts/golden/legacy/live-extract.js` holds its `applyScoresToSchedule` verbatim, and the standings, playoff and schedule code is identical in both builds (compared function by function). The newer build's gid store is reported (`event.newer_build`, `score.stores_disagree`) and not used. The check models a fresh load of the live page: playoffs are resolved on the event as read, then again after the scores arrive. A game hidden behind a later one in the same slot, as the old page drew it, is now in Unscheduled (`game.slot_hidden`); MIGRATION_PLAN.md 12.1 is corrected to match.
+- **Writer:** migration `20260927000500_legacy_import.sql`.
+  - **`import_legacy_event(owner, payload)`:** one transaction per event, and only the migration import can run it (security invoker, refuses any other role, granted to `service_role` only).
+    - It upserts on the `legacy_*` keys, so a second import keeps every id, and removes rows no longer in the export.
+    - It frees all slots first, so games can trade slots; replaces player lists; and keeps an owner a superadmin reassigned.
+    - Images are not touched (7c).
+  - **Audit:** during the import the per-row audit triggers stay quiet (a transaction-local setting only this function sets; clients cannot call `set_config`) and one `event.legacy_import` row records it with its counts.
+  - **`import_legacy_platform`** fills the default rules template only when Connect has none.
+  - **pgTAP `014_legacy_import.sql` (33 assertions)** covers the role refusals, the owner check, every mapped column, one audit row, a second import (ids kept, slots traded, removals, owner kept), a clash refused with nothing changed, and ordinary audits afterwards.
+- **`--apply --owner <email> [--env <file>] [--accept-differences]`:** prints the report first, then the target's address (never the key), then writes.
+  - Events with errors are never written; events with differences only when accepted.
+  - Every written event is read back from the database and compared with the old page again.
+  - Exit 1 if an event fails or the stored rows differ from the plan.
+  - The O-1 owner is chosen at run time.
+- **Tests:** `migrate-firebase` (45: every review finding has its own case; red check: three of the fixes undone, each case failed, file restored), `migrate-apply` (8, with a fake database: skips, failures, read-back diffs, rows the import did not make), integration `legacy-import.test.ts` (6: write, read back with no differences, re-import with the same ids and two audit rows, apply rules, the default rules, refusals, the CLI end to end).
+- **Evidence (work laptop):** lint and typecheck pass; `test:coverage` 57 files, **853 tests pass**; `src/migration` 99% lines, 96% branches (`read-back.ts` 95%); a clean build and `check:secrets` pass.
+- Not run on the laptop: pgTAP `014` and the integration test. CI runs them.
+- **For you:**
+  - After CI passes, push `20260927000500_legacy_import.sql` with the other 27/09 migrations.
+  - Then export the old database (see 7a) and run the **dry run** first; send me the summary lines.
+  - Two things to decide once we see real data: (1) if any event shows `event.newer_build` with `score.stores_disagree`, which score store to trust for it; (2) a playoff that takes the winner of a game listed after it shows TBD on a fresh load on both sites, but the old page filled it in after a later refresh or filter click. I recommend the new page resolve playoffs until nothing changes (a small Fix to PRD P-06), which needs your OK.
 
 ### Phase 7a: Firebase import, dry run and verification report (27/09/2026)
 

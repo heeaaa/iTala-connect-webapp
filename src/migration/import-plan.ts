@@ -62,11 +62,14 @@ export function planImport(tree: unknown, options: MapOptions & { only?: readonl
   for (const tier of ['primary', 'secondary'] as const)
     values(sponsorsNode[tier]).forEach((v, i) => {
       const src = imageSource(v);
-      if (src === 'unknown')
+      if (src === 'unknown' || src === 'unsupported')
         issues.push({
           level: 'warning',
-          code: 'image.unknown',
-          message: `Platform ${tier} sponsor ${i + 1} is neither a web address nor an embedded image, so it is left out.`,
+          code: src === 'unknown' ? 'image.unknown' : 'image.unsupported',
+          message:
+            src === 'unknown'
+              ? `Platform ${tier} sponsor ${i + 1} is neither a web address nor an embedded image, so it is left out.`
+              : `Platform ${tier} sponsor ${i + 1} is not a PNG, JPEG or WebP image, so it is left out.`,
         });
       else if (src !== 'none')
         sponsors.push({ tier, source: src, sort_order: sponsors.filter((s) => s.tier === tier).length });

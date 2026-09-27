@@ -2,19 +2,19 @@ import { computeStandings } from '@/domain/standings';
 import { scoredGames, toEventModel, type EventRows } from '@/lib/public-event/model';
 
 import { entries, inFirebaseOrder, isRecord } from './firebase-tree';
-import type { EventPlan } from './map-event';
+import { parseOldTime, type EventPlan } from './map-event';
 
 /**
- * The computed-output diff (MIGRATION_PLAN.md 12.1 step 7): what the old
- * public page showed, worked out by the old code itself on the old data,
- * against what the new public page shows from the imported rows. Scores
- * per game, standings per division and resolved playoff teams must match.
+ * The computed-output diff (MIGRATION_PLAN.md 12.1 step 7): what the live
+ * old page showed, worked out by the old code itself on the old data,
+ * against what the new public page shows from the imported rows. Per game:
+ * where it appears, its score and its resolved playoff teams; per division:
+ * the standings. Runs on the plan before writing and on the stored rows after.
  */
 
-/** The verbatim old functions (scripts/golden/legacy/app-extract.js). */
+/** The verbatim old functions: live-extract.js (scores) and app-extract.js (the rest, the same in both builds). */
 export interface LegacyCode {
-  cleanScheduleRow(g: object): object;
-  applyScoresToSchedule(evt: object, scores: unknown, scoresById: unknown): void;
+  applyScoresToSchedule(evt: object, scores: unknown): void;
   resolveAllPlayoffs(evt: object): void;
   publicStandings(
     evt: object,
@@ -22,7 +22,7 @@ export interface LegacyCode {
 }
 
 export interface Difference {
-  kind: 'score' | 'standings' | 'playoff';
+  kind: 'score' | 'standings' | 'playoff' | 'slot' | 'game';
   where: string;
   old: string;
   new: string;
@@ -38,22 +38,42 @@ const oldScore = (v: unknown): number | null => {
 };
 const oldTeam = (v: unknown): string | null => (typeof v === 'string' && v && v !== 'TBD' ? v : null);
 const show = (v: unknown) => JSON.stringify(v);
+const isUnscheduled = (g: OldGame) => !g.day || g.day === 'TBD' || !g.time || g.time === 'TBD';
 
-/** The old page's view of one raw event: scores applied, playoffs resolved, standings. */
+/**
+ * A fresh load of the live page (deploy/src/app.js 1356-1368): the first
+ * render resolves playoffs on the event as read, then the scores listener
+ * applies scores and renders again, which resolves them a second time.
+ */
 function oldView(raw: Record<string, unknown>, legacy: LegacyCode) {
   const evt = inFirebaseOrder(raw) as Record<string, any>;
-  // The schedule as the Firebase SDK hands it over: an array, with holes
-  // where rows are missing, so positions (and positional scores) line up.
+  // The schedule as the Firebase SDK hands it over: an array with holes, so
+  // positions (and position-based scores) line up.
   const schedule: OldGame[] = [];
-  for (const [k, g] of entries(raw.schedule)) if (isRecord(g)) schedule[Number(k)] = legacy.cleanScheduleRow(g);
+  for (const [k, g] of entries(evt.schedule)) if (isRecord(g)) schedule[Number(k)] = g;
   evt.schedule = schedule;
-  legacy.applyScoresToSchedule(evt, evt.scores ?? null, evt.scoresById ?? null);
-  const scores = schedule.map((g: OldGame) => [oldScore(g.s1), oldScore(g.s2)]);
   legacy.resolveAllPlayoffs(evt);
-  return { schedule, scores, standings: legacy.publicStandings(evt) };
+  legacy.applyScoresToSchedule(evt, evt.scores ?? null);
+  legacy.resolveAllPlayoffs(evt);
+  // Where each game appeared: days[day][time][court] = g, so a later row takes the slot.
+  const lastInSlot = new Map<string, number>();
+  schedule.forEach((g, i) => {
+    if (!isUnscheduled(g)) lastInSlot.set(`${g.day}\u0000${g.time}\u0000${g.court}`, i);
+  });
+  const placement = schedule.map((g, i) => {
+    if (isUnscheduled(g)) return 'unscheduled';
+    if (lastInSlot.get(`${g.day}\u0000${g.time}\u0000${g.court}`) !== i) return 'hidden';
+    return `${g.day} ${parseOldTime(String(g.time))?.hhmm ?? g.time} court ${parseInt(g.court, 10)}`;
+  });
+  return {
+    schedule,
+    placement,
+    scores: schedule.map((g) => [oldScore(g.s1), oldScore(g.s2)]),
+    standings: legacy.publicStandings(evt),
+  };
 }
 
-/** The imported rows as the new public page reads them. Legacy keys stand in for ids. */
+/** The plan's rows as the new public page reads them. Legacy keys stand in for ids. */
 export function rowsOf(plan: EventPlan): EventRows {
   const e = plan.event;
   return {
@@ -117,34 +137,68 @@ export function rowsOf(plan: EventPlan): EventRows {
   };
 }
 
-export function verifyEvent(raw: unknown, plan: EventPlan, legacy: LegacyCode): Difference[] {
+/**
+ * Rows keyed by legacy keys (team ids are team codes, division ids division
+ * keys) against the raw old event. oldIndex gives each game's position in
+ * the old schedule array.
+ */
+export function compareRows(
+  raw: unknown,
+  rows: EventRows,
+  oldIndex: ReadonlyMap<string, number>,
+  legacy: LegacyCode,
+): Difference[] {
   if (!isRecord(raw)) return [];
   const before = oldView(raw, legacy);
-  const model = toEventModel(rowsOf(plan), '');
-  const after = new Map(scoredGames(model).map((g) => [g.id, g]));
+  const model = toEventModel(rows, '');
+  const games = scoredGames(model);
   const diffs: Difference[] = [];
+  const matched = new Set<number>();
 
-  for (const g of plan.games) {
-    const where = `game ${g.legacy_index + 1} ("${g.label || 'no label'}")`;
-    const oldG = before.schedule[g.legacy_index];
-    const newG = after.get(g.legacy_gid)!;
-    const was = before.scores[g.legacy_index] ?? [null, null];
-    const now = [newG.score1, newG.score2];
-    if (show(was) !== show(now)) diffs.push({ kind: 'score', where, old: show(was), new: show(now) });
-    if (oldG?.playoff && oldG.team1Source) {
+  for (const g of games) {
+    const i = oldIndex.get(g.id);
+    const oldG = i === undefined ? undefined : before.schedule[i];
+    const where = `game ${i === undefined ? '?' : i + 1} ("${g.label || 'no label'}")`;
+    if (i === undefined || !oldG) {
+      diffs.push({ kind: 'game', where, old: 'not on the old page', new: 'on the new page' });
+      continue;
+    }
+    matched.add(i);
+    const now =
+      g.day === null ? 'unscheduled' : model.days.includes(g.day) ? `${g.day} ${g.time} court ${g.court}` : 'hidden';
+    const was = before.placement[i]!;
+    // A game the old page hid behind another now shows in Unscheduled: better, and reported by the mapping.
+    if (was !== now && !(was === 'hidden' && now === 'unscheduled'))
+      diffs.push({ kind: 'slot', where, old: was, new: now });
+    const score = [g.score1, g.score2];
+    if (show(before.scores[i]) !== show(score))
+      diffs.push({ kind: 'score', where, old: show(before.scores[i]), new: show(score) });
+    if (oldG.playoff && oldG.team1Source) {
       const wasTeams = [oldTeam(oldG.team1), oldTeam(oldG.team2)];
-      const nowTeams = [newG.team1Id, newG.team2Id];
+      const nowTeams = [g.team1Id, g.team2Id];
       if (show(wasTeams) !== show(nowTeams))
         diffs.push({ kind: 'playoff', where, old: show(wasTeams), new: show(nowTeams) });
     }
   }
+  before.schedule.forEach((g: OldGame, i) => {
+    if (!matched.has(i))
+      diffs.push({ kind: 'game', where: `game ${i + 1} ("${g.label ?? ''}")`, old: 'on the old page', new: 'missing' });
+  });
 
-  const games = [...after.values()];
-  for (const d of model.divisions) {
-    const was = (before.standings[d.id] ?? []).map((r) => [r.code, r.w, r.l, r.pf, r.pa, r.diff, r.gp]);
-    const now = computeStandings(d.teamIds, games, d.id).map((r) => [r.teamId, r.w, r.l, r.pf, r.pa, r.diff, r.gp]);
+  const names = new Map(model.divisions.map((d) => [d.id, d.name]));
+  for (const id of new Set([...Object.keys(before.standings), ...model.divisions.map((d) => d.id)])) {
+    const d = model.divisions.find((x) => x.id === id);
+    const was = (before.standings[id] ?? []).map((r) => [r.code, r.w, r.l, r.pf, r.pa, r.diff, r.gp]);
+    const now = d
+      ? computeStandings(d.teamIds, games, d.id).map((r) => [r.teamId, r.w, r.l, r.pf, r.pa, r.diff, r.gp])
+      : [];
     if (show(was) !== show(now))
-      diffs.push({ kind: 'standings', where: `division "${d.name}"`, old: show(was), new: show(now) });
+      diffs.push({ kind: 'standings', where: `division "${names.get(id) ?? id}"`, old: show(was), new: show(now) });
   }
   return diffs;
+}
+
+/** The diff on the plan, before anything is written. */
+export function verifyEvent(raw: unknown, plan: EventPlan, legacy: LegacyCode): Difference[] {
+  return compareRows(raw, rowsOf(plan), new Map(plan.games.map((g) => [g.legacy_gid, g.legacy_index])), legacy);
 }

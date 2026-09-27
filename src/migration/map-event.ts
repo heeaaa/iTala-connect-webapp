@@ -7,6 +7,11 @@ import { child, entries, isRecord, pushIdTime, text, values } from './firebase-t
  * 12.1, steps 2 and 3). Pure: nothing here reads or writes anything. Rows
  * refer to each other by their legacy keys; the writer turns those into ids.
  * Everything unusual is reported rather than failing or silently dropped.
+ *
+ * The reference is the build connect.itala.fyi serves (deploy/src/app.js,
+ * checked by hash on 27/09/2026; scripts/golden/legacy/live-extract.js): it
+ * shows scores by position, and a game in a slot another row also claims
+ * is hidden behind the later row.
  */
 
 export type IssueLevel = 'info' | 'warning' | 'error';
@@ -130,20 +135,31 @@ const THEME_DEFAULTS = {
   textSecondary: '#888888',
   headingColor: '#FFFFFF',
 } as const;
-// The old editor's division colour cycle (app.js 738).
-const DIVISION_COLOURS = ['#6C63FF', '#2BBF8A', '#E06040', '#D4A017', '#E06098', '#3BACDF'];
+/** The old page's colour for a division without one (getDivColor: "#888"). */
+const NO_COLOUR = '#888888';
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 const SHORT_HEX = /^#([0-9A-Fa-f])([0-9A-Fa-f])([0-9A-Fa-f])$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 /** The old app's time pattern (parseTimeMin, app.js 1918-1924). */
 const TIME_12H = /^(\d+):(\d+)\s*(AM|PM)$/i;
 const TIME_24H = /^(\d{1,2}):(\d{2})$/;
+/** The largest values the columns hold: smallint for courts, integer for the rest. */
+const MAX_SMALLINT = 32767;
+const MAX_INT = 2147483647;
+/** Image types the images bucket takes (the path checks allow .png, .jpg and .webp). */
+const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /** The old parseInt reading: "12", 12 and 12.7 are 12; anything else is NaN. */
 function int(value: unknown): number {
   if (typeof value === 'number') return Number.isFinite(value) ? Math.trunc(value) : NaN;
   return typeof value === 'string' ? parseInt(value, 10) : NaN;
+}
+
+/** A whole number the integer columns can hold, or null. */
+function int32(value: unknown): number | null {
+  const n = int(value);
+  return Number.isNaN(n) || Math.abs(n) > MAX_INT ? null : n;
 }
 
 function isRealDay(day: string): boolean {
@@ -170,6 +186,15 @@ export function parseOldTime(raw: string): { hhmm: string; canonical: boolean } 
   return null;
 }
 
+/** The zone's canonical name (Postgres matches names exactly), or null if it is not a zone. */
+export function canonicalTimeZone(zone: string): string | null {
+  try {
+    return new Intl.DateTimeFormat('en-NZ', { timeZone: zone }).resolvedOptions().timeZone;
+  } catch {
+    return null;
+  }
+}
+
 function colour(value: unknown): string | null {
   const v = text(value).trim();
   if (HEX.test(v)) return v.toUpperCase();
@@ -188,23 +213,21 @@ function isoTime(value: unknown): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-const intOrNull = (value: unknown): number | null => {
-  const n = int(value);
-  return Number.isNaN(n) ? null : n;
-};
-
-export function imageSource(value: unknown): ImageSource | 'none' | 'unknown' {
+export function imageSource(value: unknown): ImageSource | 'none' | 'unknown' | 'unsupported' {
   const v = text(value).trim();
   if (v === '') return 'none';
   const data = /^data:(image\/[A-Za-z0-9.+-]+);base64,/.exec(v);
-  if (data)
-    return {
-      kind: 'data',
-      mime: data[1]!.toLowerCase(),
-      bytes: Math.floor(((v.length - data[0].length) * 3) / 4),
-      dataUri: v,
-    };
-  if (/^https?:\/\//i.test(v)) return { kind: 'url', url: v };
+  if (data) {
+    const mime = data[1]!.toLowerCase().replace('image/jpg', 'image/jpeg');
+    if (!IMAGE_TYPES.has(mime)) return 'unsupported';
+    return { kind: 'data', mime, bytes: Math.floor(((v.length - data[0].length) * 3) / 4), dataUri: v };
+  }
+  if (/^https?:\/\//i.test(v)) {
+    // Old uploads kept their own extension; a known other type cannot go in the bucket.
+    const ext = /\.([A-Za-z0-9]+)(?:[?#].*)?$/.exec(new URL(v, 'https://x').pathname)?.[1]?.toLowerCase();
+    if (ext && !['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return 'unsupported';
+    return { kind: 'url', url: v };
+  }
   return 'unknown';
 }
 
@@ -223,11 +246,13 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
     return { plan: null, issues };
   }
 
+  // Lengths in characters, as Postgres counts them (an emoji is one).
   const clip = (value: unknown, max: number, what: string) => {
     const v = text(value);
-    if (v.length <= max) return v;
+    const chars = Array.from(v);
+    if (chars.length <= max) return v;
     note('warning', 'text.too_long', `${what} was longer than ${max} characters and was shortened.`);
-    return v.slice(0, max);
+    return chars.slice(0, max).join('');
   };
 
   // --- Event details -------------------------------------------------------
@@ -239,8 +264,8 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
       'event.day_invalid',
       `${rawDays.length - goodDays.length} event day(s) were not dates and were left out.`,
     );
-  const days = [...new Set(goodDays)].sort();
-  if (days.length !== goodDays.length) note('info', 'event.day_repeated', 'A repeated event day was kept once.');
+  const days = new Set(goodDays);
+  if (days.size !== goodDays.length) note('info', 'event.day_repeated', 'A repeated event day was kept once.');
 
   const hour = (value: unknown, fallback: string, what: string) => {
     const v = text(value).trim();
@@ -272,14 +297,15 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
     note('warning', 'event.courts_range', `Courts was ${courts}; ${fixed} is used (1 to 10).`);
     courts = fixed;
   }
-  const oldNames = values(raw.courtNames).map((n) => text(n).trim());
-  if (oldNames.length > courts)
-    note(
-      'info',
-      'event.court_names_extra',
-      `${oldNames.length - courts} court name(s) beyond the ${courts} court(s) were left out.`,
-    );
-  const courtNames = Array.from({ length: courts }, (_, i) => (oldNames[i] || `Court ${i + 1}`).slice(0, 120));
+  // Court names are by position (courtNames[court - 1]); a gap is the default name.
+  const extraNames = entries(raw.courtNames).filter(([k]) => Number(k) >= courts).length;
+  if (extraNames)
+    note('info', 'event.court_names_extra', `${extraNames} court name(s) beyond the ${courts} court(s) were left out.`);
+  const courtNames = Array.from({ length: courts }, (_, i) =>
+    Array.from(text(child(raw.courtNames, i)).trim() || `Court ${i + 1}`)
+      .slice(0, 120)
+      .join(''),
+  );
 
   const theme = isRecord(raw.theme) ? raw.theme : {};
   const themeColour = (key: keyof typeof THEME_DEFAULTS) => {
@@ -309,11 +335,13 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
   const image = (value: unknown, what: string): ImageSource | null => {
     const src = imageSource(value);
     if (src === 'none') return null;
-    if (src === 'unknown') {
+    if (src === 'unknown' || src === 'unsupported') {
       note(
         'warning',
-        'image.unknown',
-        `The ${what} is neither a web address nor an embedded image, so it is left out.`,
+        src === 'unknown' ? 'image.unknown' : 'image.unsupported',
+        src === 'unknown'
+          ? `The ${what} is neither a web address nor an embedded image, so it is left out.`
+          : `The ${what} is not a PNG, JPEG or WebP image, so it is left out (add it again in the editor).`,
       );
       return null;
     }
@@ -333,17 +361,17 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
   // --- Divisions and teams --------------------------------------------------
   const divisions: DivisionPlan[] = [];
   const teamHome = new Map<string, string>(); // team code -> division key
-  entries(raw.divisions).forEach(([key, div], di) => {
+  for (const [key, div] of entries(raw.divisions)) {
     if (!isRecord(div)) {
       note('warning', 'division.not_object', `Division ${key} is not an object and was left out.`);
-      return;
+      continue;
     }
     const divColour = colour(div.color);
     if (!divColour)
       note(
-        'warning',
+        div.color === undefined ? 'info' : 'warning',
         'division.colour',
-        `Division "${text(div.name)}" had no usable colour; the next one in the old cycle is used.`,
+        `Division "${text(div.name)}" had no usable colour; grey is used, as the old page showed it.`,
       );
     let brackets = int(div.bracketCount);
     if (Number.isNaN(brackets)) brackets = 1; // the old `|| 1`
@@ -356,7 +384,7 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
       brackets = Math.min(4, Math.max(1, brackets));
     }
     const custom = div.customGamesPerTeam === true;
-    let perTeam = div.gamesPerTeam === undefined ? null : intOrNull(div.gamesPerTeam);
+    let perTeam = div.gamesPerTeam === undefined ? null : int32(div.gamesPerTeam);
     if (perTeam !== null && (perTeam < 0 || perTeam > 20)) {
       note(
         'warning',
@@ -366,14 +394,14 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
       perTeam = Math.min(20, Math.max(0, perTeam));
     }
     const teams: TeamPlan[] = [];
-    entries(div.teams).forEach(([code, team]) => {
+    for (const [code, team] of entries(div.teams)) {
       if (!isRecord(team)) {
         note('warning', 'team.not_object', `Team ${code} in "${text(div.name)}" is not an object and was left out.`);
-        return;
+        continue;
       }
       if (teamHome.has(code)) {
         note('error', 'team.code_reused', `Team code ${code} is used in two divisions; the second is left out.`);
-        return;
+        continue;
       }
       teamHome.set(code, key);
       const players = values(team.players)
@@ -383,14 +411,24 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
           number: clip(p.num ?? p.number, 10, 'A player number'),
           sort_order: pi,
         }));
+      let name = clip(team.name, 120, 'A team name');
+      if (!name.trim()) {
+        // The old page showed the code for a team without a name (getTeamName).
+        note(
+          'info',
+          'team.no_name',
+          `A team in "${text(div.name)}" had no name; it is named ${code}, as the old page showed it.`,
+        );
+        name = Array.from(code).slice(0, 120).join('');
+      }
       teams.push({
         legacy_code: code,
-        name: clip(team.name, 120, 'A team name'),
+        name,
         coach: clip(team.coach, 120, 'A coach name'),
         sort_order: teams.length,
         players,
       });
-    });
+    }
 
     let mobileLink: DivisionPlan['mobile_link'] = null;
     if (isRecord(div.mobileLink)) {
@@ -439,7 +477,7 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
     divisions.push({
       legacy_key: key,
       name: clip(div.name, 120, 'A division name'),
-      color: divColour ?? DIVISION_COLOURS[di % DIVISION_COLOURS.length]!,
+      color: divColour ?? NO_COLOUR,
       bracket_count: brackets,
       custom_games_per_team: custom,
       games_per_team: perTeam,
@@ -447,13 +485,12 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
       teams,
       mobile_link: mobileLink,
     });
-  });
+  }
   const divisionKeys = new Set(divisions.map((d) => d.legacy_key));
 
   // --- Schedule and scores --------------------------------------------------
-  const migrated = Boolean(raw.scoresMigratedAt);
-  const scoresById = raw.scoresById;
   const positional = raw.scores;
+  const hasScoreStore = positional !== null && positional !== undefined;
   const sources = isRecord(raw.scoreSources) ? raw.scoreSources : {};
   const rows = entries(raw.schedule).filter(([k, g]) => {
     if (isRecord(g)) return true;
@@ -461,11 +498,34 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
     return false;
   }) as [string, Record<string, unknown>][];
 
+  // The newer build of the old app (src/, never served at connect.itala.fyi)
+  // added gids and a gid-keyed score store. Scores still follow the live build.
+  if (raw.scoresMigratedAt || raw.scoresById !== undefined || rows.some(([, g]) => g.gid))
+    note(
+      'warning',
+      'event.newer_build',
+      'The newer build of the old app (not the one connect.itala.fyi serves) changed this event; scores follow the live build, by position.',
+    );
+
+  // Which row the old page showed in each slot: days[day][time][court] = g, so
+  // a later row claiming the same day, time text and court hides an earlier one.
+  const isScheduled = (g: Record<string, unknown>) =>
+    Boolean(g.day) && g.day !== 'TBD' && Boolean(g.time) && g.time !== 'TBD';
+  const oldSlot = (g: Record<string, unknown>) => `${text(g.day)}\u0000${text(g.time)}\u0000${text(g.court)}`;
+  const shownInSlot = new Map<string, number>();
+  for (const [k, g] of rows) if (isScheduled(g)) shownInSlot.set(oldSlot(g), Number(k));
+
   const originalGids = new Set(rows.map(([, g]) => text(g.gid)).filter(Boolean));
+  const firstBracketRow = new Map<string, number>();
+  for (const [k, g] of rows) {
+    const id = text(g.bracketGameId);
+    if (id && !firstBracketRow.has(id)) firstBracketRow.set(id, Number(k));
+  }
   const usedGids = new Set<string>();
   const slots = new Set<string>();
   const bracketIds = new Set<string>();
-  const counts = { assigned: 0, positionalUsed: 0, rowScores: 0 };
+  const addedDays = new Set<string>();
+  const counts = { assigned: 0, positionalUsed: 0, rowValues: 0, rowIgnored: 0, storesDisagree: 0 };
   const games: GamePlan[] = [];
 
   const score = (value: unknown, where: string): number | null => {
@@ -479,6 +539,10 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
       note('warning', 'score.negative', `A score of ${n} on ${where} cannot be stored, so 0 is used.`);
       return 0;
     }
+    if (n > MAX_INT) {
+      note('warning', 'score.too_large', `A score of ${n} on ${where} is too large to store and was left out.`);
+      return null;
+    }
     if (n > 300) note('info', 'score.large', `A score of ${n} on ${where} is over 300 (kept).`);
     return n;
   };
@@ -491,7 +555,7 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
       note(
         'warning',
         'game.team_missing',
-        `${where} names team ${code}, which no longer exists; it shows as TBD (the code is kept).`,
+        `${where} names team ${code}, which no longer exists; it shows as TBD (the code is kept). The old page still counted it as a game to play, so seeding can differ.`,
       );
       return null;
     }
@@ -502,39 +566,42 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
 
   const source = (value: unknown): PlayoffSourceJson | null => {
     if (!isRecord(value)) return null;
-    const rank = int(value.rank);
-    if (value.type === 'seed' && rank >= 1) return { type: 'seed', rank };
+    const rank = int32(value.rank);
+    if (value.type === 'seed' && rank !== null && rank >= 1) return { type: 'seed', rank };
     const ref = text(value.bracketId ?? value.bracketGameId);
     if (value.type === 'winner' && ref) return { type: 'winner', bracketGameId: ref };
     return null;
   };
 
-  rows.forEach(([key, g]) => {
+  for (const [key, g] of rows) {
     const index = Number(key);
     const where = `game ${index + 1} ("${cleanLabel(text(g.label)) || 'no label'}")`;
 
-    // Scores exactly as the old page showed them (applyScoresToSchedule,
-    // app.js 1673-1685): the fixture's gid entry wins; positions only for an
-    // event that was never migrated. Worked out before any gid is assigned.
-    const gid = text(g.gid);
+    // Scores as the live page showed them (deploy/src/app.js 1429-1432): by
+    // position; with no score store at all, the row's own s1/s2 stay.
     let shown: unknown = null;
-    const byId = gid ? child(scoresById, gid) : undefined;
-    if (gid && byId) shown = byId;
-    else if (!migrated && child(positional, index)) {
+    if (hasScoreStore) {
       shown = child(positional, index);
-      counts.positionalUsed++;
+      if (isRecord(shown)) counts.positionalUsed++;
+      if (g.s1 !== undefined || g.s2 !== undefined) counts.rowIgnored++;
+    } else if (g.s1 !== undefined || g.s2 !== undefined) {
+      shown = { s1: g.s1, s2: g.s2 };
+      counts.rowValues++;
     }
     const s1 = isRecord(shown) ? score(shown.s1, where) : null;
     const s2 = isRecord(shown) ? score(shown.s2, where) : null;
     if ((s1 === null) !== (s2 === null))
       note('info', 'score.one_sided', `${where} has only one side of its score (kept, not counted).`);
-    if (g.s1 !== undefined || g.s2 !== undefined) counts.rowScores++;
 
-    // A stable gid for every row (ensureGameIds, app.js 1546-1556), but
-    // repeatable: a row without one, or with a copy of another's, gets one
-    // from its position so a second import finds the same game.
+    // An id for every row: its own gid (the first row with it), or one from
+    // its position (the live build never assigned gids).
+    const gid = text(g.gid);
+    const byId = gid ? child(raw.scoresById, gid) : undefined;
+    const pair = (s: unknown) => (isRecord(s) ? [int32(s.s1), int32(s.s2)].join() : ',');
+    if (isRecord(byId) && pair(byId) !== pair(shown)) counts.storesDisagree++;
+    const keepsGid = Boolean(gid) && !usedGids.has(gid);
     let legacyGid = gid;
-    if (!gid || usedGids.has(gid)) {
+    if (!keepsGid) {
       if (gid) note('warning', 'game.gid_repeated', `${where} repeats another game's id; it gets its own.`);
       else counts.assigned++;
       legacyGid = `import-${index}`;
@@ -559,10 +626,16 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
     let day: string | null = null;
     let time: string | null = null;
     let court: number | null = null;
-    if (rawDay && rawDay !== 'TBD' && rawTime && rawTime !== 'TBD') {
+    if (isScheduled(g)) {
       const parsed = parseOldTime(rawTime);
       const c = int(g.court);
-      if (!isRealDay(rawDay))
+      if (shownInSlot.get(oldSlot(g)) !== index)
+        note(
+          'warning',
+          'game.slot_hidden',
+          `${where} was hidden on the old page behind a later game in the same slot; it is now in Unscheduled.`,
+        );
+      else if (!isRealDay(rawDay))
         note(
           'warning',
           'game.day_invalid',
@@ -574,7 +647,7 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
           'game.time_invalid',
           `${where} has the time "${rawTime}", which cannot be read; it is unscheduled.`,
         );
-      else if (Number.isNaN(c) || c < 1)
+      else if (Number.isNaN(c) || c < 1 || c > MAX_SMALLINT)
         note('warning', 'game.court_invalid', `${where} is on court "${text(g.court)}"; it is unscheduled.`);
       else {
         const slot = `${rawDay}|${parsed.hhmm}|${c}`;
@@ -582,7 +655,7 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
           note(
             'warning',
             'game.slot_repeated',
-            `${where} shares its day, time and court with an earlier game; it is unscheduled.`,
+            `${where} is at the same day, time and court as an earlier game (written differently, so the old page showed both); it is unscheduled.`,
           );
         else {
           slots.add(slot);
@@ -595,8 +668,8 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
             );
           if (c > courts)
             note('warning', 'game.court_beyond', `${where} is on court ${c}, beyond the event's ${courts} court(s).`);
-          if (!days.includes(rawDay))
-            note('info', 'game.day_outside', `${where} is on ${rawDay}, which is not one of the event days.`);
+          // The old page showed every day that had games; the new one shows the event days.
+          if (!days.has(rawDay)) addedDays.add(rawDay);
         }
       }
     }
@@ -604,7 +677,11 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
     const team1 = resolveTeam(g.team1, divisionKey, where);
     let team2 = resolveTeam(g.team2, divisionKey, where);
     if (team1 && team2 && team1.code === team2.code) {
-      note('warning', 'game.same_team', `${where} has the same team on both sides; the second side shows as TBD.`);
+      note(
+        'warning',
+        'game.same_team',
+        `${where} has the same team on both sides; the second side shows as TBD. The old page counted it in the standings, so they can differ.`,
+      );
       team2 = null;
     }
 
@@ -632,18 +709,27 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
         );
       bracketIds.add(bracketGameId);
     }
+    const team1Source = isPlayoff ? source(g.team1Source) : null;
+    const team2Source = isPlayoff ? source(g.team2Source) : null;
+    for (const s of [team1Source, team2Source])
+      if (s?.type === 'winner' && (firstBracketRow.get(s.bracketGameId) ?? -1) > index)
+        note(
+          'warning',
+          'playoff.winner_later',
+          `${where} takes the winner of a game listed after it. On a fresh load both pages resolve playoffs in schedule order, so it shows TBD until that game is moved before it.`,
+        );
 
-    // Approval provenance, keyed by the gid the old app used.
-    const rawSource = gid ? sources[gid] : undefined;
+    // Approval provenance, keyed by the gid, for the row that keeps it.
+    const rawSource = keepsGid ? sources[gid] : undefined;
     const src: SourcePlan | null = isRecord(rawSource)
       ? {
           mobile_game_id: text(rawSource.mobileGameId) || null,
           league_id: text(rawSource.leagueId) || null,
-          s1: intOrNull(rawSource.s1),
-          s2: intOrNull(rawSource.s2),
-          home_pts: intOrNull(rawSource.homePts),
-          away_pts: intOrNull(rawSource.awayPts),
-          event_count: intOrNull(rawSource.eventCount),
+          s1: int32(rawSource.s1),
+          s2: int32(rawSource.s2),
+          home_pts: int32(rawSource.homePts),
+          away_pts: int32(rawSource.awayPts),
+          event_count: int32(rawSource.eventCount),
           last_event_at: isoTime(rawSource.lastEventAt),
           finished_at: isoTime(rawSource.finishedAt),
           approved_by_legacy: text(rawSource.approvedBy) || null,
@@ -669,39 +755,53 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
       type,
       is_playoff: isPlayoff,
       bracket_game_id: isPlayoff ? bracketGameId : null,
-      team1_source: isPlayoff ? source(g.team1Source) : null,
-      team2_source: isPlayoff ? source(g.team2Source) : null,
-      playoff_round: isPlayoff ? intOrNull(g.playoffRound) : null,
+      team1_source: team1Source,
+      team2_source: team2Source,
+      playoff_round: isPlayoff ? int32(g.playoffRound) : null,
       position: games.length,
       score: s1 === null && s2 === null ? null : { s1, s2 },
       source: src,
     });
-  });
+  }
 
-  if (counts.assigned)
+  if (addedDays.size)
     note(
-      'info',
-      'game.gid_assigned',
-      `${counts.assigned} game(s) had no id (older events) and were given one from their position.`,
+      'warning',
+      'event.day_added',
+      `${[...addedDays].sort().join(', ')} had games but was not an event day; added so its games still show.`,
     );
+  if (counts.assigned)
+    note('info', 'game.gid_assigned', `${counts.assigned} game(s) had no id and were given one from their position.`);
   if (counts.positionalUsed)
     note(
       'info',
       'score.by_position',
-      `${counts.positionalUsed} score(s) came from the old position-based store, as the old page showed them.`,
+      `${counts.positionalUsed} score(s) came from the position-based store, as the old page showed them.`,
     );
-  if (counts.rowScores)
+  if (counts.rowValues)
+    note(
+      'info',
+      'score.on_rows',
+      `${counts.rowValues} score(s) were stored on the schedule rows (the event has no score store), as the old page showed them.`,
+    );
+  if (counts.rowIgnored)
     note(
       'info',
       'game.row_scores',
-      `${counts.rowScores} schedule row(s) carried their own s1/s2, which the old page never showed; ignored.`,
+      `${counts.rowIgnored} schedule row(s) carried their own s1/s2, which the old page did not show; ignored.`,
     );
-  const orphanById = entries(scoresById).filter(([k]) => !originalGids.has(k)).length;
-  if (orphanById)
+  if (counts.storesDisagree)
+    note(
+      'warning',
+      'score.stores_disagree',
+      `${counts.storesDisagree} game(s) have a different score in the newer build's store; the live page's score is used.`,
+    );
+  const orphanPositions = entries(positional).filter(([k]) => !rows.some(([r]) => r === k)).length;
+  if (orphanPositions)
     note(
       'info',
       'score.orphan',
-      `${orphanById} score(s) belong to no game on the schedule (deleted games); not imported.`,
+      `${orphanPositions} score(s) belong to no game on the schedule (deleted games); not imported.`,
     );
   const orphanSources = Object.keys(sources).filter((k) => !originalGids.has(k)).length;
   if (orphanSources)
@@ -711,7 +811,6 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
       `${orphanSources} mobile approval record(s) belong to no game on the schedule; not imported.`,
     );
 
-  const status = raw.status === 'published' ? 'published' : 'draft';
   return {
     plan: {
       legacyId,
@@ -719,8 +818,8 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
         legacy_firebase_id: legacyId,
         legacy_created_by: text(raw.createdBy) || null,
         name: clip(raw.name, 200, 'The event name'),
-        status,
-        schedule_days: days,
+        status: raw.status === 'published' ? 'published' : 'draft',
+        schedule_days: [...new Set([...days, ...addedDays])].sort(),
         time_start: timeStart,
         time_end: timeEnd,
         courts,
