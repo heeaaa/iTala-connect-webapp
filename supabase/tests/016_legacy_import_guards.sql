@@ -78,6 +78,7 @@ select throws_ok($$select public.set_legacy_event_images('10000000-0000-0000-000
 select pg_temp.logout();
 -- The check inside the function holds even if EXECUTE were granted by mistake.
 grant execute on function public.import_legacy_event(uuid, jsonb, boolean) to authenticated;
+grant select on payload to authenticated;
 select pg_temp.login('00000000-0000-0000-0000-00000000a001');
 select throws_ok($$select public.import_legacy_event('00000000-0000-0000-0000-00000000a001', (select p from payload))$$,
   '42501', 'Only the migration import can import legacy events', 'the function refuses a signed-in caller itself');
