@@ -790,6 +790,78 @@ describe('the report', () => {
   });
 });
 
+describe('relinking the games of a deleted division (a person asks for it)', () => {
+  // A division recreated in the old app left its playoff pointing at the old key.
+  const raw = {
+    name: 'Relink',
+    scheduleDays: ['2026-10-04'],
+    divisions: { d_new: { name: 'Balik Laro', teams: { a: { name: 'A' }, b: { name: 'B' } } } },
+    schedule: [
+      {
+        day: '2026-10-04',
+        time: '9:00 AM',
+        court: 1,
+        divId: 'd_new',
+        team1: 'a',
+        team2: 'b',
+        type: 'group',
+        label: 'G',
+      },
+      {
+        day: '2026-10-04',
+        time: '11:00 AM',
+        court: 1,
+        divId: 'd_old',
+        team1: 'TBD',
+        team2: 'TBD',
+        type: 'final',
+        label: 'Final',
+        playoff: true,
+        bracketGameId: 'po_d_old_1',
+        team1Source: { type: 'seed', rank: 1 },
+        team2Source: { type: 'seed', rank: 2 },
+        playoffRound: 1,
+      },
+    ],
+    scores: [{ s1: 50, s2: 40 }],
+  };
+
+  it('left alone, the orphaned final has no division and stays TBD, as on the old page', () => {
+    const { plan, issues } = mapEvent('x', raw, opts);
+    expect(plan!.games[1]!.division_key).toBeNull();
+    expect(codes(issues)).toContain('game.division_missing');
+    expect(verifyEvent(raw, plan!, legacy)).toEqual([]);
+  });
+
+  it('relinked, the final belongs to the division and fills in from its standings, shown as the one difference', () => {
+    const { plan, issues } = mapEvent('x', raw, { ...opts, relink: { d_old: 'd_new' } });
+    expect(plan!.games[1]!.division_key).toBe('d_new');
+    expect(codes(issues)).not.toContain('game.division_missing');
+    expect(issues.find((i) => i.code === 'game.division_relinked')!.message).toBe(
+      '1 game(s) of the deleted division d_old were linked to "Balik Laro", as asked; its standings now seed them.',
+    );
+    expect(verifyEvent(raw, plan!, legacy)).toEqual([
+      { kind: 'playoff', where: 'game 2 ("Final")', old: '[null,null]', new: '["a","b"]' },
+    ]);
+  });
+
+  it('refuses a division that still exists or a target that does not, and notes a rule that moved nothing', () => {
+    const levels = (relink: Record<string, string>) =>
+      mapEvent('x', raw, { ...opts, relink })
+        .issues.filter((i) => i.code.startsWith('relink'))
+        .map((i) => [i.level, i.code]);
+    expect(levels({ d_new: 'd_new' })).toEqual([['error', 'relink.source_exists']]);
+    expect(levels({ d_old: 'd_gone' })).toEqual([['error', 'relink.target_missing']]);
+    expect(levels({ d_other: 'd_new' })).toEqual([['warning', 'relink.unused']]);
+    const plan = planImport(
+      { events: { x: raw } },
+      { ...opts, relink: { nope: { d_old: 'd_new' }, x: { d_old: 'd_new' } } },
+    );
+    expect(plan.issues.map((i) => [i.level, i.code])).toEqual([['error', 'relink.event_missing']]);
+    expect(plan.events[0]!.plan!.games[1]!.division_key).toBe('d_new');
+  });
+});
+
 describe('one broken event does not stop the rest', () => {
   it('reports an event that cannot be read, and still plans the others', () => {
     const unreadable = Object.defineProperty({}, 'scheduleDays', {
@@ -857,6 +929,9 @@ describe('npm run migrate:firebase', () => {
     expect(keys.status).toBe(2);
     expect(run().status).toBe(2);
     expect(run('--file', 'x.json', '--timezone', 'Mars/Base').stderr).toContain('is not a time zone');
+    expect(run(...file, '--relink-division=div_old').stderr).toContain(
+      '"div_old" is not <event id>:<old division key>=<new division key>.',
+    );
   }, 60_000);
 
   it('takes the keys from --env alone, and writes nowhere but the host named with --to', () => {

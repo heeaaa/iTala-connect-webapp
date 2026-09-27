@@ -2,6 +2,9 @@
  * npm run migrate:firebase -- --file <export.json> [--event=<id>]... [--timezone Pacific/Auckland] [--report <out.json>]
  * npm run migrate:firebase -- --file <export.json> --apply --owner <email> --env <file> --to <host>
  *     [--accept-differences=<id>]... [--overwrite=<id>]... [--skip-images] [--image-host <host>]...
+ * Either form also takes --relink-division=<event id>:<old division key>=<new division key>, which
+ * moves the games of a division deleted in the old app to one that exists (a person's choice,
+ * shown in the report).
  *
  * Imports the old Firebase database into iTala Connect (MIGRATION_PLAN.md
  * 12.1) from a JSON export made in the Firebase console. The old database is
@@ -60,6 +63,7 @@ const OPTIONS = {
   overwrite: { type: 'string', multiple: true },
   'skip-images': { type: 'boolean', default: false },
   'image-host': { type: 'string', multiple: true },
+  'relink-division': { type: 'string', multiple: true },
 } as const;
 
 function stop(message: string): never {
@@ -84,8 +88,15 @@ async function main() {
   for (const path of [values.file, values.report].filter(Boolean) as string[])
     if (inRepo(path)) console.warn(`Note: ${path} is inside the repository. Keep production data outside it.`);
 
+  const relink: Record<string, Record<string, string>> = {};
+  for (const rule of values['relink-division'] ?? []) {
+    const m = /^([^:]+):([^=]+)=(.+)$/.exec(rule);
+    if (!m) stop(`"${rule}" is not <event id>:<old division key>=<new division key>.`);
+    (relink[m[1]!] ??= {})[m[2]!] = m[3]!;
+  }
+
   const tree: unknown = JSON.parse(readFileSync(values.file, 'utf8'));
-  const plan = planImport(tree, { timezone, only: values.event });
+  const plan = planImport(tree, { timezone, only: values.event, relink });
   const legacy = loadLegacyCode();
   const report = importReport(plan, verifyAll(plan, legacy));
 

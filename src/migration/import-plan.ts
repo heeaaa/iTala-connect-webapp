@@ -27,7 +27,14 @@ export interface ImportPlan {
 
 const KNOWN_TOP = new Set(['events', 'platform']);
 
-export function planImport(tree: unknown, options: MapOptions & { only?: readonly string[] }): ImportPlan {
+export interface PlanOptions {
+  timezone: string;
+  only?: readonly string[];
+  /** Per event: games of a deleted division moved to one that exists (old key to new key). */
+  relink?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+}
+
+export function planImport(tree: unknown, options: PlanOptions): ImportPlan {
   const issues: Issue[] = [];
   if (!isRecord(tree)) {
     issues.push({
@@ -52,7 +59,8 @@ export function planImport(tree: unknown, options: MapOptions & { only?: readonl
     .filter(([key]) => !wanted || wanted.has(key))
     .map(([legacyId, raw]) => {
       try {
-        return { legacyId, raw, ...mapEvent(legacyId, raw, options) };
+        const mapOptions: MapOptions = { timezone: options.timezone, relink: options.relink?.[legacyId] };
+        return { legacyId, raw, ...mapEvent(legacyId, raw, mapOptions) };
       } catch (error) {
         // One unreadable event is reported; the rest of the export still plans.
         const message = `The event could not be read (${error instanceof Error ? error.message : String(error)}).`;
@@ -63,6 +71,13 @@ export function planImport(tree: unknown, options: MapOptions & { only?: readonl
     for (const id of wanted)
       if (!events.some((e) => e.legacyId === id))
         issues.push({ level: 'error', code: 'export.event_missing', message: `Event ${id} is not in the export.` });
+  for (const id of Object.keys(options.relink ?? {}))
+    if (!entries(tree.events).some(([key]) => key === id))
+      issues.push({
+        level: 'error',
+        code: 'relink.event_missing',
+        message: `A relink names event ${id}, which is not in the export.`,
+      });
 
   const platform = isRecord(tree.platform) ? tree.platform : {};
   const sponsorsNode = isRecord(platform.sponsors) ? platform.sponsors : {};

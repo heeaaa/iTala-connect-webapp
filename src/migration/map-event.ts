@@ -244,6 +244,8 @@ const cleanLabel = (label: string) => label.replaceAll(' — ', ' - ').replaceAl
 
 export interface MapOptions {
   timezone: string;
+  /** Games of a division that is gone, moved to one that exists: old division key to new. */
+  relink?: Readonly<Record<string, string>>;
 }
 
 export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): MappedEvent {
@@ -496,6 +498,18 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
   }
   const divisionKeys = new Set(divisions.map((d) => d.legacy_key));
 
+  // Relinking (a person's choice, --relink-division): games of a division that
+  // is gone move to one that exists. Only for divisions that really are gone.
+  const relink = new Map<string, string>();
+  for (const [from, to] of Object.entries(options.relink ?? {})) {
+    if (divisionKeys.has(from))
+      note('error', 'relink.source_exists', `Division ${from} still exists, so its games cannot be relinked.`);
+    else if (!divisionKeys.has(to))
+      note('error', 'relink.target_missing', `Division ${to} is not in this event, so games cannot be relinked to it.`);
+    else relink.set(from, to);
+  }
+  const relinked = new Map<string, number>();
+
   // --- Schedule and scores --------------------------------------------------
   const positional = raw.scores;
   const hasScoreStore = positional !== null && positional !== undefined;
@@ -617,11 +631,15 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
     }
     usedGids.add(legacyGid);
 
-    // Division.
+    // Division, or the one a person chose for games whose division is gone.
     const divId = text(g.divId);
     let divisionKey: string | null = null;
+    const relinkTo = divId ? relink.get(divId) : undefined;
     if (divId && divisionKeys.has(divId)) divisionKey = divId;
-    else if (divId)
+    else if (relinkTo) {
+      divisionKey = relinkTo;
+      relinked.set(divId, (relinked.get(divId) ?? 0) + 1);
+    } else if (divId)
       note(
         'warning',
         'game.division_missing',
@@ -772,6 +790,17 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
     });
   }
 
+  for (const [from, to] of relink) {
+    const n = relinked.get(from) ?? 0;
+    const name = divisions.find((d) => d.legacy_key === to)!.name;
+    if (n)
+      note(
+        'info',
+        'game.division_relinked',
+        `${n} game(s) of the deleted division ${from} were linked to "${name}", as asked; its standings now seed them.`,
+      );
+    else note('warning', 'relink.unused', `No game belongs to division ${from}, so nothing was relinked to "${name}".`);
+  }
   if (addedDays.size)
     note(
       'warning',

@@ -445,6 +445,22 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 - **CI run 36289258765 on `aee70e4`: green.** 80/80 E2E (the new link journey at both viewports), 257/257 pgTAP (with `013`), 29/29 integration, 800 unit and component tests, gitleaks clean.
 - **You, now that CI has passed:** push `20260927000400_division_mobile_link.sql` with the other 27/09 migrations (`npx supabase migration list`, then `npx supabase db push --dry-run`, then `npx supabase db push`).
 
+### Phase 7: the first dry run on the real export (27/09/2026)
+
+- **Migrations 0100 to 0700 are on the hosted project** (Aeron, 27/09/2026).
+- **The export** (kept outside the repository) holds **2 events**, both published:
+  - **BATANG PINOY BASKETBALL:** 2 divisions, 21 teams, 241 players, 85 games (13 playoff, 30 scored), 4 images.
+  - **BROTHERHOOD BASKETBALL:** 1 division, 10 teams, 53 games (7 playoff, 10 scored), 2 images.
+  - **Platform:** 1 secondary sponsor; no default rules.
+- **First run:** both READY, 0 errors, **0 differences** from the old page, 8 warnings.
+  - No `score.stores_disagree` and no `playoff.winner_later`, so neither open question needs a decision.
+- **Fixed:** two sponsors were left out as "not PNG, JPEG or WebP". They are JPEGs named `.jfif` (as Windows saves them); `.jfif` and `.jpe` now count as JPEG, and the downloaded bytes are still checked (red with the old list, green after).
+- **Five orphaned playoff games:** Batang Pinoy's BALIK LARO 35+ playoff (quarters 3v6 and 4v5, semis against 1st and 2nd, the final) points at a division deleted in the old app (`div_1787948790749`). The division was recreated as BPBL BALIKLARO 35+ (`div_1788378775661`, 7 teams, 21 group games, no playoff of its own). On the old site those games can never fill in.
+  - **Aeron's decision:** link them to the current division. New option `--relink-division=<event id>:<old key>=<new key>` (refused when the old division still exists or the new one does not; the report notes the games moved).
+  - With it, the dry run shows both events READY, 0 errors, 1 warning (`event.newer_build`), 0 differences. There are no differences yet because that round robin is unfinished; when it is complete the new page fills the bracket in, and a later check would list that as a difference to accept.
+- **Also decided:** the OPEN division's two finals on 12/12 ("DIVISION 2 - Finals" 3:30 PM, "DIVISION 1 - Finals" 5:30 PM, the same match-up) are both kept; delete one in the editor if it is a mistake.
+- **Next:** CI on the relink commit, then the real import into the hosted project with `--apply`.
+
 ### Phase 7: the writer review and its guards (27/09/2026)
 
 - **CI run 36293322920 on `1db64c5` (7c): green**: 860 unit and component tests, **302/302 pgTAP**, **36/36 integration** (with the real bucket round trip), 80/80 E2E.
