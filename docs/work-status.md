@@ -14,7 +14,7 @@ Last updated: 26/09/2026 (Claude, work laptop)
 - This is the first real-Supabase proof of the Phase 3b guard (signed-in Sign out and Back), publish and published editing.
 - The first run failed only on my new publish E2E: `getByRole('alert')` also matched Next's route announcer. That was fixed by scoping to `main`.
 
-Latest green run: **36277814542 on `cd13f54` (6b plus the fixture fix): 78/78 E2E, 246/246 pgTAP, 29/29 integration.** Before that: **36275201647 on `3a46ce9` (5e done, journey 4 added): 76/76 E2E with no retries, 238/238 pgTAP**, with integration, unit coverage, lint, typecheck, build, `check:secrets` and gitleaks all passing. Earlier: 36246633926 on `562592f` (5e-1): 72/72 E2E, 220/220 pgTAP. Before that: 36240866715 on `b2315e2` (5d): 70/70 E2E, 207/207 pgTAP, 22/22 integration. The run before that (36239532684 on `8919912`) had one flaky retry in the Phase 3b guard test, a timing bug in the test that `b2315e2` fixed (see the 5d section). Before 5d: 36234713687 on `167c8e7` (5c-3) was 68/68 E2E with 180 pgTAP. Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
+Latest green run: **36289258765 on `aee70e4` (6c, Phase 6 complete): 80/80 E2E, 257/257 pgTAP, 29/29 integration, 800 unit and component tests**, with lint, typecheck, build, `check:secrets` and gitleaks passing. Before that: 36277814542 on `cd13f54` (6b plus the fixture fix): 78/78 E2E, 246/246 pgTAP. Earlier: **36275201647 on `3a46ce9` (5e done, journey 4 added): 76/76 E2E with no retries, 238/238 pgTAP**, with integration, unit coverage, lint, typecheck, build, `check:secrets` and gitleaks all passing. Earlier: 36246633926 on `562592f` (5e-1): 72/72 E2E, 220/220 pgTAP. Before that: 36240866715 on `b2315e2` (5d): 70/70 E2E, 207/207 pgTAP, 22/22 integration. The run before that (36239532684 on `8919912`) had one flaky retry in the Phase 3b guard test, a timing bug in the test that `b2315e2` fixed (see the 5d section). Before 5d: 36234713687 on `167c8e7` (5c-3) was 68/68 E2E with 180 pgTAP. Check the PR's latest run after each push (`gh pr checks 1`). The Docker PC is no longer required for routine verification.
 
 **Important for the Docker PC:** 5b adds migration `20260926000500_event_editor.sql` (replaces `save_draft_editor` with `save_event_editor`). Apply it (`npm run db:reset` on the local stack), then run `npm run db:types`. `src/lib/supabase/database.types.ts` was hand-edited for the new function and must come out with **no diff**; if it differs, keep the generated file.
 
@@ -27,7 +27,7 @@ npm run lint && npm run typecheck && npm run test:coverage
 npm run build && npm run check:secrets && npm run test:e2e
 ```
 
-- Expected: **80 E2E tests** (78 green at `cd13f54` plus the 6c link wizard journey at two viewports) and **257 pgTAP assertions** (246 green in CI plus 11 in `013_division_mobile_link.sql`). Run `npm run db:reset` for the new migrations; `npm run db:types` must show no diff.
+- Expected: **80 E2E tests** and **257 pgTAP assertions** (both green in CI at `aee70e4`). Run `npm run db:reset` for the new migrations; `npm run db:types` must show no diff.
 - Expected: **29 integration tests** (22 plus 7 in `admin-accounts.test.ts`).
 - Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
 
@@ -442,8 +442,8 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 - **Server:** `saveMobileLink` checks sign-in, the integration, input and ownership, refuses duplicates before any read, reads the league and its teams from the mobile app again (the league name and season come from there, never the browser), and checks every team belongs to the division and every mobile team to the league. Migration `20260927000400_division_mobile_link.sql` adds `set_division_mobile_link` (security invoker, editor check, link and team map replaced together) and records a wizard link or re-link in the audit log as `division.mobile_link` (imports keep `event.mobile_import`). pgTAP `013_division_mobile_link.sql` (11 assertions).
 - **Tests:** `mobile-link` unit (7: starting pairs, duplicates, wording, labels, and the action's checks), `link-view` component (8), `results-view` (+1, the Linked confirmation and focus, red with the focus removed), `event-editor` (+2, the button). New E2E `mobile-link.spec.ts`: a hand-made division linked from the editor, the duplicate refusal, save, the Linked line with focus, the result ready on the fixture, the stored link, team map and audit entry, the wizard reopening on the saved pairs, and zero mobile writes.
 - **Evidence (work laptop):** lint and typecheck pass; `test:coverage` 55 files, **800 tests pass**; a clean build and `check:secrets` pass. Harness (link wizard, sample data) at 390 and 1440 px: axe clean, no sideways scroll, 44 px targets, duplicate marked and refused with focus kept, a server refusal with focus kept, the clash note and the unreachable state; the results inbox specs still pass (6/6). Captures `.impeccable/review/phase6/{mobile,desktop}/link-*.png`.
-- Not run on the laptop: pgTAP `013` and `mobile-link.spec.ts`. CI runs them.
-- **You, after CI passes:** push `20260927000400_division_mobile_link.sql` with the other 27/09 migrations.
+- **CI run 36289258765 on `aee70e4`: green.** 80/80 E2E (the new link journey at both viewports), 257/257 pgTAP (with `013`), 29/29 integration, 800 unit and component tests, gitleaks clean.
+- **You, now that CI has passed:** push `20260927000400_division_mobile_link.sql` with the other 27/09 migrations (`npx supabase migration list`, then `npx supabase db push --dry-run`, then `npx supabase db push`).
 
 ### Phase 5 plan (remaining slices)
 
