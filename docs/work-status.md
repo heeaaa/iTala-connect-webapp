@@ -27,7 +27,7 @@ npm run lint && npm run typecheck && npm run test:coverage
 npm run build && npm run check:secrets && npm run test:e2e
 ```
 
-- Expected: **86 E2E tests** (82 green in CI at `cc8e949` plus 4 in `event-address.spec.ts`), **357 pgTAP assertions** (329 plus 28 in `017_event_slugs.sql`) and **37 integration tests**. Run `npm run db:reset` for the new migrations; `npm run db:types` must show no diff.
+- Expected: **86 E2E tests** (82 green in CI at `cc8e949` plus 4 in `event-address.spec.ts`), **360 pgTAP assertions** (329 plus 31 in `017_event_slugs.sql`) and **37 integration tests**. Run `npm run db:reset` for the new migrations; `npm run db:types` must show no diff.
 - Expected: **29 integration tests** (22 plus 7 in `admin-accounts.test.ts`).
 - Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
 
@@ -467,7 +467,7 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 - **Tests:**
   - unit tests: `event-slug` (36, with 25 names holding TypeScript to the SQL results), `slug-actions` (16), and updates to the public loader, import and migrate tests;
   - component tests: `slug-field` (11);
-  - pgTAP `017_event_slugs.sql` (28 assertions: defaults, clashes with current and old addresses, RLS for the public, owner and another admin, audit, grants, deletion);
+  - pgTAP `017_event_slugs.sql` (31 assertions: defaults, clashes with current and old addresses, RLS for the public, owner and another admin, audit, grants, deletion). The first CI run stopped at check 20: the test called `create_draft_event` inside a `WHERE`, which runs once per row, so the second call found its own address taken. Each create now runs in its own statement and is checked in the next;
   - E2E `event-address.spec.ts` (2 journeys at 2 sizes); `public-event.spec.ts` now expects the old link to land on the address.
 - **Evidence (work laptop):**
   - lint and typecheck pass; `test:coverage` 65 files, **957 tests pass** (97.5% lines, 94.9% branches); a clean build and `check:secrets` pass;
@@ -476,7 +476,19 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
   - Captures: `.impeccable/review/address/{mobile,desktop}/`. After the first look, two fixes: the "Use …" suggestion became a lower-case text button (as a plate it was upper case and too wide for a phone), and the confirmation shortened to "Address changed." (the note already says old addresses forward).
   - One real bug found there and fixed: typing in the middle of the address sent the caret to the end.
 - **Not run on the laptop:** pgTAP, integration and E2E (CI runs them).
+- **The first push (`7262648`, run 36314325944) was red twice, both fixed:**
+  - pgTAP 017 stopped at check 20 (see Tests above), so integration and E2E did not run.
+  - Netlify's deploy preview failed in `next build`'s TypeScript step: `src/migration/apply.ts` saw `path` as possibly undefined behind `'path' in r`. Netlify restores the previous build's cache, and with that cache the inferred result type of `copyImage` widened. A fresh check (CI's Typecheck, the laptop without a cache) passed, which is why I first took it for a stale cache.
+  - Reproduced in a worktree: a typecheck of `origin/main` to build the cache, then this branch gave the same 5 errors as the Netlify log. Fixed by writing out `copyImage`'s result type; the same sequence then gave 0 errors.
 - **Before merging:** push `20260927000800_event_slugs.sql` to the hosted project first (`npx supabase db push`). The new code reads `events.slug`; the old code keeps working with the migration in place.
+
+### Hand cursor and README (28/09/2026)
+
+- **Hand cursor (The Hand Rule, DESIGN.md):** asked whether the hand was intended. A probe of every point on the home page, the editor, New event and the public game-day page found no hand over anything that cannot be clicked. The home event rows are whole-row links, which is why the hand covers most of the page. But many clickable controls showed the arrow: Expand all and Collapse all, date picker days and Remove chips, Remove team and division, game Edit, colour pickers and dropdowns.
+  - One base-layer rule in `src/app/globals.css` now gives every enabled button, disclosure heading, dropdown and picker the hand, and disabled ones the arrow.
+  - A component's own cursor still wins: busy plates show progress, and the Move handle shows grab.
+  - Re-probed: no hand without a target, and no target without a hand (bar the Move handle's grab). The probe (`test-results/guard/cursor.spec.ts`) is not committed.
+- **README:** "Deploying to Netlify" became a short "Deploying" section: where it builds, migrations first, the variable names, the Supabase URL settings and the cutover note. The one-off first-deploy steps are in "Live on Netlify" and "Deploying to Netlify: prepared" below.
 
 ### Compare rosters, read only (PRD M-11, New, 27/09/2026)
 

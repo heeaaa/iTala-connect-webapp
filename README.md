@@ -62,39 +62,11 @@ scripts/         check-secrets, local-env, create-admin
 tests/           unit, component, integration, e2e
 ```
 
-## Deploying to Netlify
+## Deploying
 
-The hosted Supabase project is `https://ephhjzrkbjrhcjrwtknn.supabase.co`. The site deploys from GitHub (`main`) on Netlify's free tier, with the build settings in `netlify.toml`. Environment values go in Netlify, never in the repository.
+The site (https://itala-connect.netlify.app) is built by Netlify's free tier from `main`, with the settings in `netlify.toml`: the build runs `check:secrets`, and Node comes from `.nvmrc`. Every merge into `main` deploys.
 
-**Before the first deploy (Supabase dashboard):**
-
-1. Migrations are pushed: `npx supabase link --project-ref ephhjzrkbjrhcjrwtknn`, then `npx supabase db push`. After any new migration, push it before (or with) the deploy that needs it.
-2. Authentication: public **sign-ups off** and **anonymous sign-ins off** for this project (the local `supabase/config.toml` does not change the hosted project).
-3. A superadmin account exists, to sign in with and to create the other admins on the Admins screen.
-
-**Netlify, once:**
-
-1. Add a new project, import from GitHub, choose `heeaaa/iTala-connect-webapp`, production branch **`main`**. Leave the build settings to `netlify.toml` (build `npm run build && npm run check:secrets`; the publish directory is set by Netlify's Next.js adapter; Node 24 from `.nvmrc`). Never drag and drop a folder.
-2. Environment variables (Project configuration > Environment variables), available to builds and functions:
-
-   | Name | Value | Mark "contains secret values"? |
-   | --- | --- | --- |
-   | `NEXT_PUBLIC_SUPABASE_URL` | `https://ephhjzrkbjrhcjrwtknn.supabase.co` | No |
-   | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the project's publishable key (`sb_publishable_...`) | No: public by design |
-   | `NEXT_PUBLIC_SITE_URL` | the site's own address, for example `https://<name>.netlify.app` (later `https://connect.itala.fyi`) | No |
-   | `SUPABASE_SECRET_KEY` | the project's secret key (`sb_secret_...`) | **Yes** |
-   | `SUPABASE_STORAGE_BUCKET` | `images` | No |
-   | `DEFAULT_EVENT_TIMEZONE` | `Pacific/Auckland` (or `America/Vancouver`) | No |
-   | `MOBILE_SUPABASE_URL`, `MOBILE_SUPABASE_PUBLISHABLE_KEY` | leave **unset** until the real mobile check; setting them turns the mobile features on | **Yes** (server only) |
-
-   Never set `ENABLE_PROTOTYPES` or any `FIREBASE_*` value on Netlify.
-3. Security: keep deploy previews for pull requests from forks behind approval (the sensitive variable policy), so outside code never builds with the secret key.
-4. Back in Supabase, Authentication > URL Configuration: set the **Site URL** to the Netlify address and add `https://<name>.netlify.app/**` to the **Redirect URLs**. Without it, sign-in and the Admins screen's set-up links point to the wrong place. Google sign-in, if on, keeps its Supabase callback in the Google console; nothing changes there.
-
-**First deploy, then check:**
-
-- The build log shows `check:secrets passed`. If Netlify's own secret scanning stops the build on the publishable key (smart detection), add that one value to `SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES`; it is public by design. Never safelist the secret key.
-- The home page loads; `/admin` sends you to sign in; you can sign in as superadmin; the Admins screen opens, and a set-up link it makes starts with the Netlify address (not `localhost`).
-- The response headers include `Content-Security-Policy` and `Strict-Transport-Security`.
-
-**After that:** every merge into `main` deploys. Work continues on a branch and reaches the site through a pull request once CI is green. Moving `connect.itala.fyi` to Netlify is the cutover step (docs/MIGRATION_PLAN.md 12.2), not part of this setup; when it happens, update `NEXT_PUBLIC_SITE_URL` and the Supabase URL configuration to the new address.
+- **Migrations first.** Push new migrations to the hosted Supabase project (`npx supabase db push`) before merging the code that needs them.
+- **Environment values** live in Netlify (Project configuration > Environment variables), never in the repository: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SITE_URL`, `SUPABASE_SECRET_KEY` (marked as secret), `SUPABASE_STORAGE_BUCKET` and `DEFAULT_EVENT_TIMEZONE`. Leave `MOBILE_*` unset until the real mobile check, and never set `ENABLE_PROTOTYPES` or `FIREBASE_*`.
+- **Supabase Auth** (URL Configuration): the Site URL is the site's address and the Redirect URLs include `https://itala-connect.netlify.app/**`, or sign-in and set-up links go to the wrong place. Public sign-ups and anonymous sign-ins stay off.
+- Moving `connect.itala.fyi` here is the cutover (docs/MIGRATION_PLAN.md 12.2); update `NEXT_PUBLIC_SITE_URL` and the Supabase URLs then.
