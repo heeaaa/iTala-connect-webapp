@@ -40,6 +40,7 @@ Set-up links expire after Supabase Auth's email link lifetime (1 hour by default
 | `npm run test:e2e` | Playwright journeys at 390 px and 1440 px (run `npm run build` first) |
 | `npm run build` | Production build |
 | `npm run golden:generate` | Rewrite `tests/golden/*.json` from the legacy code in `scripts/golden/legacy` (only when the case list changes; never to make a test pass) |
+| `npm run migrate:firebase -- --file <export.json>` | Dry run of the Firebase import: plans every event from a Firebase console JSON export and prints the verification report (counts, issues, and the old code's standings and playoff teams against the new code's). Writes nothing. Give event ids as `--event=<id>`; keep the export outside the repository |
 | `npm run check:secrets` | Fails if any server-only value or secret pattern is in `.next/static` |
 | `npm run db:reset` | Recreate the local database from migrations |
 | `npm run db:types` | Regenerate `src/lib/supabase/database.types.ts` |

@@ -1,0 +1,311 @@
+{
+  "events": {
+    "-P1JcLF-aaaaaaaaaaaa": {
+      "name": "Harbour Spring Cup",
+      "status": "published",
+      "createdBy": "superadmin",
+      "scheduleDays": ["2026-10-03"],
+      "timeStart": "09:00",
+      "timeEnd": "20:00",
+      "courts": 2,
+      "courtNames": ["Centre", "Court 2"],
+      "logo": "https://old-images.example.test/storage/v1/object/public/images/events/a/logo_1.png",
+      "theme": {
+        "primary": "#ffcc00",
+        "bg": "#0D0D0D",
+        "textPrimary": "#E0E0E0",
+        "textSecondary": "#888888",
+        "headingColor": "#FFF"
+      },
+      "sponsors": {
+        "major": "https://old-images.example.test/storage/v1/object/public/images/events/a/major_1.png",
+        "minor": ["data:image/jpeg;base64,/9j/4AAQSkZJRg==", "https://old-images.example.test/minor_2.png"]
+      },
+      "rulesHtml": "<p>Two halves</p><script>alert(1)</script>",
+      "scoresMigratedAt": 1757900000000,
+      "divisions": {
+        "div_1757000000000": {
+          "name": "Open",
+          "color": "#6C63FF",
+          "bracketCount": 1,
+          "customGamesPerTeam": false,
+          "playoff": false,
+          "seedBracket": false,
+          "teams": {
+            "t_1757000000003_cccc": { "name": "Kea", "coach": "Lou" },
+            "t_1757000000001_aaaa": {
+              "name": "Harbour Hawks",
+              "coach": "Sam",
+              "players": [
+                { "name": "Ana", "num": "7" },
+                { "name": "Ben", "num": 12 }
+              ]
+            },
+            "t_1757000000002_bbbb": {
+              "name": "Night Owls",
+              "coach": "",
+              "players": { "0": { "name": "Cai", "num": "3" } }
+            }
+          },
+          "mobileLink": {
+            "leagueId": "league-open",
+            "leagueName": "Harbour League",
+            "season": "2026",
+            "linkedAt": 1757800000000,
+            "linkedBy": "superadmin",
+            "teams": { "t_1757000000001_aaaa": "team-hawks", "t_1757000000002_bbbb": "team-owls" }
+          }
+        }
+      },
+      "schedule": [
+        {
+          "gid": "g_a1",
+          "day": "2026-10-03",
+          "time": "9:00 AM",
+          "court": 1,
+          "divId": "div_1757000000000",
+          "team1": "t_1757000000001_aaaa",
+          "team2": "t_1757000000002_bbbb",
+          "label": "Open",
+          "type": "group"
+        },
+        {
+          "gid": "g_a2",
+          "day": "2026-10-03",
+          "time": "9:00 AM",
+          "court": 2,
+          "divId": "div_1757000000000",
+          "team1": "t_1757000000003_cccc",
+          "team2": "t_1757000000001_aaaa",
+          "label": "Open",
+          "type": "group"
+        },
+        {
+          "gid": "g_a3",
+          "day": "2026-10-03",
+          "time": "11:00 AM",
+          "court": 1,
+          "divId": "div_1757000000000",
+          "team1": "t_1757000000002_bbbb",
+          "team2": "t_1757000000003_cccc",
+          "label": "Open",
+          "type": "group"
+        },
+        {
+          "gid": "g_a4",
+          "day": "2026-10-03",
+          "time": "1:00 PM",
+          "court": 1,
+          "divId": "div_1757000000000",
+          "team1": "TBD",
+          "team2": "TBD",
+          "label": "Open — Finals",
+          "type": "final",
+          "playoff": true,
+          "bracketGameId": "po_div_1757000000000_1",
+          "team1Source": { "type": "seed", "rank": 1 },
+          "team2Source": { "type": "seed", "rank": 2 },
+          "playoffRound": 1
+        },
+        {
+          "gid": "g_a5",
+          "day": "",
+          "time": "",
+          "court": 1,
+          "divId": "div_1757000000000",
+          "team1": "t_1757000000001_aaaa",
+          "team2": "t_1757000000003_cccc",
+          "label": "Open",
+          "type": "group",
+          "_idx": 4
+        },
+        {
+          "gid": "g_a6",
+          "day": "2026-10-03",
+          "time": "3:00 PM",
+          "court": 1,
+          "divId": "div_1757000000000",
+          "team1": "TBD",
+          "team2": "TBD",
+          "label": "Open — Challenge",
+          "type": "final",
+          "playoff": true,
+          "bracketGameId": "po_div_1757000000000_2",
+          "team1Source": { "type": "winner", "bracketId": "po_div_1757000000000_1" },
+          "team2Source": { "type": "seed", "rank": 3 },
+          "playoffRound": 2
+        }
+      ],
+      "scores": [{ "s1": 1, "s2": 2 }],
+      "scoresById": {
+        "g_a1": { "s1": 58, "s2": 51 },
+        "g_a2": { "s1": 40, "s2": 45 },
+        "g_a3": { "s1": 60, "s2": 55 },
+        "g_a4": { "s1": 70, "s2": 72 },
+        "g_a5": { "s1": 50, "s2": "52" },
+        "g_a6": { "s1": 10 }
+      },
+      "scoreSources": {
+        "g_a1": {
+          "mobileGameId": "fin-result",
+          "leagueId": "league-open",
+          "s1": 58,
+          "s2": 51,
+          "homePts": "58",
+          "awayPts": "51",
+          "eventCount": 48,
+          "lastEventAt": "2026-10-03T09:40:00.000Z",
+          "finishedAt": 1759484400000,
+          "approvedBy": "superadmin",
+          "approvedAt": 1759485000000,
+          "method": "manual"
+        }
+      }
+    },
+    "-P0Zslb-bbbbbbbbbbbb": {
+      "name": "Winter Social",
+      "status": "draft",
+      "createdBy": "admin",
+      "scheduleDays": ["2026-10-10", "2026-10-10", "not-a-day"],
+      "timeStart": "",
+      "timeEnd": "18:00",
+      "courts": "3",
+      "courtNames": ["A", "", "C", "D"],
+      "logo": "",
+      "divisions": {
+        "div_1756000000000": {
+          "name": "Mixed",
+          "color": "#2BBF8A",
+          "teams": {
+            "t_1756000000001_xxxx": { "name": "Rimu" },
+            "t_1756000000002_yyyy": { "name": "Totara" },
+            "t_1756000000003_zzzz": { "name": "Kauri" }
+          }
+        }
+      },
+      "schedule": [
+        {
+          "day": "2026-10-10",
+          "time": "9:00 AM",
+          "court": 1,
+          "divId": "div_1756000000000",
+          "bracketId": "A",
+          "team1": "t_1756000000001_xxxx",
+          "team2": "t_1756000000002_yyyy",
+          "label": "Mixed — Group A",
+          "type": "group"
+        },
+        {
+          "day": "2026-10-10",
+          "time": "09:00pm",
+          "court": 2,
+          "divId": "div_1756000000000",
+          "team1": "t_1756000000002_yyyy",
+          "team2": "t_1756000000003_zzzz",
+          "label": "Mixed",
+          "type": "group"
+        },
+        {
+          "day": "2026-10-10",
+          "time": "9:00 AM",
+          "court": 1,
+          "divId": "div_1756000000000",
+          "team1": "t_1756000000003_zzzz",
+          "team2": "t_1756000000001_xxxx",
+          "label": "Mixed",
+          "type": "group"
+        },
+        {
+          "day": "TBD",
+          "time": "",
+          "court": 1,
+          "divId": "div_1756000000000",
+          "team1": "t_1756000000001_xxxx",
+          "team2": "t_deleted_team",
+          "label": "Mixed",
+          "type": "group"
+        },
+        {
+          "day": "2026-10-10",
+          "time": "11:00 AM",
+          "court": 3,
+          "divId": "div_1756000000000",
+          "team1": "t_1756000000001_xxxx",
+          "team2": "t_1756000000003_zzzz",
+          "label": "Mixed",
+          "type": "group",
+          "s1": 99
+        }
+      ],
+      "scores": [{ "s1": 50, "s2": 40 }, { "s1": 30, "s2": -5 }, { "s1": 12 }, null, { "s1": 20, "s2": 20 }]
+    },
+    "-P1WYkLVcccccccccccc": {
+      "name": "Club Night",
+      "status": "published",
+      "createdBy": "superadmin",
+      "scheduleDays": ["2026-10-17"],
+      "timeStart": "18:00",
+      "timeEnd": "22:00",
+      "courts": 1,
+      "courtNames": ["Court 1"],
+      "divisions": {
+        "div_c1": {
+          "name": "Premier",
+          "color": "not-a-colour",
+          "bracketCount": 7,
+          "customGamesPerTeam": true,
+          "gamesPerTeam": 25,
+          "teams": { "t_c1": { "name": "Alpha" }, "t_c2": { "name": "Beta" } }
+        },
+        "div_c2": { "name": "Reserve", "color": "#E06040", "teams": { "t_c1": { "name": "Alpha Two" } } }
+      },
+      "schedule": {
+        "0": {
+          "gid": "g_c1",
+          "day": "2026-10-17",
+          "time": "7:00 PM",
+          "court": 1,
+          "divId": "div_c1",
+          "team1": "t_c1",
+          "team2": "t_c2",
+          "label": "Premier",
+          "type": "group"
+        },
+        "2": {
+          "gid": "g_c1",
+          "day": "2026-10-17",
+          "time": "8:00 PM",
+          "court": 1,
+          "divId": "div_gone",
+          "team1": "t_c2",
+          "team2": "t_c1",
+          "label": "Friendly",
+          "type": "group"
+        },
+        "3": "junk",
+        "4": {
+          "day": "2026-10-17",
+          "time": "9:00 PM",
+          "court": 1,
+          "divId": "div_c1",
+          "team1": "t_c1",
+          "team2": "t_c1",
+          "label": "Premier",
+          "type": "playoffish"
+        }
+      },
+      "scores": { "2": { "s1": 9, "s2": 9 } },
+      "scoresById": { "g_c1": { "s1": 3, "s2": 1 }, "g_orphan": { "s1": 1, "s2": 1 } },
+      "scoreSources": { "g_gone": { "mobileGameId": "fin-x" } }
+    },
+    "broken": "just a string"
+  },
+  "platform": {
+    "sponsors": {
+      "primary": ["https://old-images.example.test/platform/p1.png"],
+      "secondary": { "0": "data:image/png;base64,iVBORw0KGgo=", "1": "junk" }
+    },
+    "defaultRulesHtml": "<p>Be kind</p><img src=x onerror=alert(1)>"
+  },
+  "legacyStuff": { "x": 1 }
+}

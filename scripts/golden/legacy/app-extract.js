@@ -147,6 +147,67 @@ function parseTimeMin(t){
   return h*60+mi;
 }
 
+/* app.js 1540-1582 (added 27/09/2026 for the Firebase importer's
+   verification, MIGRATION_PLAN.md 12.1; same file and hash) */
+function newGid(){
+  return "g_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,8);
+}
+
+/* Give every fixture a gid. Returns true if anything was added, so the
+   caller can decide whether a save is warranted. Pure and idempotent. */
+function ensureGameIds(evt){
+  if(!evt||!evt.schedule||!evt.schedule.length)return false;
+  var seen={},changed=false;
+  evt.schedule.forEach(function(g){
+    // A duplicated gid is as dangerous as a missing one — a copy/paste of a
+    // fixture object would otherwise make two games share a score.
+    if(!g.gid||seen[g.gid]){g.gid=newGid();changed=true;}
+    seen[g.gid]=true;
+  });
+  return changed;
+}
+
+/* One-time migration for an event created before gids existed: assign the
+   ids and copy each positional score across to its fixture's gid. Safe to
+   run repeatedly — it only writes when something is actually missing, and
+   it never deletes the legacy keys. Admin-only; the caller must check. */
+/* A score written one input at a time is stored as {s1:12} — Firebase
+   drops null children — so reading it back gives s2 === undefined. Passing
+   undefined to a Firebase update THROWS, which would abort the migration
+   on every page load, forever, with nothing but a console line. */
+function normScore(s){
+  return {
+    s1: (s && s.s1 !== undefined) ? s.s1 : null,
+    s2: (s && s.s2 !== undefined) ? s.s2 : null
+  };
+}
+
+/* Rendering decorates schedule rows in place: renderPublicScheduleBody
+   stamps _idx on every row, and resolveAllPlayoffs overwrites team1/team2
+   on bracket rows with whatever resolves right now (usually "TBD"). None
+   of that belongs in the database, so anything written back is taken from
+   a freshly read copy, never from the copy the renderer has touched. */
+function cleanScheduleRow(g){
+  var out={};
+  Object.keys(g).forEach(function(k){ if(k.charAt(0)!=="_") out[k]=g[k]; });
+  return out;
+}
+
+/* app.js 1673-1685 (added 27/09/2026, as above) */
+function applyScoresToSchedule(evt,scores,scoresById){
+  if(!evt.schedule)return;
+  // No early return when both nodes are empty: clearScores() empties them,
+  // and bailing here would leave the deleted scores on screen and in the
+  // standings until a reload.
+  var migrated=!!evt.scoresMigratedAt;
+  evt.schedule.forEach(function(g,i){
+    var s=null;
+    if(g.gid&&scoresById&&scoresById[g.gid])s=scoresById[g.gid];
+    else if(!migrated&&scores&&scores[i])s=scores[i];
+    if(s){g.s1=s.s1;g.s2=s.s2;}else{g.s1=null;g.s2=null;}
+  });
+}
+
 /* harness: renderPublicStandings (app.js 1940-1958) computes the table
    inline; lines 1943-1955 below are verbatim, returning `sorted` instead
    of building HTML. */
@@ -263,5 +324,9 @@ module.exports = {
   resolveAllPlayoffs: resolveAllPlayoffs,
   publicStandings: publicStandings,
   generatePlayoff: generatePlayoff,
-  parseTimeMin: parseTimeMin
+  parseTimeMin: parseTimeMin,
+  ensureGameIds: ensureGameIds,
+  normScore: normScore,
+  cleanScheduleRow: cleanScheduleRow,
+  applyScoresToSchedule: applyScoresToSchedule
 };
