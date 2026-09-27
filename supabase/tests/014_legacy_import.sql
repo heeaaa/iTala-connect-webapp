@@ -195,6 +195,7 @@ select results_eq(
   $$values ('Harbour Spring Cup 2026')$$, 'and the failed import changed nothing');
 
 -- Ordinary changes after the import are audited as before.
+grant select on ids to authenticated;
 select pg_temp.login('00000000-0000-0000-0000-00000000e002');
 select lives_ok($$select public.set_score((select g1 from ids), 60, 51)$$, 'the owner records a score');
 select pg_temp.logout();
