@@ -445,6 +445,27 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 - **CI run 36289258765 on `aee70e4`: green.** 80/80 E2E (the new link journey at both viewports), 257/257 pgTAP (with `013`), 29/29 integration, 800 unit and component tests, gitleaks clean.
 - **You, now that CI has passed:** push `20260927000400_division_mobile_link.sql` with the other 27/09 migrations (`npx supabase migration list`, then `npx supabase db push --dry-run`, then `npx supabase db push`).
 
+### Compare rosters, read only (PRD M-11, New, 27/09/2026)
+
+- **Asked for by Aeron:** a read-only side-by-side of each team's players in iTala Connect and in its paired mobile team, sorted by jersey number and name, with a note of same or different. **Decisions:** one page per division, and two plain lists per team with one note (no player-by-player matching).
+- **`/admin/events/[eventId]/divisions/[divisionId]/mobile-rosters`** (owner or superadmin; 404 when the integration is off), reached from a linked division's card in the editor ("Compare rosters").
+  - Pure `src/lib/mobile-rosters.ts` handles the sorting and the notes. Jersey numbers sort in number order, then others (such as 12A), then none, and "0" comes before "00". Two lists count as the same whatever the order, letter case or spacing, but "0", "00" and "04" are different numbers.
+  - Loader `src/server/mobile/rosters.ts`: iTala Connect through the signed-in session; the mobile app only through the existing GET-only reader (`preview`, which already reads each team's players).
+  - States covered: not linked, league gone, unreachable, a team not paired, a team-only mobile team, and mobile teams paired with nobody.
+  - Nothing is written anywhere: the only control is Refresh.
+- **Also fixed:**
+  - a long dash in the league import preview for a missing number is now "-", labelled "No number" (organisation rule);
+  - a plain link inside a note or notice is now underlined in the accent (it looked like plain text).
+- **Tests:**
+  - unit tests: `mobile-rosters` (5: order, sameness, the notes; one real ordering bug found and fixed: "B7" sorted before "12A") and `roster-loader` (4);
+  - component tests: `rosters-view` (4) and `event-editor` (+2);
+  - new E2E `mobile-rosters.spec.ts`: an imported league starts the same, a number changed in Connect then differs after Refresh, axe clean, no sideways scroll, only Refresh as a button, and zero mobile writes with no browser calls to the mobile app.
+- **Evidence (work laptop):**
+  - lint and typecheck pass; `test:coverage` 62 files, **888 tests pass**; a clean build and `check:secrets` pass;
+  - harness (sample rosters) at 390 and 1440 px: axe clean, no sideways scroll, 44 px buttons, lists side by side on desktop and stacked on the phone;
+  - captures `.impeccable/review/rosters/{mobile,desktop}/`; after the first look, the list headings went to sentence case ("ITALA" was losing its brand casing), the team-only note gained its full stop, and the text links were underlined.
+- **Not run:** the E2E on the laptop (CI runs it), and the check against the real mobile app, which waits for your go.
+
 ### Phase 7: the first dry run on the real export (27/09/2026)
 
 - **Migrations 0100 to 0700 are on the hosted project** (Aeron, 27/09/2026).

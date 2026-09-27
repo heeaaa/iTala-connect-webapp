@@ -60,7 +60,7 @@ export default async function PreviewPage({ params }: PageProps<'/admin/import/[
                 <tbody>
                   {team.players.map((p) => (
                     <tr key={p.id}>
-                      <td>{p.number || '—'}</td>
+                      <td>{p.number || <span aria-label="No number">-</span>}</td>
                       <td>{p.name}</td>
                     </tr>
                   ))}

@@ -95,6 +95,29 @@
   margin-bottom: 1rem;
   overflow-wrap: anywhere;
 }
+/* A link inside running text reads as a link, not as more text (button-styled links keep their own look). */
+.note a:not([class]),
+.notice a:not([class]) {
+  color: var(--brand-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+/* Compare rosters (M-11): iTala Connect beside the mobile app, stacked on phones. */
+.rosterPair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem 2rem;
+}
+/* Sentence case, so the brand keeps its "iTala" (a capitalised label would read ITALA). */
+.rosterPair h3 {
+  margin: 0 0 0.25rem;
+  color: var(--brand-muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-stretch: 85%;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
 .league {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

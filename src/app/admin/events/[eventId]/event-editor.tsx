@@ -414,6 +414,16 @@ export function EventEditor({
                       {links[d.id] ? `Mobile: ${links[d.id]!.league_name || 'linked'}` : 'Link to mobile app'}
                       <span className="sr-only">{` for ${d.name || `division ${di + 1}`}`}</span>
                     </Link>
+                    {links[d.id] ? (
+                      // Read only (M-11): the rosters here beside the paired mobile teams' rosters.
+                      <Link
+                        href={`/admin/events/${data.id}/divisions/${d.id}/mobile-rosters`}
+                        className={`${s.button} ${s.buttonQuiet}`}
+                      >
+                        Compare rosters
+                        <span className="sr-only">{` for ${d.name || `division ${di + 1}`}`}</span>
+                      </Link>
+                    ) : null}
                   </div>
                 ) : null}
                 <div className={w.fields}>

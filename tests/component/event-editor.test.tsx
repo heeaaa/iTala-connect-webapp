@@ -570,5 +570,25 @@ describe('Mobile link button (M-03)', () => {
     expect(screen.getByText('Linked to iTala mobile: Harbour League (2026)')).toBeInTheDocument();
     expect(linkFor(/^Mobile: Harbour League ?for Open$/)).toBeInTheDocument();
     expect(linkFor(/^Link to mobile app/)).not.toBeInTheDocument();
+    // M-11: a linked division offers the read-only roster comparison.
+    expect(linkFor(/^Compare rosters ?for Open$/)).toHaveAttribute(
+      'href',
+      `/admin/events/${uuid(1)}/divisions/${uuid(10)}/mobile-rosters`,
+    );
+  });
+
+  it('offers no roster comparison for a division that is not linked', () => {
+    render(
+      <EventEditor
+        initial={initial}
+        links={{}}
+        images={NO_IMAGES}
+        games={[]}
+        published={false}
+        notice=""
+        mobileEnabled
+      />,
+    );
+    expect(screen.queryByRole('link', { name: /^Compare rosters/ })).not.toBeInTheDocument();
   });
 });
