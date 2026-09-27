@@ -16,7 +16,7 @@ export default async function ImportPage({ searchParams }: PageProps<'/admin/imp
   } catch {
     return (
       <>
-        <TitlePlate title="Import from iTala mobile" sub="Choose a league" />
+        <TitlePlate title="Import from the mobile app" sub="Choose a league" />
         <p role="alert" className={s.error}>
           Can&apos;t reach the iTala mobile app right now. Try again.
         </p>
@@ -32,7 +32,7 @@ export default async function ImportPage({ searchParams }: PageProps<'/admin/imp
   const visible = leagues.filter((l) => show || l.kind !== 'recreational');
   return (
     <>
-      <TitlePlate title="Import from iTala mobile" sub="Choose a league" />
+      <TitlePlate title="Import from the mobile app" sub="Choose a league" />
       <p className={w.note}>
         Bring a league&apos;s teams and players into a new draft. You can review everything before creating the event.
       </p>

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import { loginNoticeMessage, safeNextPath } from '@/server/access';
-import { BrandName, platformStyles as st, TitlePlate } from '@/components/platform/platform-frame';
+import { platformStyles as st, TitlePlate } from '@/components/platform/platform-frame';
 import { getAccess } from '@/server/auth';
 import { googleSignInEnabled } from '@/server/auth-providers';
 
@@ -25,14 +25,7 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
   return (
     <PlatformChrome current="login">
       <main className={st.wrap}>
-        <TitlePlate
-          title={
-            <>
-              Sign in to <BrandName /> Connect
-            </>
-          }
-          sub="Organisers only. Fans never need an account."
-        />
+        <TitlePlate title="Sign in" sub="Organisers only. Fans never need an account." />
         <div className="flex flex-col gap-4 pb-12">
           {notice ? (
             <p role="alert" className={st.notice}>

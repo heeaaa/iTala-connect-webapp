@@ -391,7 +391,7 @@ The platform is the iTala network's on-air graphics package. Home runs the seaso
 
 Colour is rationed. Teal is the network's identity: the key block ahead of each title plate, the top edge of every date block, the current nav underline, focus, and secondary actions. Lime is air time: it marks an event that is on now, with a pulsing pip, and the one primary action on a screen. Everything else is ink and muted ink on navy.
 
-Copy is NZ English, dates DD/MM/YYYY, and "iTala" keeps its own casing even inside capitalised plates.
+Copy is NZ English, dates DD/MM/YYYY, and "iTala" never appears in capitalised text: titles, headings, buttons and labels are worded without it ("Sign in", "Import from the mobile app"). The brand shows in the network bar wordmark and in sentence-case copy, always as "iTala".
 
 **Key Characteristics:**
 - Network ground `platform-ground`, plates on two navy steps, 1 px seams.
@@ -509,7 +509,7 @@ All three are self-hosted through `next/font` (`src/app/event-fonts.ts`) as `--f
 #### Named Rules
 **The Two Widths Rule.** Condensed caps (width 75% to 85%) are for plates, names, labels, buttons and nav. Reading text (body, ledes, meta, inputs, notices) stays at normal width and sentence case.
 
-**The Brand Casing Rule.** "iTala" keeps its own casing inside capitalised plates ("SIGN IN TO iTala CONNECT"); it is never set as "ITALA".
+**The Brand Casing Rule.** "iTala" is never set as "ITALA", and never sits inside capitalised text either (a lowercase brand in a capitalised title reads as a mistake). Word capitalised titles, headings, buttons and labels without it; the network bar wordmark and sentence-case copy carry the brand. (Revised 27/09/2026: the earlier rule kept "iTala" lowercase inside capitalised plates, which looked broken.)
 
 **The Platform Tabular Rule.** The platform body sets `font-variant-numeric: tabular-nums`, so every date and count lines up.
 
@@ -783,7 +783,7 @@ One easing, `cubic-bezier(0.16, 1, 0.3, 1)`. Colour transitions 150ms (nav links
 - **Do** stack surfaces ground, plate, raised plate, with 1 px seams where a line is needed.
 - **Do** set plates, names, labels, buttons and nav in condensed Saira caps, and reading text at normal width.
 - **Do** say every status in words on its bug; colour only reinforces it.
-- **Do** keep "iTala" in its own casing inside capitalised plates.
+- **Do** word capitalised titles, headings, buttons and labels without "iTala"; write it as "iTala" only in sentence-case copy.
 - **Do** place the iTala mark directly on Network Ground, unaltered.
 - **Do** keep every link and button in an action row at least 2.75rem tall, wrapping rather than truncating.
 - **Do** ask through the confirmation dialog, Cancel first, before an event, team or division is removed or unsaved edits are lost.

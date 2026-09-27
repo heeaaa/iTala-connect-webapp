@@ -690,11 +690,6 @@ a.bug:hover {
 
 /* Review fixes --------------------------------------------------------------- */
 
-/* The brand keeps its own casing inside capitalised plates. */
-.brandName {
-  text-transform: none;
-}
-
 /* Heading key: the title plate's teal block, at heading size. */
 .key {
   flex: none;

@@ -65,9 +65,6 @@ export function PlatformFrame({ current, viewer, fontClassName, signOut, childre
 }
 
 /** 'iTala' in its own casing, even inside plates that CSS sets in capitals (brand commitment). */
-export function BrandName() {
-  return <span className={styles.brandName}>iTala</span>;
-}
 
 /** Lower-third title plate; it wipes in once on load (the platform's signature motion). */
 export function TitlePlate({ title, sub, id }: { title: ReactNode; sub?: ReactNode; id?: string }) {

@@ -40,7 +40,7 @@ export function DashboardView({
         </Link>
         {mobileEnabled && (
           <Link href="/admin/import" className={`${s.button} ${s.buttonQuiet}`}>
-            Import from <span className={s.brandName}>iTala</span> mobile
+            Import from the mobile app
           </Link>
         )}
       </div>

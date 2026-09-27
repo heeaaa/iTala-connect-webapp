@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { BrandName, platformStyles as st, TitlePlate } from '@/components/platform/platform-frame';
+import { platformStyles as st, TitlePlate } from '@/components/platform/platform-frame';
 
 import { PlatformChrome } from '../../platform-chrome';
 import { ConfirmForm } from './confirm-form';
@@ -26,11 +26,7 @@ export default async function ConfirmPage({ searchParams }: PageProps<'/auth/con
       <main className={st.wrap}>
         <TitlePlate
           title={type === 'recovery' ? 'Choose a new password' : 'Set up your account'}
-          sub={
-            <>
-              <BrandName /> Connect organisers
-            </>
-          }
+          sub="Organisers only"
         />
         <div className="flex flex-col gap-4 pb-12">
           {tokenHash && type ? (
