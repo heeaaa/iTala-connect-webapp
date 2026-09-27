@@ -4,7 +4,7 @@ Last updated: 26/09/2026 (Claude, work laptop)
 
 ## Current handoff (27/09/2026, Claude on the work laptop)
 
-**Where things are:** Phase 3b is code complete. Phase 5 is done (5a to 5e, its journeys and the 5e finish review), and so is Google sign-in (A-11). **Phase 6 is code complete against the recorded mobile fixtures:** 6a (read-only inbox, dashboard Results), 6b (approve, re-approve, keep, attach) and 6c (link wizard for divisions made by hand), all pushed on branch `handoff/codex`. Its one manual check against the real mobile project stays **NOT RUN** until you say go. **Phase 7 is IN PROGRESS:** 7a (the dry-run planner and verification report) and 7b (the writer, `--apply`) are done; next is 7c (images). **The old site runs the older build** (scores by position); the import follows it (7b section). **Migrations to push to the hosted project after CI passes, in order:** `20260927000100_platform_sponsor_paths.sql`, `20260927000200_admin_accounts.sql`, `20260927000300_keep_published_score.sql`, `20260927000400_division_mobile_link.sql` and `20260927000500_legacy_import.sql` (and 5d's `20260926000700_rules_and_images.sql` if that is not pushed yet).
+**Where things are:** Phase 3b is code complete. Phase 5 is done (5a to 5e, its journeys and the 5e finish review), and so is Google sign-in (A-11). **Phase 6 is code complete against the recorded mobile fixtures:** 6a (read-only inbox, dashboard Results), 6b (approve, re-approve, keep, attach) and 6c (link wizard for divisions made by hand), all pushed on branch `handoff/codex`. Its one manual check against the real mobile project stays **NOT RUN** until you say go. **Phase 7 is IN PROGRESS:** 7a (the dry-run planner and verification report), 7b (the writer, `--apply`) and 7c (images) are done; next is the first dry run on a real export (yours to make, see 7a). **The old site runs the older build** (scores by position); the import follows it (7b section). **Migrations to push to the hosted project after CI passes, in order:** `20260927000100_platform_sponsor_paths.sql`, `20260927000200_admin_accounts.sql`, `20260927000300_keep_published_score.sql`, `20260927000400_division_mobile_link.sql`, `20260927000500_legacy_import.sql` and `20260927000600_legacy_images.sql` (and 5d's `20260926000700_rules_and_images.sql` if that is not pushed yet).
 
 **Old app down (27/09/2026):** connect.itala.fyi shows `permission_denied at /events` because the old Firebase database's "test mode" rules expired at 00:00 today (Auckland). Nothing in this project changed them; the data is still there. The fix is yours in the Firebase console (Realtime Database, Rules): move the expiry date forward and Publish, knowing the rules stay open to anyone with the address. For Phase 7, the importer should read with proper credentials rather than rely on open rules.
 
@@ -27,7 +27,7 @@ npm run lint && npm run typecheck && npm run test:coverage
 npm run build && npm run check:secrets && npm run test:e2e
 ```
 
-- Expected: **80 E2E tests**, **290 pgTAP assertions** (257 green in CI plus 33 in `014_legacy_import.sql`) and **35 integration tests** (29 plus 6 in `legacy-import.test.ts`). Run `npm run db:reset` for the new migrations; `npm run db:types` must show no diff.
+- Expected: **80 E2E tests**, **302 pgTAP assertions** (290 green in CI at `849cc5c` plus 12 in `015_legacy_images.sql`) and **36 integration tests** (35 plus the image round trip). Run `npm run db:reset` for the new migrations; `npm run db:types` must show no diff.
 - Expected: **29 integration tests** (22 plus 7 in `admin-accounts.test.ts`).
 - Record the results here. If `admin-publish.spec.ts` or the guard test fails, follow reproduce, fail, fix, pass.
 
@@ -444,6 +444,20 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
 - **Evidence (work laptop):** lint and typecheck pass; `test:coverage` 55 files, **800 tests pass**; a clean build and `check:secrets` pass. Harness (link wizard, sample data) at 390 and 1440 px: axe clean, no sideways scroll, 44 px targets, duplicate marked and refused with focus kept, a server refusal with focus kept, the clash note and the unreachable state; the results inbox specs still pass (6/6). Captures `.impeccable/review/phase6/{mobile,desktop}/link-*.png`.
 - **CI run 36289258765 on `aee70e4`: green.** 80/80 E2E (the new link journey at both viewports), 257/257 pgTAP (with `013`), 29/29 integration, 800 unit and component tests, gitleaks clean.
 - **You, now that CI has passed:** push `20260927000400_division_mobile_link.sql` with the other 27/09 migrations (`npx supabase migration list`, then `npx supabase db push --dry-run`, then `npx supabase db push`).
+
+### Phase 7c: images (27/09/2026)
+
+- **CI run 36292926776 on `849cc5c` (7b): green**: 853 unit and component tests, **290/290 pgTAP** (with `014`), **35/35 integration** (with the six import tests on a real local database: written, read back with no differences, re-imported with the same ids), 80/80 E2E. The first 7b run failed only in pgTAP `014`: the signed-in owner could not read the test's temporary id table (31 of 33 passed); fixed in `849cc5c`.
+- **`--apply` now copies each written event's images** (MIGRATION_PLAN.md 12.1 step 4), unless `--skip-images`:
+  - **Sources:** embedded images are decoded; web addresses are fetched once (GET only, 20 s limit, stopping past 5 MB).
+  - **Checks:** each is checked by its own bytes as an upload is (PNG, JPEG or WebP, at most 5 MB), then stored in the event's folder under a name taken from its content, so a later import reuses the same file.
+  - **Rows:** `set_legacy_event_images` sets the logo and sponsor rows together and returns the files no longer used, which are then removed. Minor sponsors keep their order and close any gap a lost one leaves.
+  - **Failures:** an image that cannot be copied is reported ("image left out: the major sponsor, because it could not be fetched (...)") and never undoes the event.
+  - **Platform sponsors** are filled only when iTala Connect has none (`set_legacy_platform_sponsors`, locked so two imports cannot both fill it); if someone set theirs meanwhile, the copied files are removed again.
+- Migration `20260927000600_legacy_images.sql` (migration import only, as 0500) and pgTAP `015_legacy_images.sql` (12 assertions): refusals, an event made in Connect untouched, rows set and replaced, the unused files returned, a file outside the event folder refused with nothing changed, platform fill-only.
+- **Tests:** `migrate-images.test.ts` (7: decoding, the upload checks, content names, what is copied or left out and why, the platform rules, failures, skipping). The integration test gains a real bucket round trip: the embedded sponsor lands in the local bucket with its row, the unreachable addresses are reported, and a second import reuses the file.
+- **Evidence (work laptop):** lint and typecheck pass; `test:coverage` 58 files, **860 tests pass**; `src/migration` 99% lines, 97% branches; a clean build and `check:secrets` pass. Not run on the laptop: pgTAP `015` and the integration tests (CI).
+- **You, after CI passes:** push `20260927000600_legacy_images.sql` with the other 27/09 migrations.
 
 ### Phase 7b: the writer, and the 7a review (27/09/2026)
 

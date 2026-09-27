@@ -87,6 +87,7 @@ describe('Firebase import writer', () => {
       ownerEmail: owner.email,
       acceptDifferences: false,
       platform: false,
+      images: false,
     });
     expect(result.events.map((e) => [e.legacyId, e.outcome, e.differences ?? e.reason])).toEqual([
       [B, 'skipped', 'has differences (check them, then use --accept-differences)'],
@@ -102,6 +103,7 @@ describe('Firebase import writer', () => {
       ownerEmail: owner.email,
       acceptDifferences: true,
       platform: false,
+      images: false,
     });
     expect(written.events[0]).toMatchObject({ outcome: 'written', result: { created: true, games: 5 } });
     expect(written.events[0]!.differences).toEqual(accepted.report.events[0]!.differences);
@@ -113,7 +115,7 @@ describe('Firebase import writer', () => {
     try {
       await db.from('platform_settings').update({ default_rules_html: '' }).eq('id', true);
       const { plan, report } = planned([A]);
-      const options = { ownerEmail: owner.email, acceptDifferences: false, platform: true };
+      const options = { ownerEmail: owner.email, acceptDifferences: false, platform: true, images: false };
       expect((await applyImport(plan, report, target(), legacy, options)).defaultRules).toBe(true);
       expect((await applyImport(plan, report, target(), legacy, options)).defaultRules).toBe(false);
       expect((await db.from('platform_settings').select('default_rules_html').single()).data!.default_rules_html).toBe(
@@ -124,6 +126,43 @@ describe('Firebase import writer', () => {
     }
   });
 
+  it('copies the old images into the bucket, sets their rows, and reuses the same file next time', async () => {
+    const db = adminClient();
+    const { plan, report } = planned([A]);
+    const options = { ownerEmail: owner.email, acceptDifferences: false, platform: false, images: true };
+    const first = await applyImport(plan, report, target(), legacy, options);
+    // The embedded minor sponsor is copied; the old addresses (example.test) cannot be reached.
+    expect(first.events[0]!.images!.copied).toBe(1);
+    expect(first.events[0]!.images!.left.map((l) => l.what)).toEqual([
+      'the logo',
+      'the major sponsor',
+      'minor sponsor 2',
+    ]);
+    const eventId = await eventIdOf(A);
+    const rows = (await db.from('event_sponsors').select('tier, image_path, sort_order').eq('event_id', eventId)).data!;
+    expect(rows).toEqual([
+      {
+        tier: 'minor',
+        image_path: expect.stringMatching(new RegExp(`^events/${eventId}/minor-legacy-[0-9a-f]{20}\\.jpg$`)),
+        sort_order: 0,
+      },
+    ]);
+    const bucket = db.storage.from(process.env.SUPABASE_STORAGE_BUCKET || 'images');
+    const file = await bucket.download(rows[0]!.image_path);
+    expect(file.error).toBeNull();
+    expect(new Uint8Array(await file.data!.arrayBuffer()).slice(0, 3)).toEqual(new Uint8Array([0xff, 0xd8, 0xff]));
+
+    await applyImport(plan, report, target(), legacy, options);
+    expect((await db.from('event_sponsors').select('image_path').eq('event_id', eventId)).data).toEqual([
+      { image_path: rows[0]!.image_path },
+    ]);
+    expect((await bucket.download(rows[0]!.image_path)).error).toBeNull();
+    // Skipping images later leaves them as they were.
+    await applyImport(plan, report, target(), legacy, { ...options, images: false });
+    expect((await db.from('event_sponsors').select('image_path').eq('event_id', eventId)).data).toHaveLength(1);
+    await bucket.remove([rows[0]!.image_path]);
+  });
+
   it('refuses an owner who is not an active admin, and anyone but the secret key', async () => {
     const { plan, report } = planned([A]);
     await expect(
@@ -131,6 +170,7 @@ describe('Firebase import writer', () => {
         ownerEmail: 'nobody@itala.test',
         acceptDifferences: false,
         platform: false,
+        images: false,
       }),
     ).rejects.toThrow('No active admin account has the email nobody@itala.test.');
     const signedIn = await signedInClient(owner);
@@ -141,7 +181,7 @@ describe('Firebase import writer', () => {
     expect(error?.code).toBe('42501');
   });
 
-  it('runs end to end from the command line: report first, then the write and its read-back', () => {
+  it('runs end to end from the command line: report first, then the write, its read-back and its images', () => {
     const r = spawnSync(
       process.execPath,
       [
@@ -160,6 +200,7 @@ describe('Firebase import writer', () => {
     expect(r.stdout).toContain('READY  Harbour Spring Cup');
     expect(r.stdout).toContain('UPDATED  Harbour Spring Cup');
     expect(r.stdout).toContain('read back: matches the old page');
+    expect(r.stdout).toContain('images: 1 copied');
     expect(r.stdout).not.toContain(process.env.SUPABASE_SECRET_KEY!);
     expect(r.status).toBe(0);
   }, 60_000);

@@ -829,6 +829,11 @@ export type Database = {
           version: string
         }[]
       }
+      set_legacy_event_images: {
+        Args: { p_event_id: string; p_logo_path: string; p_sponsors: Json }
+        Returns: string[]
+      }
+      set_legacy_platform_sponsors: { Args: { p_sponsors: Json }; Returns: boolean }
       set_major_sponsor: {
         Args: { p_event_id: string; p_path?: string }
         Returns: string

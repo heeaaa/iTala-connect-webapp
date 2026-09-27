@@ -1,10 +1,12 @@
 /**
- * The database side of the Firebase import (Phase 7b): the secret-key client
- * calling import_legacy_event, and the read-back for the verification diff.
- * Used by scripts/migrate-firebase.ts only.
+ * The database side of the Firebase import (Phase 7b and 7c): the secret-key
+ * client calling import_legacy_event, the read-back for the verification
+ * diff, and the images (old ones fetched by address, new ones uploaded to the
+ * images bucket). Used by scripts/migrate-firebase.ts only.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+import { IMAGE_LIMIT } from '../src/lib/event-images';
 import type { Database, Json } from '../src/lib/supabase/database.types';
 import type { ImportResult, ImportTarget } from '../src/migration/apply';
 import type { StoredEvent } from '../src/migration/read-back';
@@ -15,6 +17,8 @@ const GAME_COLUMNS =
   'id, division_id, day, start_time, court, group_id, team1_id, team2_id, label, type, is_playoff, bracket_game_id, team1_source, team2_source, playoff_round, position, legacy_gid, legacy_index';
 
 export function supabaseTarget(url: string, secretKey: string): ImportTarget {
+  // Read here, after --env has loaded the file.
+  const BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'images';
   const db: SupabaseClient<Database> = createClient<Database>(url, secretKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -68,6 +72,46 @@ export function supabaseTarget(url: string, secretKey: string): ImportTarget {
     },
     async importPlatform(rules) {
       return Boolean(must(await db.rpc('import_legacy_platform', { p_default_rules_html: rules ?? '' })));
+    },
+    async fetchImage(address) {
+      // Read only: a GET of the old image, with a time limit, stopping past 5 MB.
+      const res = await fetch(address, { signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) throw new Error(`the old address answered ${res.status}`);
+      if (Number(res.headers.get('content-length') ?? 0) > IMAGE_LIMIT) throw new Error('it is larger than 5 MB');
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+        size += chunk.length;
+        if (size > IMAGE_LIMIT) throw new Error('it is larger than 5 MB');
+        chunks.push(chunk);
+      }
+      return new Uint8Array(Buffer.concat(chunks));
+    },
+    async uploadImage(path, bytes, type) {
+      const { error } = await db.storage.from(BUCKET).upload(path, bytes, { contentType: type, upsert: true });
+      if (error) throw new Error(error.message);
+    },
+    async removeImages(paths) {
+      const { error } = await db.storage.from(BUCKET).remove(paths);
+      if (error) throw new Error(error.message);
+    },
+    async setEventImages(eventId, logoPath, sponsors) {
+      const unused = may(
+        await db.rpc('set_legacy_event_images', {
+          p_event_id: eventId,
+          p_logo_path: logoPath as string,
+          p_sponsors: sponsors as unknown as Json,
+        }),
+      );
+      return unused ?? [];
+    },
+    async platformHasSponsors() {
+      const { count, error } = await db.from('platform_sponsors').select('id', { count: 'exact', head: true });
+      if (error) throw new Error(error.message);
+      return (count ?? 0) > 0;
+    },
+    async setPlatformSponsors(sponsors) {
+      return Boolean(may(await db.rpc('set_legacy_platform_sponsors', { p_sponsors: sponsors as unknown as Json })));
     },
   };
 }

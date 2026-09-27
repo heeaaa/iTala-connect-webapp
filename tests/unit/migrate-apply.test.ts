@@ -67,6 +67,14 @@ function fakeTarget(overrides: Partial<ImportTarget> = {}) {
     }),
     readBack: vi.fn(async (eventId: string) => stored(plans.get(eventId)!)),
     importPlatform: vi.fn(async () => true),
+    fetchImage: vi.fn(async (): Promise<Uint8Array> => {
+      throw new Error('the old address answered 404');
+    }),
+    uploadImage: vi.fn(async () => {}),
+    removeImages: vi.fn(async () => {}),
+    setEventImages: vi.fn(async (): Promise<string[]> => []),
+    platformHasSponsors: vi.fn(async () => false),
+    setPlatformSponsors: vi.fn(async () => true),
     ...overrides,
   };
   return target;
@@ -185,6 +193,7 @@ describe('applying an import', () => {
       ownerEmail: ' Owner@itala.test ',
       acceptDifferences: false,
       platform: true,
+      images: false,
     });
     expect(target.ownerId).toHaveBeenCalledWith('owner@itala.test');
     expect(result.ownerId).toBe('owner-uuid');
@@ -218,6 +227,7 @@ describe('applying an import', () => {
       ownerEmail: 'owner@itala.test',
       acceptDifferences: true,
       platform: false,
+      images: false,
     });
     expect(result.events.map((e) => [e.name, e.outcome])).toEqual([
       ['Winter Social', 'written'],
@@ -241,16 +251,19 @@ describe('applying an import', () => {
         ownerEmail: 'someone@itala.test',
         acceptDifferences: false,
         platform: true,
+        images: true,
       }),
     ).rejects.toThrow('No active admin account has the email someone@itala.test.');
     expect(target.importEvent).not.toHaveBeenCalled();
     expect(target.importPlatform).not.toHaveBeenCalled();
+    expect(target.uploadImage).not.toHaveBeenCalled();
   });
 
   it('says what happened in words', () => {
     const text = formatApplied({
       ownerId: 'o',
       defaultRules: false,
+      platformSponsors: null,
       events: [
         {
           legacyId: 'x',

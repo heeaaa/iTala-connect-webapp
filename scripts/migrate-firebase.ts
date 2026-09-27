@@ -1,6 +1,6 @@
 /**
  * npm run migrate:firebase -- --file <export.json> [--event=<id>]... [--timezone Pacific/Auckland] [--report <out.json>]
- * npm run migrate:firebase -- --file <export.json> --apply --owner <email> [--env <file>] [--accept-differences]
+ * npm run migrate:firebase -- --file <export.json> --apply --owner <email> [--env <file>] [--accept-differences] [--skip-images]
  *
  * Imports the old Firebase database into iTala Connect (MIGRATION_PLAN.md
  * 12.1) from a JSON export made in the Firebase console. The old database is
@@ -10,8 +10,9 @@
  * writes nothing. With --apply it prints the same report, then writes each
  * ready event through import_legacy_event with SUPABASE_SECRET_KEY (from the
  * environment, or --env <file>), owned by the --owner admin, reads each one
- * back and compares it with the old page again. Events with errors are never
- * written; events with differences only with --accept-differences.
+ * back and compares it with the old page again, then copies its images
+ * (unless --skip-images). Events with errors are never written; events with
+ * differences only with --accept-differences.
  *
  * Firebase event ids start with "-", so give them as --event=<id>.
  */
@@ -43,6 +44,7 @@ const OPTIONS = {
   owner: { type: 'string' },
   env: { type: 'string' },
   'accept-differences': { type: 'boolean', default: false },
+  'skip-images': { type: 'boolean', default: false },
 } as const;
 
 function stop(message: string): never {
@@ -90,6 +92,7 @@ async function main() {
     acceptDifferences: values['accept-differences'],
     // The default rules template is platform-wide: only on a whole import.
     platform: !values.event?.length,
+    images: !values['skip-images'],
   });
   console.log(formatApplied(result));
   const planned = new Map(report.events.map((e) => [e.legacyId, JSON.stringify(e.differences)]));
