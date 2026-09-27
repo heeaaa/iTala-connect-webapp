@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { mobileIntegrationEnabled } from '@/env';
 import { clientEnv } from '@/env.client';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
@@ -83,6 +84,7 @@ export default async function EventEditorPage({ params, searchParams }: PageProp
         score2: scores.get(g.id)?.s2 ?? null,
       }))}
       published={event.status !== 'draft'}
+      mobileEnabled={mobileIntegrationEnabled()}
       notice={
         imported
           ? `Event created from ${imported}. Add dates and courts, then publish.`

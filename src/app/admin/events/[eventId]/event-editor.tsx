@@ -38,6 +38,7 @@ export function EventEditor({
   images,
   published,
   notice,
+  mobileEnabled = false,
 }: {
   initial: EditorInput;
   /** The event logo and sponsors as stored (E-15 to E-17); they save on upload, not with Save. */
@@ -47,6 +48,8 @@ export function EventEditor({
   links: Record<string, { league_name: string; season: string | null }>;
   published: boolean;
   notice: string;
+  /** The mobile integration is on: saved divisions offer the link wizard (M-03). */
+  mobileEnabled?: boolean;
 }) {
   const [data, setData] = useState(initial);
   const [saved, setSaved] = useState(JSON.stringify(initial));
@@ -401,6 +404,18 @@ export function EventEditor({
                     {links[d.id]!.season ? ` (${links[d.id]!.season})` : ''}
                   </p>
                 )}
+                {mobileEnabled && initial.divisions.some((v) => v.id === d.id) ? (
+                  <div className={w.actions}>
+                    {/* The old divCardButton: only divisions already saved can be linked. */}
+                    <Link
+                      href={`/admin/events/${data.id}/divisions/${d.id}/mobile-link`}
+                      className={`${s.button} ${s.buttonQuiet}`}
+                    >
+                      {links[d.id] ? `Mobile: ${links[d.id]!.league_name || 'linked'}` : 'Link to mobile app'}
+                      <span className="sr-only">{` for ${d.name || `division ${di + 1}`}`}</span>
+                    </Link>
+                  </div>
+                ) : null}
                 <div className={w.fields}>
                   <label className={w.field}>
                     <span className={s.label}>Division {di + 1} name</span>

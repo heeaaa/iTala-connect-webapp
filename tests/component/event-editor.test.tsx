@@ -526,3 +526,49 @@ describe('Images and rules in the editor (E-15, E-70)', () => {
     );
   });
 });
+
+describe('Mobile link button (M-03)', () => {
+  const linkFor = (name: RegExp) => screen.queryByRole('link', { name });
+
+  it('offers the link wizard for a saved division only when the mobile integration is on', async () => {
+    const user = userEvent.setup();
+    const { unmount } = editor();
+    expect(linkFor(/^Link to mobile app/)).not.toBeInTheDocument();
+    unmount();
+    render(
+      <EventEditor
+        initial={initial}
+        links={{}}
+        images={NO_IMAGES}
+        games={[]}
+        published={false}
+        notice=""
+        mobileEnabled
+      />,
+    );
+    expect(linkFor(/^Link to mobile app ?for Open$/)).toHaveAttribute(
+      'href',
+      `/admin/events/${uuid(1)}/divisions/${uuid(10)}/mobile-link`,
+    );
+    // A division added in this session is not saved yet, so it has nothing to link.
+    await user.click(screen.getByRole('button', { name: /Add division/ }));
+    expect(screen.getAllByRole('link', { name: /^Link to mobile app/ })).toHaveLength(1);
+  });
+
+  it('names the league a linked division is on', () => {
+    render(
+      <EventEditor
+        initial={initial}
+        links={{ [uuid(10)]: { league_name: 'Harbour League', season: '2026' } }}
+        images={NO_IMAGES}
+        games={[]}
+        published={false}
+        notice=""
+        mobileEnabled
+      />,
+    );
+    expect(screen.getByText('Linked to iTala mobile: Harbour League (2026)')).toBeInTheDocument();
+    expect(linkFor(/^Mobile: Harbour League ?for Open$/)).toBeInTheDocument();
+    expect(linkFor(/^Link to mobile app/)).not.toBeInTheDocument();
+  });
+});

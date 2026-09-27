@@ -95,6 +95,10 @@ export function createMobileReader(url: string, key: string, request: typeof fet
       if (!league) throw new Error('Mobile league no longer exists');
       return buildLeaguePreview(league, teams, players);
     },
+    /** A league's teams, for the link wizard (M-03). */
+    async teams(leagueId: string) {
+      return rows('teams', mobileTeamSchema, leagueId);
+    },
     /** A league's finished games (M-02), newest first as the old inbox read them. */
     async finals(leagueId: string) {
       return rows('final_game_scores', mobileFinalSchema, leagueId, 'finished_at.desc,game_id.asc');

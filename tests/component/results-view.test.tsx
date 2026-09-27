@@ -142,6 +142,16 @@ describe('Results inbox (M-04, M-05)', () => {
     expect(screen.queryByRole('heading', { name: 'Nothing waiting' })).not.toBeInTheDocument();
   });
 
+  it('confirms a new link from the wizard and moves focus to it, and says nothing otherwise', () => {
+    const { unmount } = render(<ResultsView inbox={inbox()} linked />);
+    const line = screen.getByText('Linked. Results for this division will now appear in Pending results.');
+    expect(line).toHaveFocus();
+    unmount();
+    render(<ResultsView inbox={inbox()} />);
+    expect(screen.queryByText(/^Linked\. Results/)).not.toBeInTheDocument();
+    expect(document.body).toHaveFocus();
+  });
+
   it('refreshes from the mobile app on request', async () => {
     const user = userEvent.setup();
     render(<ResultsView inbox={inbox()} />);

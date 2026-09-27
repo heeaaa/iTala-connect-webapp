@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useId, useRef, useState, useTransition } from 'react';
+import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { platformStyles as s, TitlePlate } from '@/components/platform/platform-frame';
 import { formatDayLabel, formatTime } from '@/lib/format';
 import { GROUPS, detailLine, driftLine, resultLine } from '@/lib/mobile-results';
@@ -118,7 +118,7 @@ function ResultCard({ inbox, item, busy, attachValue, onApprove, onKeep, onAttac
  * matched to fixtures and grouped as the old inbox grouped them. Nothing is
  * approved automatically; the server checks every approval again.
  */
-export function ResultsView({ inbox }: { inbox: Inbox }) {
+export function ResultsView({ inbox, linked = false }: { inbox: Inbox; linked?: boolean }) {
   const router = useRouter();
   const [refreshing, refresh] = useTransition();
   const [busy, run] = useTransition();
@@ -126,6 +126,10 @@ export function ResultsView({ inbox }: { inbox: Inbox }) {
   const [attach, setAttach] = useState<{ item: InboxItem; gameId: string } | null>(null);
   const statusLine = useRef<HTMLParagraphElement>(null);
   const idBase = useId();
+  // Arriving from the link wizard: the confirmation takes focus so it is read out.
+  useEffect(() => {
+    if (linked) statusLine.current?.focus();
+  }, [linked]);
   const groups = GROUPS.map((g) => ({ ...g, items: inbox.items.filter((i) => i.result.state === g.state) })).filter(
     (g) => g.items.length,
   );
@@ -178,7 +182,7 @@ export function ResultsView({ inbox }: { inbox: Inbox }) {
         </p>
       ) : null}
       <p ref={statusLine} tabIndex={-1} aria-live="polite" className={w.imageStatus} data-tone={status?.tone}>
-        {status?.text}
+        {status?.text ?? (linked ? 'Linked. Results for this division will now appear in Pending results.' : '')}
       </p>
       {inbox.notice ? (
         <p role="status" className={w.notice}>

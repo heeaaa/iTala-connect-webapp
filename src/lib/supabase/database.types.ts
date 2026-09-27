@@ -803,6 +803,16 @@ export type Database = {
         }
         Returns: string
       }
+      set_division_mobile_link: {
+        Args: {
+          p_division_id: string
+          p_league_id: string
+          p_league_name: string
+          p_season: string
+          p_teams: Json
+        }
+        Returns: undefined
+      }
       set_event_logo: {
         Args: { p_event_id: string; p_path?: string; p_version?: string }
         Returns: {
