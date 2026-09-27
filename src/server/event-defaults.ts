@@ -1,0 +1,4 @@
+import 'server-only';
+// Legacy src/defaults.js, retrieved 26/09/2026. Event organisers can replace it.
+export const DEFAULT_RULES_HTML =
+  '<h2>Tournament Rules &amp; Format</h2><h3>General Game Rules</h3><ul><li><strong>1st Half:</strong> 15 minutes running time</li><li><strong>2nd Half:</strong> 20 minutes running time</li><li><strong>Team Fouls:</strong> 9 team fouls for penalty situation</li><li><strong>Timeouts:</strong> 2 per half. Only 1 unused timeout may carry over.</li></ul><h3>Player Eligibility</h3><ul><li>Players must be on the final official roster</li><li>Must have played in at least 1 elimination game to qualify for Semi Finals / Finals</li></ul><h3>Additional Notes</h3><ul><li>Only listed players and coaches allowed on the team bench</li><li>Proper sportsmanship expected at all times</li><li>Organisers may adjust schedules when necessary</li><li>Official FIBA Rules apply unless otherwise stated</li></ul><p><strong>SCHEDULE IS FINAL</strong></p>';

@@ -44,10 +44,10 @@ A zero-build static site (8 script files, about 4,000 lines, no dependencies). A
 | Styling | Tailwind CSS v4, CSS variables for tokens | Brand tokens and event tokens are separate layers (section 6) |
 | Components | shadcn/ui (Radix primitives) where it saves work: Dialog, Popover, Tabs, Toast, Dropdown | Accessible dialogs replace `alert` and `confirm` |
 | Forms and validation | zod schemas shared by client forms and Server Actions | |
-| Drag and drop | `@dnd-kit/core` | Pointer, touch and keyboard |
+| Drag and drop | `@dnd-kit/react` (pinned 0.5.0) | Pointer, touch and keyboard |
 | Rich text | Tiptap (StarterKit limited to the old toolbar) + `sanitize-html` on the server | |
 | Backend | Supabase: Postgres, Auth, Storage, Realtime | `@supabase/supabase-js` + `@supabase/ssr` |
-| Image compression | `browser-image-compression` | |
+| Image compression | Browser canvas, no dependency | Longest edge 1600 px, WebP with a PNG or JPEG fallback |
 | PWA | Web app manifest and icons only | No service worker offline promises (CLAUDE.md PWA rules) |
 | Tests | Vitest, React Testing Library, Playwright, `@axe-core/playwright`, pgTAP via `supabase test db` | |
 | Local backend | Supabase CLI (`supabase start`, Docker) | Replaces the old Local Mode |
@@ -92,7 +92,7 @@ iTala-connect-webapp/
       repositories/*.ts         typed queries
       actions/*.ts              Server Actions (zod in, typed result out)
       mobile/reader.ts          read-only mobile Supabase client
-      storage.ts                signed upload URLs, deletes
+      image-cleanup.ts          removes a deleted event's images
     components/                 UI, split by feature
     lib/supabase/{client,server}.ts
   supabase/
@@ -220,7 +220,7 @@ Every policy gets a pgTAP test for allowed and denied cases (section 10). Realti
 - **Public page**: Server Component renders the event, then a client island subscribes to `game_scores` and `games` changes for that event over Realtime and updates the schedule and standings (P-07). Playoff resolution and standings run in `src/domain` on both server and client, so they always agree.
 - **Autosave**: debounced (600 ms) for the E-05 triggers, with a visible "Saving... / Saved" status.
 - **Legacy links**: old links look like `/#/event/{firebaseId}`. A small client component on `/` reads `location.hash`, calls a server lookup by `legacy_firebase_id`, and replaces the URL with `/events/{id}`.
-- **Images**: the server issues a signed upload URL for a path under the event; the browser compresses and uploads directly; the server records the path and deletes the previous object.
+- **Images**: the browser resizes the picture on a canvas, then sends it to a Server Action (`src/server/actions/images.ts`). The action checks the type from the bytes, stores it under `events/{eventId}/` with the user's session (storage RLS limits writes to the event's folder), records it through `set_event_logo` or `set_major_sponsor`, and deletes the replaced file. A path check on the tables keeps every stored path inside its own event's folder.
 - **Mobile integration**: `src/server/mobile/reader.ts` holds the only client for the mobile project, select-only. It reads as an **anonymous session created on the server and cached** (O-3), refreshed server-side, never one sign-in per request. Import actions (stage 1) and the Results page (stage 2) are server-rendered. Details: MOBILE_INTEGRATION.md.
 - **Caching and CSP**: a nonce-based CSP makes pages dynamic. Public event pages are dynamic anyway (live data), and score updates arrive over Realtime, so the LCP target (X-06) is met through small server payloads and streaming rather than static caching. Home can use a strict hash-based CSP and short revalidation instead. Confirm with a measured LCP in phase 8.
 
@@ -271,10 +271,10 @@ Jobs: `lint` (ESLint + Prettier check), `typecheck` (`tsc --noEmit`), `unit` (`v
 ### 12.1 Import script (`scripts/migrate-firebase.ts`)
 
 1. **Read** the old database with a Firebase service account (or a JSON export from the Firebase console). Read-only.
-2. **Normalise** each event exactly as the old app's `migrateEventScores` does: assign gids to rows missing them or with duplicates, strip `_*` fields, take `scoresById[gid]`, fall back to positional `scores[i]` only if the event has no `scoresMigratedAt`.
-3. **Map** fields, and **report** everything unusual rather than failing or silently dropping it: `h:mm AM` text to `time`; `""` or `"TBD"` day to unscheduled; `"TBD"` teams to null; team codes to team UUIDs; `divId` not found to `division_id` null (kept, flagged in the report); `createdBy` `superadmin` or `admin` to the owner chosen in O-1, keeping the raw value in `legacy_created_by`; `approvedBy` and `linkedBy` ("superadmin", "admin", "unknown") into the `*_legacy` text columns; team codes that no longer exist to null with the raw code kept in `legacy_team1/2`; duplicate slots (possible from the old playoff overflow) keep the first game and move the rest to Unscheduled; out-of-range values (`courts`, `games_per_team`, `bracket_count` NaN, negative or huge scores) imported as-is where the column allows, otherwise clamped, and always listed; any non-null `s1`/`s2` stored directly on schedule rows listed. Team `sort_order` comes from the key order the old app iterated (Firebase lexicographic key order), not creation time, so the golden parity check holds.
-4. **Images**: URLs already in the old Supabase bucket are copied into the new bucket; base64 data URIs are decoded and uploaded; the event stores the new path.
-5. **Upsert** by `legacy_*` keys so the script can run many times. `--dry-run` writes nothing and prints the report.
+2. **Normalise** each event exactly as the live old page showed it. connect.itala.fyi serves the older build (`deploy/src/app.js`, checked by hash on 27/09/2026), which shows scores by position (`scores[i]`), or the rows' own `s1`/`s2` when an event has no score store. The newer build's gid store (`scoresById`, `scoresMigratedAt`) was never live; where it exists it is reported, and where it disagrees the live score is used. Rows keep their own gid (the first row with it); rows without one, or repeating one, get a repeatable id from their position.
+3. **Map** fields, and **report** everything unusual rather than failing or silently dropping it: `h:mm AM` text to `time`; `""` or `"TBD"` day to unscheduled; `"TBD"` teams to null; team codes to team UUIDs; `divId` not found to `division_id` null (kept, flagged in the report); `createdBy` `superadmin` or `admin` to the owner chosen in O-1, keeping the raw value in `legacy_created_by`; `approvedBy` and `linkedBy` ("superadmin", "admin", "unknown") into the `*_legacy` text columns; team codes that no longer exist to null with the raw code kept in `legacy_team1/2`; duplicate slots (possible from the old playoff overflow) keep the game the old page showed (it drew the later row) and move the rest to Unscheduled; a game on a day that is not an event day adds that day, since the old page showed every day with games; out-of-range values (`courts`, `games_per_team`, `bracket_count` NaN, negative or huge scores) imported as-is where the column allows, otherwise clamped, and always listed; any non-null `s1`/`s2` stored directly on schedule rows listed. Team `sort_order` comes from the key order the old app iterated (Firebase order as JavaScript lists it), not creation time, so the golden parity check holds. A later import with a changed export updates the same rows by their legacy keys and removes what is gone; position-based ids can then name a different game, which is safe before cutover because nothing else refers to game ids yet.
+4. **Images**: URLs already in the old Supabase bucket are copied into the new bucket; base64 data URIs are decoded and uploaded; the event stores the new path. The editor's rules apply: PNG, JPEG or WebP by the file's own bytes, at most 5 MB, in the event's (or the platform's) folder, named from the content so a later import reuses the file. An image that cannot be copied is reported and the event is still imported. Platform sponsors are filled only when iTala Connect has none.
+5. **Upsert** by `legacy_*` keys so the script can run many times. `--dry-run` writes nothing and prints the report. A later run never silently undoes work done in iTala Connect: an event changed there since its last import (an audited action, an edit, a row added), deleted there, or with far fewer games or scores in the new export, is refused unless it is named with `--overwrite=<id>`.
 6. **Archive** the raw Firebase export (including positional `scores/{idx}`) as a dated, access-restricted file for at least one season, as the old decommission plan intended.
 7. **Report and verify** per event: counts of divisions, teams, players, games, scored games, unscheduled, orphaned; and a **computed-output diff**: standings and resolved playoff teams from the old code on the old data versus the new code on the imported data must match.
 
@@ -283,7 +283,7 @@ Jobs: `lint` (ESLint + Prettier check), `typecheck` (`tsc --noEmit`), `unit` (`v
 1. Import to a staging Supabase project, fix every report issue, repeat until clean.
 2. Run both sites side by side for one event weekend if possible (new app read-only on a staging URL).
 3. Announce a freeze window. Make the old database read-only by **changing the Firebase rules** (`.write: false`). Hiding the admin screens is not enough, because the old database accepts writes from anyone.
-4. Final import into production, verify the report.
+4. Final import into production, verify the report. Events changed in iTala Connect during testing are refused by the import; decide for each whether the export or the Connect version stands (`--overwrite=<id>` for the export).
 5. Point connect.itala.fyi at the Netlify Next.js site. Keep the old site at a separate read-only URL for one season.
 6. After a season, disable the Firebase database writes permanently and remove `FIREBASE_*` from every environment.
 

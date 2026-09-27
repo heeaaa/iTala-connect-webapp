@@ -45,3 +45,14 @@ export const NO_ACCESS_MESSAGES: Record<'no-profile' | 'no-role' | 'disabled', s
 
 /** A-07 and A-10: one generic message for every credential failure. */
 export const SIGN_IN_FAILED = 'Incorrect email or password.';
+
+/** A-11: why a Google sign-in ended back on the login page. Never echoes provider text. */
+export const GOOGLE_SIGN_IN_FAILED =
+  "Google sign-in didn't work for this account. Only invited organisers can sign in: ask a superadmin to invite the email address of your Google account.";
+
+export type LoginNotice = 'google' | 'no-profile' | 'no-role' | 'disabled';
+
+export function loginNoticeMessage(key: unknown): string | undefined {
+  if (key === 'google') return GOOGLE_SIGN_IN_FAILED;
+  return key === 'no-profile' || key === 'no-role' || key === 'disabled' ? NO_ACCESS_MESSAGES[key] : undefined;
+}

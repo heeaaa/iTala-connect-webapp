@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 import { fixtures, signIn } from './fixtures';
+import { adminClient } from '../support/supabase';
 
 /*
  * Public pages (phase 4), MIGRATION_PLAN.md section 10:
@@ -86,7 +87,7 @@ test.describe('Public event page (journey 6)', () => {
     await expect(page).toHaveURL(new RegExp(`/events/${publicEvent.id}$`));
     const missing = await page.goto('/l/-NdoesNotExist');
     expect(missing?.status()).toBe(404);
-    await expect(page.getByRole('heading', { name: 'Event not found' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
   });
 
   test('share previews carry the event name', async ({ page }) => {
@@ -121,6 +122,19 @@ test.describe('Live scores (journey 3, PRD P-06 to P-09)', () => {
   }) => {
     test.slow();
     const { publicEvent, users } = fixtures();
+
+    // Both viewport projects use the same local fixture. Start each run with
+    // the second group game unscored so the Realtime transition is observable.
+    const admin = adminClient();
+    const { data: groupGame, error: gameError } = await admin
+      .from('games')
+      .select('id')
+      .eq('event_id', publicEvent.id)
+      .eq('position', 1)
+      .single();
+    if (gameError) throw gameError;
+    const { error: resetError } = await admin.from('game_scores').delete().eq('game_id', groupGame.id);
+    if (resetError) throw resetError;
 
     const spectator = await (await browser.newContext()).newPage();
     await spectator.goto(`/events/${publicEvent.id}?tab=standings`);

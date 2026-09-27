@@ -1,0 +1,106 @@
+import { sanitizeRulesHtml } from '@/lib/rules-html';
+
+import { entries, isRecord, text, values } from './firebase-tree';
+import { imageSource, mapEvent, type ImageSource, type Issue, type MapOptions, type MappedEvent } from './map-event';
+
+/**
+ * The whole Firebase export planned as an import (MIGRATION_PLAN.md 12.1):
+ * every event, plus the platform settings. Pure; nothing is written.
+ */
+
+export interface PlatformPlan {
+  sponsors: { tier: 'primary' | 'secondary'; source: ImageSource; sort_order: number }[];
+  /** Null when the old database never had one (it was only ever set by hand). */
+  default_rules_html: string | null;
+}
+
+export interface PlannedEvent extends MappedEvent {
+  legacyId: string;
+  raw: unknown;
+}
+
+export interface ImportPlan {
+  events: PlannedEvent[];
+  platform: PlatformPlan;
+  issues: Issue[];
+}
+
+const KNOWN_TOP = new Set(['events', 'platform']);
+
+export interface PlanOptions {
+  timezone: string;
+  only?: readonly string[];
+  /** Per event: games of a deleted division moved to one that exists (old key to new key). */
+  relink?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+}
+
+export function planImport(tree: unknown, options: PlanOptions): ImportPlan {
+  const issues: Issue[] = [];
+  if (!isRecord(tree)) {
+    issues.push({
+      level: 'error',
+      code: 'export.not_object',
+      message: 'The file is not a Firebase export (no top-level object).',
+    });
+    return { events: [], platform: { sponsors: [], default_rules_html: null }, issues };
+  }
+  for (const key of Object.keys(tree))
+    if (!KNOWN_TOP.has(key))
+      issues.push({
+        level: 'info',
+        code: 'export.unknown_node',
+        message: `The top-level node "${key}" is not used by the old app; not imported.`,
+      });
+  if (!isRecord(tree.events))
+    issues.push({ level: 'warning', code: 'export.no_events', message: 'The export has no events node.' });
+
+  const wanted = options.only?.length ? new Set(options.only) : null;
+  const events = entries(tree.events)
+    .filter(([key]) => !wanted || wanted.has(key))
+    .map(([legacyId, raw]) => {
+      try {
+        const mapOptions: MapOptions = { timezone: options.timezone, relink: options.relink?.[legacyId] };
+        return { legacyId, raw, ...mapEvent(legacyId, raw, mapOptions) };
+      } catch (error) {
+        // One unreadable event is reported; the rest of the export still plans.
+        const message = `The event could not be read (${error instanceof Error ? error.message : String(error)}).`;
+        return { legacyId, raw, plan: null, issues: [{ level: 'error' as const, code: 'event.unreadable', message }] };
+      }
+    });
+  if (wanted)
+    for (const id of wanted)
+      if (!events.some((e) => e.legacyId === id))
+        issues.push({ level: 'error', code: 'export.event_missing', message: `Event ${id} is not in the export.` });
+  for (const id of Object.keys(options.relink ?? {}))
+    if (!entries(tree.events).some(([key]) => key === id))
+      issues.push({
+        level: 'error',
+        code: 'relink.event_missing',
+        message: `A relink names event ${id}, which is not in the export.`,
+      });
+
+  const platform = isRecord(tree.platform) ? tree.platform : {};
+  const sponsorsNode = isRecord(platform.sponsors) ? platform.sponsors : {};
+  const sponsors: PlatformPlan['sponsors'] = [];
+  for (const tier of ['primary', 'secondary'] as const)
+    values(sponsorsNode[tier]).forEach((v, i) => {
+      const src = imageSource(v);
+      if (src === 'unknown' || src === 'unsupported')
+        issues.push({
+          level: 'warning',
+          code: src === 'unknown' ? 'image.unknown' : 'image.unsupported',
+          message:
+            src === 'unknown'
+              ? `Platform ${tier} sponsor ${i + 1} is neither a web address nor an embedded image, so it is left out.`
+              : `Platform ${tier} sponsor ${i + 1} is not a PNG, JPEG or WebP image, so it is left out.`,
+        });
+      else if (src !== 'none')
+        sponsors.push({ tier, source: src, sort_order: sponsors.filter((s) => s.tier === tier).length });
+    });
+  const rules = text(platform.defaultRulesHtml);
+  return {
+    events,
+    platform: { sponsors, default_rules_html: rules.trim() ? sanitizeRulesHtml(rules) : null },
+    issues,
+  };
+}

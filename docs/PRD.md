@@ -40,6 +40,7 @@ Organisers create basketball events (tournaments or leagues), define divisions a
 | A-08 | Logout returns to the home page. | Logout called an undefined `Router.go` | Fix |
 | A-09 | Superadmin can invite an admin, set role, and disable an account (small Admins screen). Until built, done in the Supabase dashboard with a documented script. | None (accounts were two env passwords) | New |
 | A-10 | Brute-force protection on sign-in (Supabase Auth rate limits, generic error message). | None | Improve |
+| A-11 | Admins may also sign in with Google, using the same Google account as the iTala mobile app. Accounts stay invite-only: public sign-ups remain off, so Google sign-in only works for an account a superadmin created, and the Google identity links to it by verified email. The same role checks as password sign-in apply. The button shows only when the provider is on. Failures show one fixed message, never provider text. Apple sign-in is not offered (decided 26/09/2026). | None | New |
 
 ## 3. Routes
 
@@ -55,6 +56,7 @@ Organisers create basketball events (tournaments or leagues), define divisions a
 | `#/admin/link/:id/:div` | `/admin/events/[eventId]/divisions/[divisionId]/mobile-link` | Owner or superadmin, integration configured | Keep |
 | `#/admin/results/:id` | `/admin/events/[eventId]/results` | Owner or superadmin, integration configured | Keep |
 | (none) | `/admin/admins` | Superadmin | New (A-09) |
+| (none) | `/auth/google`, `/auth/callback` | Public (start and finish Google sign-in, A-11) | New |
 | (none) | `/admin/import-mobile` | Admin, superadmin, integration configured | New (MI-01) |
 | Legacy links `https://connect.itala.fyi/#/event/{firebaseId}` | Client redirect on `/` reads the hash, looks up `events.legacy_firebase_id`, redirects to `/events/[eventId]` | Public | New (keeps shared links working) |
 
@@ -208,6 +210,7 @@ Organisers create basketball events (tournaments or leagues), define divisions a
 | M-08 | "Same day" is decided in the **event's time zone** (new event setting, default `Pacific/Auckland`, editable). | Admin browser's local time zone | Improve (server has no browser zone) |
 | M-09 | Playoff games can be approved once their teams are resolved. | Impossible: stored playoff teams were always TBD | Improve |
 | M-10 | Local Mode (whole app in browser localStorage when Firebase was blank). Developers use the local Supabase stack instead. | `db.js` localStorage engine | Retire |
+| M-11 | Compare rosters, read only, one page per division linked to a mobile league (owner or superadmin, only with the integration on): for each team, its iTala Connect players and its paired mobile team's players in two lists side by side, each sorted by jersey number (numbers in order, others after, blanks last) then name; one note per team ("Same in both (12 players)" or "The lists differ (12 in iTala Connect, 11 in the mobile app)"), ignoring order, letter case and spacing, with "0" and "00" kept apart. A team not paired says so and points to the link wizard. Refresh reads the mobile app again. Nothing is written anywhere. Requested 27/09/2026. | None | New |
 
 ## 10A. Mobile league import (first slice)
 

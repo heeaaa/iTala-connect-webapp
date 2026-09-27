@@ -58,6 +58,13 @@ export const serverEnvSchema = clientEnvSchema
     ENABLE_PROTOTYPES: optionalBlank(z.enum(['0', '1'], { error: 'must be 0 or 1' })).transform((v) => v === '1'),
   })
   .superRefine((env, ctx) => {
+    if (env.MOBILE_SUPABASE_PUBLISHABLE_KEY && !env.MOBILE_SUPABASE_URL) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['MOBILE_SUPABASE_URL'],
+        message: 'is required when MOBILE_SUPABASE_PUBLISHABLE_KEY is set',
+      });
+    }
     if (env.MOBILE_SUPABASE_URL && !env.MOBILE_SUPABASE_PUBLISHABLE_KEY) {
       ctx.addIssue({
         code: 'custom',

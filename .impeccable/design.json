@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-26T12:00:00+12:00",
+  "generatedAt": "2026-09-26T18:00:00+12:00",
   "title": "Design System: iTala Connect",
   "scope": "Two scoped worlds that never mix. Event pages (a published event at /events/[eventId]): Painted Lines, organiser --ev-* tokens only; colour values are the default event theme. Platform screens (Home, Sign in, admin shell, 404 pages): Broadcast Package, --brand-* tokens (frontmatter keys prefixed platform-). Brand tokens never apply inside an event page; the only iTala element there is the \"Powered by iTala Connect\" footer, painted in event tokens.",
   "extensions": {
@@ -706,6 +706,51 @@
       "html": "<form class=\"ds-form\"><div class=\"ds-field\"><label class=\"ds-label\" for=\"ds-email\">Email</label><input class=\"ds-input\" id=\"ds-email\" type=\"email\" value=\"organiser@example.nz\"></div><div class=\"ds-field\"><label class=\"ds-label\" for=\"ds-pw\">Password</label><input class=\"ds-input\" id=\"ds-pw\" type=\"password\" aria-invalid=\"true\" value=\"secret\"></div><p class=\"ds-form-error\" role=\"alert\">Email or password is not right.</p></form>",
       "css": ".ds-form { display: grid; gap: 1.25rem; max-width: 26rem; padding: 1.5rem 1.5rem 1.75rem; background: var(--brand-surface, #172033); clip-path: polygon(0 0, 100% 0, 100% calc(100% - 1.25rem), calc(100% - 1.25rem) 100%, 0 100%); font-family: Saira, system-ui, sans-serif; } .ds-field { display: grid; gap: 0.375rem; } .ds-label { color: var(--brand-muted, #8B95B5); font-stretch: 80%; font-weight: 700; font-size: 0.8125rem; letter-spacing: 0.1em; text-transform: uppercase; } .ds-input { min-height: 3rem; padding: 0 0.875rem; border: 0; border-bottom: 2px solid var(--brand-border, #243049); background: var(--brand-bg, #0B0F18); color: var(--brand-text, #F4F8FF); font: inherit; font-size: 1rem; transition: border-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-input:hover { border-bottom-color: var(--brand-muted, #8B95B5); } .ds-input:focus-visible { outline: 2px solid var(--brand-accent, #12D7D0); outline-offset: 0; border-bottom-color: var(--brand-accent, #12D7D0); } .ds-input[aria-invalid='true'] { border-bottom-color: var(--brand-danger, #FF7A7A); } .ds-form-error { margin: 0; color: var(--brand-danger, #FF7A7A); font-weight: 600; font-size: 0.9375rem; }",
       "world": "platform"
+    },
+    {
+      "name": "Platform Action Row",
+      "kind": "custom",
+      "refersTo": "platform-danger-action",
+      "description": "Wrapping row of actions, 0.75rem apart, every target at least 2.75rem; one filled plate leads, danger text actions follow.",
+      "html": "<div class=\"ds-wrap\"><div class=\"ds-row\"><button class=\"ds-btn ds-btn-live\" type=\"button\">Save draft</button></div><div class=\"ds-row\"><button class=\"ds-btn ds-btn-quiet\" type=\"button\">Players (2)</button><button class=\"ds-danger\" type=\"button\">Remove team</button></div></div>",
+      "css": ".ds-wrap { display: grid; gap: 1rem; padding: 1rem; background: var(--brand-bg, #0B0F18); font-family: Saira, system-ui, sans-serif; color: var(--brand-text, #F4F8FF); } .ds-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 calc(1rem + 0.9rem) 0 1rem; border: 0; clip-path: polygon(0 0, 100% 0, calc(100% - 0.9rem) 100%, 0 100%); font-family: Saira, system-ui, sans-serif; font-stretch: 85%; font-weight: 800; font-size: 0.9375rem; letter-spacing: 0.06em; text-transform: uppercase; white-space: normal; text-align: center; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-live { background: var(--brand-live, #C7F000); color: var(--brand-live-text, #0B0F18); } .ds-btn-live:hover { background: #D8FF3A; } .ds-btn-teal { background: var(--brand-accent, #12D7D0); color: var(--brand-accent-text, #0B0F18); } .ds-btn-teal:hover { background: #45E6E0; } .ds-btn-quiet { background: var(--brand-raised, #1F2A40); color: var(--brand-text, #F4F8FF); } .ds-btn-quiet:hover { background: #2A3752; } .ds-btn:focus-visible, .ds-danger:focus-visible { outline: 3px solid var(--brand-focus, #12D7D0); outline-offset: 2px; } .ds-danger { min-height: 2.75rem; padding: 0.5rem 0.75rem; border: 0; background: transparent; color: var(--brand-danger, #FF7A7A); font: inherit; text-decoration: underline; text-underline-offset: 0.2em; cursor: pointer; } .ds-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; } @media (prefers-reduced-motion: reduce) { .ds-btn { transition: none; } }",
+      "world": "platform"
+    },
+    {
+      "name": "Platform Confirmation Dialog",
+      "kind": "custom",
+      "refersTo": "platform-dialog",
+      "description": "Modal Bug Plate with a 1 px teal edge over a flat 75% black scrim; Cancel first and focused, teal go-ahead named for the act.",
+      "html": "<div class=\"ds-scrim\"><div class=\"ds-dialog\" role=\"dialog\" aria-labelledby=\"ds-dlg-t\"><h2 id=\"ds-dlg-t\">Discard unsaved changes?</h2><p>Your latest edits have not been saved.</p><div class=\"ds-row\"><button class=\"ds-btn ds-btn-quiet\" type=\"button\">Cancel</button><button class=\"ds-btn ds-btn-teal\" type=\"button\">Continue</button></div></div></div>",
+      "css": ".ds-scrim { padding: 2rem 1rem; background: rgb(0 0 0 / 75%); font-family: Saira, system-ui, sans-serif; } .ds-dialog { max-width: min(42rem, calc(100vw - 2rem)); padding: 1.5rem; border: 1px solid var(--brand-accent, #12D7D0); background: var(--brand-surface, #172033); color: var(--brand-text, #F4F8FF); } .ds-dialog h2 { margin: 0 0 1rem; font-size: 1.5rem; font-weight: 750; } .ds-dialog p { margin: 0 0 1rem; line-height: 1.55; } .ds-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 calc(1rem + 0.9rem) 0 1rem; border: 0; clip-path: polygon(0 0, 100% 0, calc(100% - 0.9rem) 100%, 0 100%); font-family: Saira, system-ui, sans-serif; font-stretch: 85%; font-weight: 800; font-size: 0.9375rem; letter-spacing: 0.06em; text-transform: uppercase; white-space: normal; text-align: center; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-live { background: var(--brand-live, #C7F000); color: var(--brand-live-text, #0B0F18); } .ds-btn-live:hover { background: #D8FF3A; } .ds-btn-teal { background: var(--brand-accent, #12D7D0); color: var(--brand-accent-text, #0B0F18); } .ds-btn-teal:hover { background: #45E6E0; } .ds-btn-quiet { background: var(--brand-raised, #1F2A40); color: var(--brand-text, #F4F8FF); } .ds-btn-quiet:hover { background: #2A3752; } .ds-btn:focus-visible, .ds-danger:focus-visible { outline: 3px solid var(--brand-focus, #12D7D0); outline-offset: 2px; } .ds-danger { min-height: 2.75rem; padding: 0.5rem 0.75rem; border: 0; background: transparent; color: var(--brand-danger, #FF7A7A); font: inherit; text-decoration: underline; text-underline-offset: 0.2em; cursor: pointer; } .ds-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; } @media (prefers-reduced-motion: reduce) { .ds-btn { transition: none; } }",
+      "world": "platform"
+    },
+    {
+      "name": "Platform Players Dialog",
+      "kind": "custom",
+      "refersTo": "platform-dialog",
+      "description": "Dialog frame with player rows (number, name, danger Remove); Add player quiet, Done teal.",
+      "html": "<div class=\"ds-dialog\" role=\"dialog\" aria-labelledby=\"ds-pl-t\"><h2 id=\"ds-pl-t\">Players · Harbour Hawks</h2><div class=\"ds-prow\"><label class=\"ds-field\"><span class=\"ds-label\">Number 1</span><input class=\"ds-input\" value=\"7\"></label><label class=\"ds-field\"><span class=\"ds-label\">Player 1</span><input class=\"ds-input\" value=\"Aroha Ngata\"></label><button class=\"ds-danger\" type=\"button\">Remove</button></div><div class=\"ds-row\"><button class=\"ds-btn ds-btn-quiet\" type=\"button\">Add player</button><button class=\"ds-btn ds-btn-teal\" type=\"button\">Done</button></div></div>",
+      "css": ".ds-dialog { max-width: min(42rem, calc(100vw - 2rem)); padding: 1.5rem; border: 1px solid var(--brand-accent, #12D7D0); background: var(--brand-surface, #172033); color: var(--brand-text, #F4F8FF); font-family: Saira, system-ui, sans-serif; } .ds-dialog h2 { margin: 0 0 1rem; font-size: 1.5rem; font-weight: 750; } .ds-prow { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr) auto; gap: 0.5rem; align-items: end; margin-bottom: 0.75rem; } .ds-field { display: grid; gap: 0.375rem; min-width: 0; } .ds-label { color: var(--brand-muted, #8B95B5); font-stretch: 80%; font-weight: 700; font-size: 0.8125rem; letter-spacing: 0.1em; text-transform: uppercase; } .ds-input { min-width: 0; width: 100%; min-height: 3rem; padding: 0 0.875rem; border: 0; border-bottom: 2px solid var(--brand-border, #243049); background: var(--brand-bg, #0B0F18); color: var(--brand-text, #F4F8FF); font: inherit; } .ds-input:focus-visible { outline: 2px solid var(--brand-accent, #12D7D0); outline-offset: 0; border-bottom-color: var(--brand-accent, #12D7D0); } @media (max-width: 40rem) { .ds-prow { grid-template-columns: 4rem minmax(0, 1fr); } .ds-prow .ds-danger { grid-column: 2; justify-self: end; } } .ds-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 calc(1rem + 0.9rem) 0 1rem; border: 0; clip-path: polygon(0 0, 100% 0, calc(100% - 0.9rem) 100%, 0 100%); font-family: Saira, system-ui, sans-serif; font-stretch: 85%; font-weight: 800; font-size: 0.9375rem; letter-spacing: 0.06em; text-transform: uppercase; white-space: normal; text-align: center; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-live { background: var(--brand-live, #C7F000); color: var(--brand-live-text, #0B0F18); } .ds-btn-live:hover { background: #D8FF3A; } .ds-btn-teal { background: var(--brand-accent, #12D7D0); color: var(--brand-accent-text, #0B0F18); } .ds-btn-teal:hover { background: #45E6E0; } .ds-btn-quiet { background: var(--brand-raised, #1F2A40); color: var(--brand-text, #F4F8FF); } .ds-btn-quiet:hover { background: #2A3752; } .ds-btn:focus-visible, .ds-danger:focus-visible { outline: 3px solid var(--brand-focus, #12D7D0); outline-offset: 2px; } .ds-danger { min-height: 2.75rem; padding: 0.5rem 0.75rem; border: 0; background: transparent; color: var(--brand-danger, #FF7A7A); font: inherit; text-decoration: underline; text-underline-offset: 0.2em; cursor: pointer; } .ds-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; } @media (prefers-reduced-motion: reduce) { .ds-btn { transition: none; } }",
+      "world": "platform"
+    },
+    {
+      "name": "Platform Multi-date Calendar",
+      "kind": "custom",
+      "refersTo": "platform-calendar-day-selected",
+      "description": "Month grid of 2.75rem day toggles, teal when chosen; chosen dates repeat below as removable chips.",
+      "html": "<div class=\"ds-cal\"><h3>Event dates (2 selected)</h3><div class=\"ds-row\"><button class=\"ds-btn ds-btn-quiet\" type=\"button\" aria-label=\"Previous month\">Previous</button><span>October 2026</span><button class=\"ds-btn ds-btn-quiet\" type=\"button\" aria-label=\"Next month\">Next</button></div><div class=\"ds-week\" aria-hidden=\"true\"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div><div class=\"ds-week\" role=\"group\" aria-label=\"Choose event dates\"><span></span><span></span><span></span><span></span><button type=\"button\" aria-pressed=\"false\">1</button><button type=\"button\" aria-pressed=\"true\" aria-label=\"02/10/2026\">2</button><button type=\"button\" aria-pressed=\"false\">3</button><button type=\"button\" aria-pressed=\"false\">4</button><button type=\"button\" aria-pressed=\"false\">5</button><button type=\"button\" aria-pressed=\"false\">6</button><button type=\"button\" aria-pressed=\"false\">7</button><button type=\"button\" aria-pressed=\"false\">8</button><button type=\"button\" aria-pressed=\"true\" aria-label=\"09/10/2026\">9</button><button type=\"button\" aria-pressed=\"false\">10</button></div><ul class=\"ds-chips\"><li><button type=\"button\" aria-label=\"Remove 02/10/2026\">02/10/2026 · Remove</button></li><li><button type=\"button\" aria-label=\"Remove 09/10/2026\">09/10/2026 · Remove</button></li></ul></div>",
+      "css": ".ds-cal { max-width: 24rem; padding: 1rem; background: var(--brand-bg, #0B0F18); color: var(--brand-text, #F4F8FF); font-family: Saira, system-ui, sans-serif; font-variant-numeric: tabular-nums; } .ds-cal h3 { margin: 0 0 0.75rem; font-size: 1.125rem; font-weight: 750; } .ds-cal .ds-row { margin: 0 0 0.75rem; } .ds-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); text-align: center; } .ds-week button { min-height: 2.75rem; border: 1px solid transparent; background: transparent; color: inherit; font: inherit; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-week button:hover { background: var(--brand-raised, #1F2A40); } .ds-week button[aria-pressed='true'] { background: var(--brand-accent, #12D7D0); color: var(--brand-accent-text, #0B0F18); } .ds-week button:focus-visible, .ds-chips button:focus-visible { outline: 3px solid var(--brand-focus, #12D7D0); outline-offset: 2px; } .ds-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0 0; padding: 0; list-style: none; } .ds-chips button { min-height: 2.75rem; padding: 0.5rem; border: 1px solid var(--brand-border, #243049); background: transparent; color: inherit; font: inherit; cursor: pointer; } @media (prefers-reduced-motion: reduce) { .ds-week button { transition: none; } } .ds-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 calc(1rem + 0.9rem) 0 1rem; border: 0; clip-path: polygon(0 0, 100% 0, calc(100% - 0.9rem) 100%, 0 100%); font-family: Saira, system-ui, sans-serif; font-stretch: 85%; font-weight: 800; font-size: 0.9375rem; letter-spacing: 0.06em; text-transform: uppercase; white-space: normal; text-align: center; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-live { background: var(--brand-live, #C7F000); color: var(--brand-live-text, #0B0F18); } .ds-btn-live:hover { background: #D8FF3A; } .ds-btn-teal { background: var(--brand-accent, #12D7D0); color: var(--brand-accent-text, #0B0F18); } .ds-btn-teal:hover { background: #45E6E0; } .ds-btn-quiet { background: var(--brand-raised, #1F2A40); color: var(--brand-text, #F4F8FF); } .ds-btn-quiet:hover { background: #2A3752; } .ds-btn:focus-visible, .ds-danger:focus-visible { outline: 3px solid var(--brand-focus, #12D7D0); outline-offset: 2px; } .ds-danger { min-height: 2.75rem; padding: 0.5rem 0.75rem; border: 0; background: transparent; color: var(--brand-danger, #FF7A7A); font: inherit; text-decoration: underline; text-underline-offset: 0.2em; cursor: pointer; } .ds-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; } @media (prefers-reduced-motion: reduce) { .ds-btn { transition: none; } }",
+      "world": "platform"
+    },
+    {
+      "name": "Platform Editor Section and Notice",
+      "kind": "custom",
+      "refersTo": "platform-workspace-notice",
+      "description": "Native disclosure section under a 1 px seam rule with a 2.75rem summary; workspace notice is a 1 px teal outline with no fill.",
+      "html": "<div class=\"ds-ed\"><p class=\"ds-notice\" role=\"status\">Saved</p><details open class=\"ds-sec\"><summary>Divisions (1)</summary><p class=\"ds-notice\">Linked to iTala mobile: Harbour League (2026)</p></details><details class=\"ds-sec\"><summary>Event details</summary></details></div>",
+      "css": ".ds-ed { padding: 1rem; background: var(--brand-bg, #0B0F18); color: var(--brand-text, #F4F8FF); font-family: Saira, system-ui, sans-serif; } .ds-notice { margin: 0 0 1rem; padding: 1rem; border: 1px solid var(--brand-accent, #12D7D0); line-height: 1.5; overflow-wrap: anywhere; } .ds-sec { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--brand-border, #243049); } .ds-sec summary { min-height: 2.75rem; font-size: 1.5rem; font-weight: 750; font-stretch: 80%; cursor: pointer; } .ds-sec > summary { margin-bottom: 1rem; } .ds-sec summary:focus-visible { outline: 3px solid var(--brand-focus, #12D7D0); outline-offset: 2px; }",
+      "world": "platform"
     }
   ],
   "narrative": {
@@ -837,6 +882,18 @@
         "world": "platform",
         "section": "shapes",
         "body": "A clipped plate would cut off an outside focus ring, so focusable plates (event bugs) draw the 3 px teal ring inside (-3px offset)."
+      },
+      {
+        "name": "The Red Is Words Rule",
+        "world": "platform",
+        "section": "components",
+        "body": "A destructive action outside a dialog is Alert Red underlined text, never a filled plate."
+      },
+      {
+        "name": "The Safe Choice First Rule",
+        "world": "platform",
+        "section": "components",
+        "body": "In a confirmation dialog Cancel comes first and takes focus; the go-ahead is teal and names the act. A confirm is never lime."
       }
     ],
     "dos": [
@@ -856,7 +913,10 @@
       "Do set plates, names, labels, buttons and nav in condensed Saira caps, and reading text at normal width.",
       "Do say every status in words on its bug; colour only reinforces it.",
       "Do keep \"iTala\" in its own casing inside capitalised plates.",
-      "Do place the iTala mark directly on Network Ground, unaltered."
+      "Do place the iTala mark directly on Network Ground, unaltered.",
+      "Do keep every link and button in an action row at least 2.75rem tall, wrapping rather than truncating.",
+      "Do ask through the confirmation dialog, Cancel first, before an event, team or division is removed or unsaved edits are lost.",
+      "Do repeat every chosen calendar date as a removable chip beneath the calendar."
     ],
     "donts": [
       "Don't add shadows, glows, gradients, blurs, glass or textures in either world.",
@@ -870,7 +930,9 @@
       "Don't build white cards, a left sidebar, or rounded corners; the only circle is the LIVE pip.",
       "Don't add motion beyond the one-time title plate wipe, the LIVE pip and 150ms colour transitions.",
       "Don't describe or treat the iTala mark as transparent, or recolour, crop or re-ground it.",
-      "Don't apply the iTala mobile app's colour-role rule here; it was declared not binding on 26/09/2026."
+      "Don't apply the iTala mobile app's colour-role rule here; it was declared not binding on 26/09/2026.",
+      "Don't put a destructive action on a filled plate, or make a dialog's go-ahead lime.",
+      "Don't use the browser's native confirm prompt for in-app questions; the only native prompt left is the reload and close-tab fallback."
     ],
     "worlds": {
       "event": {
@@ -940,6 +1002,10 @@
     {
       "date": "26/09/2026",
       "decision": "public/brand/itala-mark.png is the mobile app's favicon.png (196 by 196) copied unchanged; its ground #0B0F18 equals the platform ground. Provenance is embedded in the PNG text metadata. It is not a transparent cut-out."
+    },
+    {
+      "date": "26/09/2026",
+      "decision": "Phase 3b admin workspace recorded as an ordinary extension of Broadcast Package: action rows, danger text action, confirmation dialog (also the unsaved-changes guard), players dialog, multi-date calendar picker, editor collapsible sections and workspace notices. Finish review disposition: ship."
     }
   ]
 }

@@ -12,7 +12,16 @@ export function LoginForm({ next }: { next: string }) {
   const invalid = state.error ? true : undefined;
 
   return (
-    <form action={formAction} className={s.formPanel} noValidate>
+    <form
+      action={formAction}
+      className={s.formPanel}
+      noValidate
+      // The button stays focusable while it runs (a disabled one drops keyboard focus to the page,
+      // so after a refusal the person would start again from the top); a second press is ignored.
+      onSubmit={(e) => {
+        if (pending) e.preventDefault();
+      }}
+    >
       <input type="hidden" name="next" value={next} />
 
       <div className={s.field}>
@@ -52,7 +61,7 @@ export function LoginForm({ next }: { next: string }) {
         {state.error ?? ''}
       </p>
 
-      <button type="submit" disabled={pending} className={`${s.button} ${s.buttonLive}`}>
+      <button type="submit" aria-disabled={pending} className={`${s.button} ${s.buttonLive}`}>
         {pending ? 'Signing in...' : 'Sign in'}
       </button>
     </form>

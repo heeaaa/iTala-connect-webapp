@@ -189,6 +189,24 @@ export type Database = {
           },
         ]
       }
+      event_image_cleanup: {
+        Row: {
+          created_at: string
+          event_id: string
+          requested_by: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          requested_by: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          requested_by?: string
+        }
+        Relationships: []
+      }
       event_sponsors: {
         Row: {
           created_at: string
@@ -685,6 +703,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_playoff: {
+        Args: { p_event_id: string; p_games: Json; p_unschedule: string[] }
+        Returns: number
+      }
+      add_round_robin: {
+        Args: {
+          p_custom: boolean
+          p_division_id: string
+          p_event_id: string
+          p_games: Json
+          p_games_per_team: number
+          p_unschedule: string[]
+        }
+        Returns: number
+      }
       append_games: {
         Args: { p_event_id: string; p_games: Json }
         Returns: number
@@ -694,14 +727,43 @@ export type Database = {
         Returns: undefined
       }
       assert_event_editor: { Args: { p_event_id: string }; Returns: undefined }
+      begin_schedule_addition: {
+        Args: { p_event_id: string; p_unschedule: string[] }
+        Returns: undefined
+      }
       can_read_event: { Args: { p_event_id: string }; Returns: boolean }
       can_write_image_path: { Args: { p_name: string }; Returns: boolean }
+      create_draft_event: {
+        Args: { p_name: string; p_rules: string; p_timezone: string }
+        Returns: string
+      }
+      dates_are_distinct: { Args: { p_days: string[] }; Returns: boolean }
       dismiss_mobile_result: {
         Args: { p_game_id: string; p_source: Json }
         Returns: undefined
       }
       division_event_id: { Args: { p_division_id: string }; Returns: string }
       game_event_id: { Args: { p_game_id: string }; Returns: string }
+      import_legacy_event: {
+        Args: { p_event: Json; p_force?: boolean; p_owner: string }
+        Returns: Json
+      }
+      import_legacy_platform: {
+        Args: { p_default_rules_html: string }
+        Returns: boolean
+      }
+      import_mobile_league: {
+        Args: {
+          p_allow_duplicate?: boolean
+          p_division_name: string
+          p_event_name: string
+          p_league: Json
+          p_rules: string
+          p_teams: Json
+          p_timezone: string
+        }
+        Returns: string
+      }
       insert_games_json_invoker: {
         Args: { p_event_id: string; p_games: Json }
         Returns: number
@@ -711,6 +773,20 @@ export type Database = {
       is_event_published: { Args: { p_event_id: string }; Returns: boolean }
       is_privileged_role: { Args: never; Returns: boolean }
       is_superadmin: { Args: never; Returns: boolean }
+      legacy_import_baseline: { Args: { p_event_id: string }; Returns: string }
+      legacy_import_changes: { Args: { p_event_id: string }; Returns: string }
+      legacy_import_running: { Args: never; Returns: boolean }
+      list_admin_accounts: {
+        Args: never
+        Returns: {
+          disabled_at: string
+          display_name: string
+          email: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          signed_in: boolean
+        }[]
+      }
       move_game: {
         Args: {
           p_court: number
@@ -723,6 +799,51 @@ export type Database = {
       publish_event: {
         Args: { p_clear_scores?: boolean; p_event_id: string; p_games: Json }
         Returns: number
+      }
+      record_account_link: {
+        Args: { p_account: string; p_kind: string }
+        Returns: undefined
+      }
+      save_event_editor: {
+        Args: {
+          p_details: Json
+          p_divisions: Json
+          p_event_id: string
+          p_unschedule?: string[]
+          p_version: string
+        }
+        Returns: string
+      }
+      set_division_mobile_link: {
+        Args: {
+          p_division_id: string
+          p_league_id: string
+          p_league_name: string
+          p_season: string
+          p_teams: Json
+        }
+        Returns: undefined
+      }
+      set_event_logo: {
+        Args: { p_event_id: string; p_path?: string; p_version?: string }
+        Returns: {
+          old_path: string
+          version: string
+        }[]
+      }
+      set_legacy_event_images: {
+        Args: {
+          p_event_id: string
+          p_logo_path: string
+          p_replace?: boolean
+          p_sponsors: Json
+        }
+        Returns: string[]
+      }
+      set_legacy_platform_sponsors: { Args: { p_sponsors: Json }; Returns: boolean }
+      set_major_sponsor: {
+        Args: { p_event_id: string; p_path?: string }
+        Returns: string
       }
       set_score: {
         Args: { p_game_id: string; p_s1: number; p_s2: number }

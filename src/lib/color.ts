@@ -34,3 +34,15 @@ export function contrastRatio(a: string, b: string): number {
 export function readableOn(hex: string): '#000000' | '#FFFFFF' {
   return contrastRatio(hex, '#000000') >= contrastRatio(hex, '#FFFFFF') ? '#000000' : '#FFFFFF';
 }
+
+const hex2 = (n: number) => n.toString(16).padStart(2, '0').toUpperCase();
+
+/**
+ * Semi and final cards (E-43): the old warm shift of the division colour
+ * (red +60, green +40, blue -20), returned as a valid #RRGGBB. The old code
+ * returned rgb() into hex maths and painted NaN.
+ */
+export function playoffColour(divisionColour: string): string {
+  const [r, g, b] = isHexColour(divisionColour) ? channels(divisionColour) : [0x88, 0x88, 0x88];
+  return `#${hex2(Math.min(255, r + 60))}${hex2(Math.min(255, g + 40))}${hex2(Math.max(0, b - 20))}`;
+}

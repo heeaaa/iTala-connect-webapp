@@ -118,27 +118,9 @@ export function hhmm(time: string | null): string | null {
   return time ? time.slice(0, 5) : null;
 }
 
-const byOrder = <T extends { sort_order: number; created_at?: string }>(a: T, b: T) =>
-  a.sort_order - b.sort_order || (a.created_at ?? '').localeCompare(b.created_at ?? '');
-
-export function toEventModel(rows: EventRows, supabaseUrl: string): EventModel {
-  const { event } = rows;
-  const divisions = [...rows.divisions].sort(byOrder);
-  const teams = [...rows.teams].sort(byOrder);
-  const playersByTeam = new Map<string, EventModel['teams'][number]['players']>();
-  for (const p of [...rows.players].sort(byOrder)) {
-    playersByTeam.set(p.team_id, [
-      ...(playersByTeam.get(p.team_id) ?? []),
-      { id: p.id, name: p.name, number: p.number },
-    ]);
-  }
-  const sponsorUrls = (list: SponsorRow[], tier: string) =>
-    [...list]
-      .filter((s) => s.tier === tier)
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map((s) => imageUrl(supabaseUrl, s.image_path)!);
-
-  const games = [...rows.games]
+/** Stored games in schedule order, as domain games without scores. */
+export function gamesFromRows(rows: readonly GameRow[]): (Game & { id: string })[] {
+  return [...rows]
     .sort((a, b) => a.position - b.position)
     .map((g): Game & { id: string } => {
       const s1 = g.is_playoff ? playoffSource(g.team1_source) : null;
@@ -170,6 +152,29 @@ export function toEventModel(rows: EventRows, supabaseUrl: string): EventModel {
           : {}),
       };
     });
+}
+
+const byOrder = <T extends { sort_order: number; created_at?: string }>(a: T, b: T) =>
+  a.sort_order - b.sort_order || (a.created_at ?? '').localeCompare(b.created_at ?? '');
+
+export function toEventModel(rows: EventRows, supabaseUrl: string): EventModel {
+  const { event } = rows;
+  const divisions = [...rows.divisions].sort(byOrder);
+  const teams = [...rows.teams].sort(byOrder);
+  const playersByTeam = new Map<string, EventModel['teams'][number]['players']>();
+  for (const p of [...rows.players].sort(byOrder)) {
+    playersByTeam.set(p.team_id, [
+      ...(playersByTeam.get(p.team_id) ?? []),
+      { id: p.id, name: p.name, number: p.number },
+    ]);
+  }
+  const sponsorUrls = (list: SponsorRow[], tier: string) =>
+    [...list]
+      .filter((s) => s.tier === tier)
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((s) => imageUrl(supabaseUrl, s.image_path)!);
+
+  const games = gamesFromRows(rows.games);
 
   return {
     id: event.id,

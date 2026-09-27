@@ -1,0 +1,4 @@
+# False positives only: made-up 56-character test tokens in unit tests, not credentials
+# (gitleaks generic-api-key, commit 6c627e6). The tests now build low-randomness tokens instead.
+6c627e63d88b757f9f52369d39943b0424d959a7:tests/unit/account-actions.test.ts:generic-api-key:26
+6c627e63d88b757f9f52369d39943b0424d959a7:tests/unit/admin-actions.test.ts:generic-api-key:56

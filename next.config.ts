@@ -14,6 +14,11 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  experimental: {
+    // Event logo and sponsor uploads (E-18) go through a Server Action. The
+    // browser shrinks them to 1600 px first; 5 MB matches the images bucket.
+    serverActions: { bodySizeLimit: '5mb' },
+  },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
