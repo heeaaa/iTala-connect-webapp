@@ -477,7 +477,8 @@ User decision: add Google sign-in (the same Google account as the iTala mobile a
   - The integration test gains the real case: a score entered in Connect through the API blocks the re-import, and `--overwrite` restores the export's score.
   - **Red check:** redirects, keeping earlier images, and the address allow-list were each undone; each test failed; files restored.
 - **Evidence (work laptop):** lint and typecheck pass; `test:coverage` 59 files, **871 tests pass**; `src/migration` 99% lines, 97% branches; a clean build and `check:secrets` pass. Not run on the laptop: pgTAP `016` and the integration tests (CI).
-- **You, after CI passes:** push `20260927000700_legacy_import_guards.sql` with the others (0100 to 0700).
+- **CI run 36295332381 on `1ca94c5`: green**, 871 unit and component tests, **329/329 pgTAP** (with `016`), **37/37 integration** (with the Connect-change guard through the API), 80/80 E2E. The first run (`1675911`) failed only in pgTAP `016` test 6: the signed-in role could not read the test's payload table (26 of 27 passed); fixed with a grant.
+- **You, now that CI has passed:** push `20260927000700_legacy_import_guards.sql` with the others (0100 to 0700).
 
 ### Phase 7c: images (27/09/2026)
 
