@@ -148,13 +148,17 @@ test('creates a draft, guards unsaved edits, deletes with confirmation, and refu
   await page.getByRole('link', { name: 'Cancel', exact: true }).click();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page).toHaveURL(/\/admin$/);
+  const dashboardName =
+    info.project.name === 'mobile'
+      ? page.getByTestId('dashboard-mobile-list').locator('strong', { hasText: name })
+      : page.getByRole('cell', { name, exact: true });
   await page.getByRole('button', { name: `Delete ${name}`, exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText("This can't be undone.");
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(page.getByRole('cell', { name, exact: true })).toBeVisible();
+  await expect(dashboardName).toBeVisible();
   await page.getByRole('button', { name: `Delete ${name}`, exact: true }).click();
   await page.getByRole('button', { name: 'Delete event', exact: true }).click();
-  await expect(page.getByRole('cell', { name, exact: true })).toHaveCount(0);
+  await expect(dashboardName).toHaveCount(0);
   expect((await storage.list(`events/${eventId}/nested`)).data).toEqual([]);
   expect((await adminClient().from('event_image_cleanup').select('event_id').eq('event_id', eventId)).data).toEqual([]);
 });
