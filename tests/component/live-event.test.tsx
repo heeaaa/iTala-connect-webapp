@@ -170,6 +170,74 @@ describe('LiveEvent (PRD P-07, P-08)', () => {
     expect(saveScore).toHaveBeenCalledWith({ gameId: GAME, score1: 25, score2: 18 });
   });
 
+  it('locks completed scores until the admin opens the lock, then relocks after saving', async () => {
+    saveScore.mockResolvedValue({ ok: true, data: undefined });
+    const finalRendered = Date.parse('2026-10-03T23:30:00Z'); // 12:30 pm on 04/10 in Auckland
+    render(<LiveEvent model={model()} tab="schedule" selectedDay={null} canEdit renderedAt={finalRendered} />);
+
+    const input = screen.getByRole('textbox', { name: /Hawks score, 10:00 am/ });
+    expect(input).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /Unlock score for Hawks versus Bolts/ }));
+    expect(input).not.toBeDisabled();
+
+    fireEvent.change(input, { target: { value: '25' } });
+    await act(async () => vi.advanceTimersByTime(800));
+    expect(saveScore).toHaveBeenCalledWith({ gameId: GAME, score1: 25, score2: 18 });
+    expect(input).toBeDisabled();
+  });
+
+  it('keeps a newer score edit open while an earlier save finishes', async () => {
+    let finishFirst!: (result: { ok: true; data: undefined }) => void;
+    saveScore.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishFirst = resolve;
+        }),
+    );
+    saveScore.mockResolvedValue({ ok: true, data: undefined });
+    const finalRendered = Date.parse('2026-10-03T23:30:00Z');
+    render(<LiveEvent model={model()} tab="schedule" selectedDay={null} canEdit renderedAt={finalRendered} />);
+    fireEvent.click(screen.getByRole('button', { name: /Unlock score for Hawks versus Bolts/ }));
+    const input = screen.getByRole('textbox', { name: /Hawks score/ });
+    fireEvent.change(input, { target: { value: '25' } });
+    await act(async () => vi.advanceTimersByTime(800));
+    fireEvent.change(input, { target: { value: '26' } });
+    await act(async () => finishFirst({ ok: true, data: undefined }));
+    expect(input).not.toBeDisabled();
+    await act(async () => vi.advanceTimersByTime(800));
+    expect(saveScore).toHaveBeenLastCalledWith({ gameId: GAME, score1: 26, score2: 18 });
+    expect(input).toBeDisabled();
+  });
+
+  it('keeps a past game with a missing score editable until both scores save', async () => {
+    let finish!: (result: { ok: true; data: undefined }) => void;
+    saveScore.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const awaiting = model();
+    awaiting.scores[GAME] = { score1: 20, score2: null };
+    render(
+      <LiveEvent
+        model={awaiting}
+        tab="schedule"
+        selectedDay={null}
+        canEdit
+        renderedAt={Date.parse('2026-10-03T23:30:00Z')}
+      />,
+    );
+    const input = screen.getByRole('textbox', { name: /Bolts score/ });
+    expect(input).not.toBeDisabled();
+    fireEvent.change(input, { target: { value: '18' } });
+    expect(input).not.toBeDisabled();
+    await act(async () => vi.advanceTimersByTime(800));
+    expect(input).not.toBeDisabled();
+    await act(async () => finish({ ok: true, data: undefined }));
+    expect(input).toBeDisabled();
+  });
+
   it('a failed save says so and puts the score back', async () => {
     saveScore.mockResolvedValue({ ok: false, error: 'Could not save the score. Check your connection and try again.' });
     render(<LiveEvent model={model()} tab="schedule" selectedDay={null} canEdit renderedAt={RENDERED} />);

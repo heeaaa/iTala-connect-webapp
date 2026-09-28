@@ -12,7 +12,10 @@ test.afterEach(async () => {
 });
 
 // E-15 to E-18 and E-70, E-71: images and rules on an event, stored and shown on its page.
-test('uploads the logo and sponsors, writes the rules, and shows them on the event page', async ({ page }, info) => {
+test('uploads event images, saves sponsor backing and banner crop, and shows them on the event page', async ({
+  page,
+}, info) => {
+  test.setTimeout(60_000);
   // Violations are sent to the test as they happen, so none are lost when the page navigates.
   const csp: string[] = [];
   await page.exposeFunction('reportCsp', (v: string) => csp.push(v));
@@ -30,7 +33,9 @@ test('uploads the logo and sponsors, writes the rules, and shows them on the eve
   const eventId = new URL(page.url()).pathname.split('/').pop()!;
   const main = page.getByRole('main');
   const db = adminClient();
-  const stored = async () => (await db.from('events').select('logo_path, rules_html').eq('id', eventId).single()).data!;
+  const stored = async () =>
+    (await db.from('events').select('logo_path, banner_path, banner_focus, rules_html').eq('id', eventId).single())
+      .data!;
   const files = async () =>
     ((await db.storage.from('images').list(`events/${eventId}`)).data ?? []).map((f) => f.name).sort();
 
@@ -51,18 +56,30 @@ test('uploads the logo and sponsors, writes the rules, and shows them on the eve
   await expect.poll(async () => (await stored()).logo_path).not.toBe(first);
   await expect.poll(files).not.toContain(first.split('/').pop());
 
+  await main.getByLabel('Upload event banner').setInputFiles(file('banner.png', 2000, 1000));
+  await expect(main.getByText('Event banner saved.')).toBeVisible();
+  await expect(main.getByLabel('Desktop banner preview')).toBeVisible();
+  await expect(main.getByLabel('Mobile banner preview')).toBeVisible();
+  await main.getByLabel('Banner focal point').selectOption('right');
+  await expect(main.getByText('Banner focal point saved.')).toBeVisible();
+  expect((await stored()).banner_focus).toBe('right');
+  expect((await stored()).banner_path).toMatch(new RegExp(`^events/${eventId}/banner-[0-9a-f-]{36}\\.webp$`));
+
   // Sponsors: a major one and two minor ones, then one minor removed.
   await main.getByLabel('Upload major sponsor').setInputFiles(file('major.png'));
   await expect(main.getByText('Major sponsor saved.')).toBeVisible();
+  await main.getByRole('combobox', { name: 'Logo backing' }).selectOption('dark');
+  await expect(main.getByText('Sponsor backing saved.')).toBeVisible();
   await main.getByLabel('Add minor sponsors').setInputFiles([file('a.png'), file('b.png')]);
   await expect(main.getByText('2 minor sponsors added.')).toBeVisible();
   await expect(main.getByRole('img', { name: /^Minor sponsor logo/ })).toHaveCount(2);
   await main.getByRole('button', { name: 'Remove minor sponsor 2' }).click();
   await expect(main.getByText('Minor sponsor removed.')).toBeVisible();
   await expect(main.getByRole('img', { name: /^Minor sponsor logo/ })).toHaveCount(1);
-  const { data: sponsors } = await db.from('event_sponsors').select('tier').eq('event_id', eventId);
+  const { data: sponsors } = await db.from('event_sponsors').select('tier, display_mode').eq('event_id', eventId);
   expect(sponsors!.map((s) => s.tier).sort()).toEqual(['major', 'minor']);
-  await expect.poll(async () => (await files()).length).toBe(3);
+  expect(sponsors!.find((s) => s.tier === 'major')?.display_mode).toBe('dark');
+  await expect.poll(async () => (await files()).length).toBe(4);
 
   // Rules: formatted with the toolbar, saved with the event, cleaned on the way in.
   const rules = main.getByRole('textbox', { name: 'Event rules' });
@@ -84,13 +101,21 @@ test('uploads the logo and sponsors, writes the rules, and shows them on the eve
   await expect(page.getByText('Five fouls and you sit.')).toBeVisible();
   await expect(page.getByRole('img', { name: `${name} logo` })).toBeVisible();
   await expect(page.getByRole('img', { name: 'Sponsor logo' })).toHaveCount(2);
+  await expect(page.getByRole('link', { name: 'All events' })).toHaveAttribute('href', '/');
+  await expect(page.locator('img[data-focus="right"]')).toBeVisible();
+  await expect(page.locator('[data-mode="dark"] img[alt="Sponsor logo"]')).toHaveCount(1);
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(await page.locator('img[data-focus="right"]').evaluate((img) => getComputedStyle(img).objectPosition)).toBe(
+    '100% 50%',
+  );
+  await page.setViewportSize({ width: 1280, height: 800 });
 
   // Removing the logo deletes its file too.
   await page.goto(`/admin/events/${eventId}`);
   await main.getByRole('button', { name: 'Remove logo', exact: true }).click();
   await expect(main.getByText('Logo removed.')).toBeVisible();
   expect((await stored()).logo_path).toBeNull();
-  await expect.poll(async () => (await files()).length).toBe(2);
+  await expect.poll(async () => (await files()).length).toBe(3);
   // Only zod's harmless eval probe is expected.
   expect(csp.filter((v) => !v.startsWith('script-src eval'))).toEqual([]);
 });

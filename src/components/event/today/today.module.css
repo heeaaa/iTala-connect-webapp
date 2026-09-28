@@ -803,6 +803,30 @@
   min-width: 0;
 }
 
+.lockButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-left: auto;
+  border: 0;
+  color: var(--ev-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.lockButton:hover,
+.lockButton:focus-visible {
+  color: var(--ev-heading);
+}
+
+.lockButton svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  fill: currentColor;
+}
+
 .cellHead .swatch {
   width: 0.625rem;
   height: 0.625rem;

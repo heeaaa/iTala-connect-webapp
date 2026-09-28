@@ -26,6 +26,10 @@
   scrollbar-color: color-mix(in srgb, var(--ev-accent) 55%, var(--ev-bg)) transparent;
 }
 
+.hero {
+  position: relative;
+}
+
 .root ::selection {
   background: var(--ev-accent);
   color: var(--ev-on-accent);
@@ -54,11 +58,81 @@
   text-align: center;
 }
 
+.allEvents {
+  position: absolute;
+  top: 1rem;
+  left: max(var(--gutter), calc((100% - var(--measure)) / 2 + var(--gutter)));
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 2px solid var(--ev-accent);
+  border-radius: 50%;
+  color: var(--ev-heading);
+  background: color-mix(in srgb, var(--ev-bg) 84%, transparent);
+  text-decoration: none;
+  transition:
+    background-color 150ms ease-out,
+    color 150ms ease-out;
+}
+
+.allEvents svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: currentColor;
+}
+
+.allEvents span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.allEvents:hover,
+.allEvents:focus-visible {
+  background: var(--ev-accent);
+  color: var(--ev-on-accent);
+}
+
+.banner {
+  width: 100%;
+  max-width: var(--measure);
+  height: clamp(7rem, 22vw, 14rem);
+  margin: 0 auto;
+  border-bottom: var(--line) solid var(--ev-accent);
+  overflow: hidden;
+}
+
+.banner img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.banner img[data-focus='left'] {
+  object-position: left center;
+}
+
+.banner img[data-focus='right'] {
+  object-position: right center;
+}
+
 .header {
   width: 100%;
   max-width: var(--measure);
   margin-inline: auto;
-  padding: 1.75rem var(--gutter) 1rem;
+  padding: 4.5rem var(--gutter) 1rem;
+}
+
+.headerWithBanner {
+  padding-top: 1.75rem;
 }
 
 .name {
@@ -148,4 +222,15 @@
   margin: 0;
   padding-top: 1rem;
   border-top: 1px solid var(--rule);
+}
+
+@media (max-width: 47.99rem) {
+  .allEvents {
+    top: 0.75rem;
+    left: var(--gutter);
+  }
+
+  .banner {
+    height: clamp(7rem, 30vw, 10rem);
+  }
 }

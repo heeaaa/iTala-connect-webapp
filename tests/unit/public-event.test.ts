@@ -151,8 +151,8 @@ describe('public event model (PRD P-01 to P-10)', () => {
 
   it('builds image URLs for the logo and sponsors, in sponsor order', () => {
     expect(model.logoUrl).toBe(`${URL_}/storage/v1/object/public/images/events/e1/logo%201.png`);
-    expect(model.sponsors.major).toBe(`${URL_}/storage/v1/object/public/images/events/e1/major.png`);
-    expect(model.sponsors.minor.map((u) => u.split('/').at(-1))).toEqual(['m1.png', 'm2.png']);
+    expect(model.sponsors.major?.url).toBe(`${URL_}/storage/v1/object/public/images/events/e1/major.png`);
+    expect(model.sponsors.minor.map((u) => u.url.split('/').at(-1))).toEqual(['m1.png', 'm2.png']);
     expect(model.sponsors.platformPrimary).toHaveLength(1);
     expect(model.sponsors.platformSecondary).toHaveLength(1);
     expect(imageUrl(`${URL_}/`, null)).toBeNull();

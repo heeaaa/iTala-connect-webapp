@@ -34,10 +34,27 @@ export interface DayGridProps {
   teamId: string | null;
   /** Owners and superadmins enter scores here (PRD P-08). */
   onScoreChange?: (gameId: string, side: 1 | 2, score: number | null) => void;
+  unlockedGames?: ReadonlySet<string>;
+  pendingGames?: ReadonlySet<string>;
+  onToggleLock?: (gameId: string, locked: boolean) => void;
 }
 
 export function DayGrid(props: DayGridProps) {
-  const { games, window: w, courts, courtName, clock, day, teamName, divisionColor, teamId, onScoreChange } = props;
+  const {
+    games,
+    window: w,
+    courts,
+    courtName,
+    clock,
+    day,
+    teamName,
+    divisionColor,
+    teamId,
+    onScoreChange,
+    unlockedGames,
+    pendingGames,
+    onToggleLock,
+  } = props;
   const rows = (w.end - w.start) / STEP;
   const row = (minutes: number) => Math.floor((minutes - w.start) / STEP) + 1;
   const hours: number[] = [];
@@ -102,6 +119,9 @@ export function DayGrid(props: DayGridProps) {
                 ...divisionVars(divisionColor(g)),
               }}
               onScoreChange={onScoreChange}
+              unlockedGames={unlockedGames}
+              pendingGames={pendingGames}
+              onToggleLock={onToggleLock}
             />
           );
         })}
@@ -134,9 +154,19 @@ function GameCell(props: {
   teamName: (id: string | null) => string;
   style: CSSProperties;
   onScoreChange?: DayGridProps['onScoreChange'];
+  unlockedGames?: ReadonlySet<string>;
+  pendingGames?: ReadonlySet<string>;
+  onToggleLock?: DayGridProps['onToggleLock'];
 }) {
-  const { game, status, match, teamId, teamName, style, onScoreChange } = props;
+  const { game, status, match, teamId, teamName, style, onScoreChange, unlockedGames, pendingGames, onToggleLock } =
+    props;
   const bothKnown = game.team1Id !== null && game.team2Id !== null;
+  const scoreLocked =
+    Boolean(onToggleLock) &&
+    status === 'final' &&
+    hasBothScores(game) &&
+    !unlockedGames?.has(game.id) &&
+    !pendingGames?.has(game.id);
   const winner = status === 'final' && hasBothScores(game) && game.score1 !== game.score2;
   const words = STATUS_WORDS[status];
 
@@ -157,6 +187,8 @@ function GameCell(props: {
             inputMode="numeric"
             pattern="[0-9]*"
             maxLength={3}
+            disabled={scoreLocked}
+            aria-readonly={scoreLocked}
             aria-label={`${teamName(id)} score, ${formatTime(game.time!)} ${game.label}`}
             defaultValue={score ?? ''}
             onChange={(e) => {
@@ -185,6 +217,29 @@ function GameCell(props: {
       <header className={styles.cellHead}>
         <span className={styles.swatch} aria-hidden="true" />
         <span className={styles.cellLabel}>{game.label}</span>
+        {bothKnown && onScoreChange && status === 'final' && onToggleLock ? (
+          <button
+            type="button"
+            className={styles.lockButton}
+            aria-label={
+              (scoreLocked ? 'Unlock' : 'Lock') +
+              ' score for ' +
+              teamName(game.team1Id) +
+              ' versus ' +
+              teamName(game.team2Id)
+            }
+            title={scoreLocked ? 'Unlock score' : 'Lock score'}
+            onClick={() => onToggleLock(game.id, scoreLocked)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              {scoreLocked ? (
+                <path d="M7 10V7a5 5 0 0 1 10 0v3h1v10H6V10h1Zm2 0h6V7a3 3 0 0 0-6 0v3Zm3 3a1.5 1.5 0 0 0-1 2.62V18h2v-2.38A1.5 1.5 0 0 0 12 13Z" />
+              ) : (
+                <path d="M8 10V7a4 4 0 0 1 7.75-1.33l-1.9.64A2 2 0 0 0 10 7v3h8v10H6V10h2Zm4 3a1.5 1.5 0 0 0-1 2.62V18h2v-2.38A1.5 1.5 0 0 0 12 13Z" />
+              )}
+            </svg>
+          </button>
+        ) : null}
       </header>
       {words ? <p className={styles.cellStatus}>{words}</p> : null}
       {team(1)}

@@ -236,6 +236,7 @@ export type Database = {
       event_sponsors: {
         Row: {
           created_at: string
+          display_mode: string
           event_id: string
           id: string
           image_path: string
@@ -244,6 +245,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          display_mode?: string
           event_id: string
           id?: string
           image_path: string
@@ -252,6 +254,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          display_mode?: string
           event_id?: string
           id?: string
           image_path?: string
@@ -273,6 +276,8 @@ export type Database = {
           court_names: string[]
           courts: number
           created_at: string
+          banner_path: string | null
+          banner_focus: string
           id: string
           legacy_created_by: string | null
           legacy_firebase_id: string | null
@@ -298,6 +303,8 @@ export type Database = {
           court_names?: string[]
           courts?: number
           created_at?: string
+          banner_path?: string | null
+          banner_focus?: string
           id?: string
           legacy_created_by?: string | null
           legacy_firebase_id?: string | null
@@ -323,6 +330,8 @@ export type Database = {
           court_names?: string[]
           courts?: number
           created_at?: string
+          banner_path?: string | null
+          banner_focus?: string
           id?: string
           legacy_created_by?: string | null
           legacy_firebase_id?: string | null
@@ -531,6 +540,7 @@ export type Database = {
       platform_sponsors: {
         Row: {
           created_at: string
+          display_mode: string
           id: string
           image_path: string
           sort_order: number
@@ -538,6 +548,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          display_mode?: string
           id?: string
           image_path: string
           sort_order?: number
@@ -545,6 +556,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          display_mode?: string
           id?: string
           image_path?: string
           sort_order?: number
@@ -878,6 +890,17 @@ export type Database = {
           old_path: string
           version: string
         }[]
+      }
+      set_event_banner: {
+        Args: { p_event_id: string; p_path?: string; p_version?: string }
+        Returns: {
+          old_path: string
+          version: string
+        }[]
+      }
+      set_event_banner_focus: {
+        Args: { p_event_id: string; p_focus: string; p_version?: string }
+        Returns: string
       }
       set_event_slug: {
         Args: { p_event_id: string; p_slug: string }

@@ -172,13 +172,26 @@ export function RulesTab({ html, empty }: { html: string; empty: boolean }) {
  */
 export function EventMedia(props: {
   logoUrl: string | null;
-  sponsors: { major: string | null; minor: string[]; platformPrimary: string[]; platformSecondary: string[] };
+  sponsors: {
+    major: { url: string; displayMode: 'light' | 'dark' } | string | null;
+    minor: ({ url: string; displayMode: 'light' | 'dark' } | string)[];
+    platformPrimary: ({ url: string; displayMode: 'light' | 'dark' } | string)[];
+    platformSecondary: ({ url: string; displayMode: 'light' | 'dark' } | string)[];
+  };
   eventName: string;
 }) {
   const { logoUrl, sponsors, eventName } = props;
-  const small = [...sponsors.platformSecondary, ...sponsors.minor];
-  const large = [...sponsors.platformPrimary, ...(sponsors.major ? [sponsors.major] : [])];
+  const toSponsor = (item: { url: string; displayMode: 'light' | 'dark' } | string) =>
+    typeof item === 'string' ? { url: item, displayMode: 'light' as const } : item;
+  const small = [...sponsors.platformSecondary, ...sponsors.minor].map(toSponsor);
+  const large = [...sponsors.platformPrimary, ...(sponsors.major ? [sponsors.major] : [])].map(toSponsor);
   if (!logoUrl && small.length === 0 && large.length === 0) return null;
+  const sponsor = (item: { url: string; displayMode: 'light' | 'dark' }) => (
+    <li key={item.url} className={styles.sponsorPlaque} data-mode={item.displayMode}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={item.url} alt="Sponsor logo" loading="lazy" />
+    </li>
+  );
   return (
     <div className={styles.media}>
       {logoUrl ? (
@@ -188,22 +201,12 @@ export function EventMedia(props: {
       ) : null}
       {large.length ? (
         <ul className={styles.sponsorsLarge} aria-label="Major sponsors">
-          {large.map((src) => (
-            <li key={src}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt="Sponsor logo" loading="lazy" />
-            </li>
-          ))}
+          {large.map(sponsor)}
         </ul>
       ) : null}
       {small.length ? (
         <ul className={styles.sponsorsSmall} aria-label="Sponsors">
-          {small.map((src) => (
-            <li key={src}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt="Sponsor logo" loading="lazy" />
-            </li>
-          ))}
+          {small.map(sponsor)}
         </ul>
       ) : null}
     </div>

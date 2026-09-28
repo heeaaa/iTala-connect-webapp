@@ -341,6 +341,33 @@
   object-fit: contain;
 }
 
+.sponsorPlaque {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 8.5rem;
+  height: 3.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--ev-muted) 45%, var(--ev-bg));
+  background: color-mix(in srgb, #fff 94%, var(--ev-accent));
+}
+
+.sponsorPlaque[data-mode='dark'] {
+  background: color-mix(in srgb, #111 88%, var(--ev-accent));
+  border-color: color-mix(in srgb, #555 75%, var(--ev-accent));
+}
+
+.sponsorPlaque img {
+  margin: 0;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.sponsorsLarge .sponsorPlaque {
+  width: 16rem;
+  height: 6rem;
+}
+
 /* Desktop: sponsor rows first (small, then large), logo to the right. */
 @media (min-width: 48rem) {
   .media {

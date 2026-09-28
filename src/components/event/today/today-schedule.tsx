@@ -31,10 +31,22 @@ export interface TodayScheduleProps {
   selectedDay: string | null;
   feed: FeedState;
   onScoreChange?: (gameId: string, side: 1 | 2, score: number | null) => void;
+  unlockedGames?: ReadonlySet<string>;
+  pendingGames?: ReadonlySet<string>;
+  onToggleLock?: (gameId: string, locked: boolean) => void;
 }
 
 /** Public event page, Schedule tab (PRD P-04, P-05), Painted Lines direction. */
-export function TodaySchedule({ event, clock, selectedDay, feed, onScoreChange }: TodayScheduleProps) {
+export function TodaySchedule({
+  event,
+  clock,
+  selectedDay,
+  feed,
+  onScoreChange,
+  unlockedGames,
+  pendingGames,
+  onToggleLock,
+}: TodayScheduleProps) {
   const [storedTeam, setTeam] = useStoredTeam(event.id);
   const teamId = event.teams.some((t) => t.id === storedTeam) ? storedTeam : null;
   const focus = pickFocusDay(event.days, clock.date);
@@ -148,6 +160,9 @@ export function TodaySchedule({ event, clock, selectedDay, feed, onScoreChange }
                 divisionColor={(g: TodayGame) => divisionColor(g.divisionId)}
                 teamId={teamId}
                 onScoreChange={onScoreChange}
+                unlockedGames={unlockedGames}
+                pendingGames={pendingGames}
+                onToggleLock={onToggleLock}
               />
             ) : (
               <p className={styles.emptyState}>No games on {formatDayLabel(day)}.</p>

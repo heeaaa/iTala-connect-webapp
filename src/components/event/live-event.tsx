@@ -42,7 +42,11 @@ export function LiveEvent({ model, tab, selectedDay, canEdit, renderedAt }: Live
   const [feed, setFeed] = useState<FeedState>('live');
   const [clock, setClock] = useState(() => clockInZone(new Date(renderedAt), model.timeZone));
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [unlockedGames, setUnlockedGames] = useState<Set<string>>(() => new Set());
+  const [pendingGames, setPendingGames] = useState<Set<string>>(() => new Set());
   const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const saveQueues = useRef(new Map<string, Promise<void>>());
+  const editVersions = useRef(new Map<string, number>());
 
   const gameIds = useMemo(() => new Set(model.games.map((g) => g.id)), [model.games]);
   const scores = useMemo(() => ({ ...model.scores, ...overrides }), [model.scores, overrides]);
@@ -90,19 +94,41 @@ export function LiveEvent({ model, tab, selectedDay, canEdit, renderedAt }: Live
   const onScoreChange = (gameId: string, side: 1 | 2, value: number | null) => {
     const before = scores[gameId] ?? { score1: null, score2: null };
     const next: Score = side === 1 ? { ...before, score1: value } : { ...before, score2: value };
+    const editVersion = (editVersions.current.get(gameId) ?? 0) + 1;
+    editVersions.current.set(gameId, editVersion);
     setOverrides((o) => ({ ...o, [gameId]: next }));
+    setPendingGames((ids) => new Set(ids).add(gameId));
     setSaveError(null);
     const timers = saveTimers.current;
     clearTimeout(timers.get(gameId));
     timers.set(
       gameId,
-      setTimeout(async () => {
+      setTimeout(() => {
         timers.delete(gameId);
-        const result = await saveScore({ gameId, score1: next.score1, score2: next.score2 });
-        if (!result.ok) {
-          setSaveError(result.error);
-          setOverrides((o) => ({ ...o, [gameId]: before }));
-        }
+        const prior = saveQueues.current.get(gameId) ?? Promise.resolve();
+        const saving = prior.then(async () => {
+          const result = await saveScore({ gameId, score1: next.score1, score2: next.score2 }).catch(() => ({
+            ok: false as const,
+            error: 'Could not save the score. Check your connection and try again.',
+          }));
+          if (editVersions.current.get(gameId) !== editVersion) return;
+          setPendingGames((ids) => {
+            const nextIds = new Set(ids);
+            nextIds.delete(gameId);
+            return nextIds;
+          });
+          if (!result.ok) {
+            setSaveError(result.error);
+            setOverrides((o) => ({ ...o, [gameId]: before }));
+          } else {
+            setUnlockedGames((ids) => {
+              const nextIds = new Set(ids);
+              nextIds.delete(gameId);
+              return nextIds;
+            });
+          }
+        });
+        saveQueues.current.set(gameId, saving);
       }, SAVE_DELAY_MS),
     );
   };
@@ -123,6 +149,19 @@ export function LiveEvent({ model, tab, selectedDay, canEdit, renderedAt }: Live
           selectedDay={selectedDay}
           feed={feed}
           onScoreChange={canEdit ? onScoreChange : undefined}
+          unlockedGames={unlockedGames}
+          pendingGames={pendingGames}
+          onToggleLock={
+            canEdit
+              ? (gameId, locked) =>
+                  setUnlockedGames((ids) => {
+                    const nextIds = new Set(ids);
+                    if (locked) nextIds.add(gameId);
+                    else nextIds.delete(gameId);
+                    return nextIds;
+                  })
+              : undefined
+          }
         />
       ) : (
         <StandingsTab

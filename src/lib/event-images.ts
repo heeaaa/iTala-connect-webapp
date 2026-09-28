@@ -21,7 +21,7 @@ export const MAX_EDGE = 1600;
 export const STORED_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 export type StoredType = (typeof STORED_TYPES)[number];
 
-export type ImageKind = 'logo' | 'major' | 'minor';
+export type ImageKind = 'logo' | 'banner' | 'major' | 'minor';
 
 /** "Upload failed: {reason}" (E-18). */
 export const uploadFailed = (reason: string) => `Upload failed: ${reason}`;

@@ -75,6 +75,8 @@ export default async function EventPage({ params, searchParams }: Props) {
       days={model.days}
       theme={model.theme}
       tab={tab}
+      bannerUrl={model.bannerUrl}
+      bannerFocus={model.bannerFocus}
       fontClassName={eventFontClassName}
       notice={model.status === 'draft' ? 'Draft preview. Only you can see this until the event is published.' : null}
       media={<EventMedia logoUrl={model.logoUrl} sponsors={model.sponsors} eventName={model.name} />}
