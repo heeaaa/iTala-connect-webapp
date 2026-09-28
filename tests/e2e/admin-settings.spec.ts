@@ -89,12 +89,8 @@ test('manages platform sponsors and the default rules that new events start with
   await page.keyboard.press('Enter');
   await page.keyboard.type('Play nice.');
   await expect(main.getByText('Unsaved changes')).toBeVisible();
-  await expect(main.getByRole('combobox', { name: 'Logo backing for primary sponsor 1' })).toHaveCSS(
-    'min-height',
-    '48px',
-  );
-  // The sticky bar can temporarily clip a sponsor control at the scroll
-  // position left by typing in Rules; audit at a stable page position.
+  await expect(main.getByRole('combobox', { name: /^Logo backing/ })).toHaveCount(0);
+  // Audit at a stable position below the sticky bar after typing in Rules.
   await page.evaluate(() => window.scrollTo(0, 0));
   const axe = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])

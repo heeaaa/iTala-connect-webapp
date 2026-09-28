@@ -316,79 +316,90 @@
   object-fit: contain;
 }
 
+.sponsorSection {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.875rem 1rem 1rem;
+  background: color-mix(in srgb, white 94%, var(--ev-accent));
+  color: color-mix(in srgb, black 92%, var(--ev-accent));
+}
+
+.sponsorGroup {
+  min-width: 0;
+}
+
+.sponsorHeading {
+  margin: 0 0 0.5rem;
+  color: inherit;
+  font-family: var(--font-ev-body), system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .sponsorsLarge,
 .sponsorsSmall {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1rem 1.5rem;
+  gap: 0.75rem 1.75rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+.sponsorsLarge li,
+.sponsorsSmall li {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.sponsorsLarge li {
+  width: min(12rem, 100%);
+  height: 4.5rem;
+}
+
+.sponsorsSmall li {
+  width: min(7rem, 100%);
+  height: 2.75rem;
+}
+
 .sponsorsLarge img {
   display: block;
-  max-width: 14rem;
+  max-width: 100%;
   max-height: 4.5rem;
   object-fit: contain;
 }
 
 .sponsorsSmall img {
   display: block;
-  max-width: 7rem;
+  max-width: 100%;
   max-height: 2.5rem;
   object-fit: contain;
 }
 
-.sponsorPlaque {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 8.5rem;
-  height: 3.5rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--ev-muted) 45%, var(--ev-bg));
-  background: color-mix(in srgb, #fff 94%, var(--ev-accent));
-}
-
-.sponsorPlaque[data-mode='dark'] {
-  background: color-mix(in srgb, #111 88%, var(--ev-accent));
-  border-color: color-mix(in srgb, #555 75%, var(--ev-accent));
-}
-
-.sponsorPlaque img {
-  margin: 0;
-  max-width: 100%;
-  max-height: 100%;
-}
-
-.sponsorsLarge .sponsorPlaque {
-  width: 16rem;
-  height: 6rem;
-}
-
-/* Desktop: sponsor rows first (small, then large), logo to the right. */
+/* The event mark stands apart from the shared sponsor backing. */
 @media (min-width: 48rem) {
   .media {
     display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-areas:
-      'small logo'
-      'large logo';
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'sponsors logo';
     align-items: center;
   }
 
   .logo {
     grid-area: logo;
+    justify-self: end;
   }
 
-  .sponsorsSmall {
-    grid-area: small;
-  }
-
-  .sponsorsLarge {
-    grid-area: large;
+  .sponsorSection {
+    grid-area: sponsors;
+    width: max-content;
+    min-width: 20rem;
+    max-width: min(100%, 46rem);
   }
 }
 

@@ -7,7 +7,6 @@ import { platformStyles as s } from '@/components/platform/platform-frame';
 import {
   removeEventImage,
   setEventBannerFocus,
-  setEventSponsorDisplayMode,
   uploadEventImage,
   type ImageOutcome,
   type RemoveImageInput,
@@ -20,8 +19,7 @@ export interface EventImagesData {
   banner?: string | null;
   bannerFocus?: 'left' | 'center' | 'right';
   major: string | null;
-  minors: { id: string; url: string; displayMode?: 'light' | 'dark' }[];
-  majorDisplayMode?: 'light' | 'dark';
+  minors: { id: string; url: string }[];
 }
 
 type Result = { ok: true; data: ImageOutcome } | { ok: false; error: string };
@@ -48,10 +46,6 @@ const NAMES: Record<ImageKind, string> = {
 export function EventImages({ eventId, images, run }: { eventId: string; images: EventImagesData; run: RunImageTask }) {
   const [status, setStatus] = useState<Status>(null);
   const [bannerFocus, setBannerFocus] = useState<'left' | 'center' | 'right'>(images.bannerFocus ?? 'center');
-  const [majorMode, setMajorMode] = useState<'light' | 'dark'>(images.majorDisplayMode ?? 'light');
-  const [minorModes, setMinorModes] = useState<Record<string, 'light' | 'dark'>>(() =>
-    Object.fromEntries(images.minors.map((m) => [m.id, m.displayMode ?? 'light'])),
-  );
   const logoId = useId();
   const bannerId = useId();
   const majorId = useId();
@@ -122,27 +116,6 @@ export function EventImages({ eventId, images, run }: { eventId: string; images:
     if (result.ok) picks[input.kind].current?.focus();
   };
 
-  const changeSponsorMode = async (input: { kind: 'major' | 'minor'; sponsorId?: string; mode: 'light' | 'dark' }) => {
-    const previous = input.kind === 'major' ? majorMode : minorModes[input.sponsorId!];
-    if (input.kind === 'major') setMajorMode(input.mode);
-    else setMinorModes((m) => ({ ...m, [input.sponsorId!]: input.mode }));
-    setStatus({ tone: 'busy', text: 'Saving sponsor backing…' });
-    try {
-      const result = await setEventSponsorDisplayMode({
-        eventId,
-        kind: input.kind,
-        ...(input.sponsorId ? { sponsorId: input.sponsorId } : {}),
-        displayMode: input.mode,
-      });
-      if (!result.ok) throw new Error(result.error);
-      setStatus({ tone: 'done', text: 'Sponsor backing saved.' });
-    } catch (e) {
-      if (input.kind === 'major') setMajorMode(previous as 'light' | 'dark');
-      else setMinorModes((m) => ({ ...m, [input.sponsorId!]: previous as 'light' | 'dark' }));
-      setStatus({ tone: 'error', text: e instanceof Error ? e.message : 'Could not update the sponsor backing.' });
-    }
-  };
-
   const changeBannerFocus = async (focus: 'left' | 'center' | 'right') => {
     const previous = bannerFocus;
     setBannerFocus(focus);
@@ -179,19 +152,6 @@ export function EventImages({ eventId, images, run }: { eventId: string; images:
           </button>
         )}
       </div>
-      {kind === 'major' && url ? (
-        <label className={w.field}>
-          <span className={s.label}>Logo backing</span>
-          <select
-            className={s.input}
-            value={majorMode}
-            onChange={(e) => changeSponsorMode({ kind: 'major', mode: e.target.value as 'light' | 'dark' })}
-          >
-            <option value="light">Light plaque</option>
-            <option value="dark">Dark plaque</option>
-          </select>
-        </label>
-      ) : null}
     </section>
   );
 
@@ -264,19 +224,6 @@ export function EventImages({ eventId, images, run }: { eventId: string; images:
               <li key={m.id}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={m.url} alt={`Minor sponsor logo ${i + 1}`} className={w.sponsorThumb} />
-                <label className={w.field}>
-                  <span className="sr-only">Logo backing for minor sponsor {i + 1}</span>
-                  <select
-                    className={s.input}
-                    value={minorModes[m.id] ?? 'light'}
-                    onChange={(e) =>
-                      changeSponsorMode({ kind: 'minor', sponsorId: m.id, mode: e.target.value as 'light' | 'dark' })
-                    }
-                  >
-                    <option value="light">Light plaque</option>
-                    <option value="dark">Dark plaque</option>
-                  </select>
-                </label>
                 <button
                   type="button"
                   className={w.danger}

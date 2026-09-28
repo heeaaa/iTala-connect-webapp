@@ -126,8 +126,12 @@ describe('EventMedia (PRD P-01)', () => {
       />,
     );
     expect(screen.getByRole('img', { name: 'Spring Hoops logo' })).toBeInTheDocument();
-    expect(within(screen.getByRole('list', { name: 'Major sponsors' })).getAllByRole('img')).toHaveLength(2);
-    expect(within(screen.getByRole('list', { name: 'Sponsors' })).getAllByRole('img')).toHaveLength(1);
+    const sponsorSection = screen.getByRole('region', { name: 'Event sponsors' });
+    const inSponsors = within(sponsorSection);
+    expect(inSponsors.getByRole('heading', { name: 'Major sponsors' })).toBeInTheDocument();
+    expect(inSponsors.getByRole('heading', { name: /^Sponsors$/ })).toBeInTheDocument();
+    expect(within(inSponsors.getByRole('list', { name: 'Major sponsors' })).getAllByRole('img')).toHaveLength(2);
+    expect(within(inSponsors.getByRole('list', { name: /^Sponsors$/ })).getAllByRole('img')).toHaveLength(1);
     const order = [...container.querySelectorAll('img, ul')].map(
       (el) => el.getAttribute('aria-label') ?? el.getAttribute('alt'),
     );

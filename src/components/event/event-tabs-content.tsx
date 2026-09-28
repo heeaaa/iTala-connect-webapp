@@ -166,28 +166,26 @@ export function RulesTab({ html, empty }: { html: string; empty: boolean }) {
 }
 
 /**
- * P-01 sponsor rows and logo. Desktop: platform secondary and event minor
- * logos small, then platform primary and event major large. Phones: logo,
- * major, minor. Empty rows are left out.
+ * P-01 sponsor rows and event logo. Sponsor logos share one neutral section;
+ * the event logo stays outside it. Empty rows are left out.
  */
 export function EventMedia(props: {
   logoUrl: string | null;
   sponsors: {
-    major: { url: string; displayMode: 'light' | 'dark' } | string | null;
-    minor: ({ url: string; displayMode: 'light' | 'dark' } | string)[];
-    platformPrimary: ({ url: string; displayMode: 'light' | 'dark' } | string)[];
-    platformSecondary: ({ url: string; displayMode: 'light' | 'dark' } | string)[];
+    major: { url: string } | string | null;
+    minor: ({ url: string } | string)[];
+    platformPrimary: ({ url: string } | string)[];
+    platformSecondary: ({ url: string } | string)[];
   };
   eventName: string;
 }) {
   const { logoUrl, sponsors, eventName } = props;
-  const toSponsor = (item: { url: string; displayMode: 'light' | 'dark' } | string) =>
-    typeof item === 'string' ? { url: item, displayMode: 'light' as const } : item;
+  const toSponsor = (item: { url: string } | string) => (typeof item === 'string' ? { url: item } : item);
   const small = [...sponsors.platformSecondary, ...sponsors.minor].map(toSponsor);
   const large = [...sponsors.platformPrimary, ...(sponsors.major ? [sponsors.major] : [])].map(toSponsor);
   if (!logoUrl && small.length === 0 && large.length === 0) return null;
-  const sponsor = (item: { url: string; displayMode: 'light' | 'dark' }) => (
-    <li key={item.url} className={styles.sponsorPlaque} data-mode={item.displayMode}>
+  const sponsor = (item: { url: string }) => (
+    <li key={item.url}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={item.url} alt="Sponsor logo" loading="lazy" />
     </li>
@@ -199,15 +197,25 @@ export function EventMedia(props: {
         // eslint-disable-next-line @next/next/no-img-element
         <img className={styles.logo} src={logoUrl} alt={`${eventName} logo`} />
       ) : null}
-      {large.length ? (
-        <ul className={styles.sponsorsLarge} aria-label="Major sponsors">
-          {large.map(sponsor)}
-        </ul>
-      ) : null}
-      {small.length ? (
-        <ul className={styles.sponsorsSmall} aria-label="Sponsors">
-          {small.map(sponsor)}
-        </ul>
+      {large.length || small.length ? (
+        <section className={styles.sponsorSection} aria-label="Event sponsors">
+          {large.length ? (
+            <div className={styles.sponsorGroup}>
+              <h2 className={styles.sponsorHeading}>Major sponsors</h2>
+              <ul className={styles.sponsorsLarge} aria-label="Major sponsors">
+                {large.map(sponsor)}
+              </ul>
+            </div>
+          ) : null}
+          {small.length ? (
+            <div className={styles.sponsorGroup}>
+              <h2 className={styles.sponsorHeading}>Sponsors</h2>
+              <ul className={styles.sponsorsSmall} aria-label="Sponsors">
+                {small.map(sponsor)}
+              </ul>
+            </div>
+          ) : null}
+        </section>
       ) : null}
     </div>
   );

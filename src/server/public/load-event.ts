@@ -87,8 +87,8 @@ export const loadPublicEvent = cache(async (eventId: string): Promise<PublicEven
       .eq('event_id', eventId),
     supabase.from('games').select(GAME_COLUMNS).eq('event_id', eventId),
     supabase.from('game_scores').select('game_id, s1, s2').eq('event_id', eventId),
-    supabase.from('event_sponsors').select('tier, image_path, sort_order, display_mode').eq('event_id', eventId),
-    supabase.from('platform_sponsors').select('tier, image_path, sort_order, display_mode'),
+    supabase.from('event_sponsors').select('tier, image_path, sort_order').eq('event_id', eventId),
+    supabase.from('platform_sponsors').select('tier, image_path, sort_order'),
     canEditEvent(eventId),
   ]);
   for (const r of [divisions, games, scores, eventSponsors, platformSponsors]) {

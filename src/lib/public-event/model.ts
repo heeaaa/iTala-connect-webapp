@@ -55,7 +55,7 @@ export type GameRow = Pick<
   | 'position'
 >;
 export type ScoreRow = Pick<Rows['game_scores']['Row'], 'game_id' | 's1' | 's2'>;
-export type SponsorRow = { tier: string; image_path: string; sort_order: number; display_mode?: string };
+export type SponsorRow = { tier: string; image_path: string; sort_order: number };
 
 export interface Score {
   score1: number | null;
@@ -74,10 +74,10 @@ export interface EventModel {
   bannerUrl: string | null;
   bannerFocus: 'left' | 'center' | 'right';
   sponsors: {
-    major: { url: string; displayMode: 'light' | 'dark' } | null;
-    minor: { url: string; displayMode: 'light' | 'dark' }[];
-    platformPrimary: { url: string; displayMode: 'light' | 'dark' }[];
-    platformSecondary: { url: string; displayMode: 'light' | 'dark' }[];
+    major: { url: string } | null;
+    minor: { url: string }[];
+    platformPrimary: { url: string }[];
+    platformSecondary: { url: string }[];
   };
   divisions: { id: string; name: string; color: string; teamIds: string[] }[];
   teams: {
@@ -179,13 +179,7 @@ export function toEventModel(rows: EventRows, supabaseUrl: string): EventModel {
     [...list]
       .filter((s) => s.tier === tier)
       .sort((a, b) => a.sort_order - b.sort_order)
-      .map(
-        (s) =>
-          ({
-            url: imageUrl(supabaseUrl, s.image_path)!,
-            displayMode: s.display_mode === 'dark' ? 'dark' : 'light',
-          }) as const,
-      );
+      .map((s) => ({ url: imageUrl(supabaseUrl, s.image_path)! }));
 
   const games = gamesFromRows(rows.games);
 

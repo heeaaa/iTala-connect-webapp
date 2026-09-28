@@ -1,16 +1,14 @@
 'use client';
 import { useId, useRef, useState } from 'react';
 import { ImageProblem, compressImage } from '@/lib/compress-image';
-import { platformStyles as s } from '@/components/platform/platform-frame';
 import { uploadFailed, type PlatformTier } from '@/lib/event-images';
-import { removePlatformSponsor, setPlatformSponsorDisplayMode, uploadPlatformSponsor } from '@/server/actions/platform';
+import { removePlatformSponsor, uploadPlatformSponsor } from '@/server/actions/platform';
 import { ImagePick } from '../_components/image-pick';
 import w from '../admin-workspace.module.css';
 
 export interface PlatformSponsor {
   id: string;
   url: string;
-  displayMode?: 'light' | 'dark';
 }
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -31,9 +29,6 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
  */
 export function PlatformSponsors({ sponsors }: { sponsors: Record<PlatformTier, PlatformSponsor[]> }) {
   const [status, setStatus] = useState<Status>(null);
-  const [modes, setModes] = useState<Record<string, 'light' | 'dark'>>(() =>
-    Object.fromEntries([...sponsors.primary, ...sponsors.secondary].map((s) => [s.id, s.displayMode ?? 'light'])),
-  );
   const primaryId = useId();
   const secondaryId = useId();
   const primaryPick = useRef<HTMLInputElement>(null);
@@ -94,20 +89,6 @@ export function PlatformSponsors({ sponsors }: { sponsors: Record<PlatformTier, 
     picks[tier].current?.focus();
   };
 
-  const changeMode = async (sponsorId: string, mode: 'light' | 'dark') => {
-    const previous = modes[sponsorId] ?? 'light';
-    setModes((current) => ({ ...current, [sponsorId]: mode }));
-    setStatus({ tone: 'busy', text: 'Saving sponsor backing…' });
-    try {
-      const result = await setPlatformSponsorDisplayMode(sponsorId, mode);
-      if (!result.ok) throw new Error(result.error);
-      setStatus({ tone: 'done', text: 'Sponsor backing saved.' });
-    } catch (e) {
-      setModes((current) => ({ ...current, [sponsorId]: previous }));
-      setStatus({ tone: 'error', text: e instanceof Error ? e.message : 'Could not update the sponsor backing.' });
-    }
-  };
-
   const tier = (t: PlatformTier) => (
     <section aria-labelledby={ids[t]} className={w.imageSlot}>
       <h3 id={ids[t]}>{TIERS[t].title}</h3>
@@ -124,19 +105,6 @@ export function PlatformSponsors({ sponsors }: { sponsors: Record<PlatformTier, 
                 className={w.sponsorThumb}
                 loading="lazy"
               />
-              <label className={w.field}>
-                <span className="sr-only">
-                  Logo backing for {TIERS[t].one} {i + 1}
-                </span>
-                <select
-                  className={s.input}
-                  value={modes[sponsor.id] ?? 'light'}
-                  onChange={(e) => changeMode(sponsor.id, e.target.value as 'light' | 'dark')}
-                >
-                  <option value="light">Light plaque</option>
-                  <option value="dark">Dark plaque</option>
-                </select>
-              </label>
               {/* The name starts with the visible word, so voice control still finds "Remove". */}
               <button
                 type="button"

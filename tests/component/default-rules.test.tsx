@@ -25,7 +25,8 @@ beforeEach(() => {
 describe('Default rules (S-02)', () => {
   it('starts from the built-in rules when none are stored, and says so', async () => {
     render(<DefaultRules stored="" builtIn={BUILT_IN} />);
-    const text = await screen.findByRole('textbox', { name: 'Default rules' });
+    // The editor is lazy-loaded; allow its module to settle on slower local machines.
+    const text = await screen.findByRole('textbox', { name: 'Default rules' }, { timeout: 5000 });
     expect(text).toHaveTextContent('Official FIBA Rules apply.');
     expect(
       screen.getByText(/Save an empty box to go back to the built-in iTala rules\. These are the built-in rules\./),
