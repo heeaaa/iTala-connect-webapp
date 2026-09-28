@@ -42,7 +42,7 @@ export function PlayersDialog({
           <label className={w.field}>
             <span className={s.label}>Paste players</span>
             <textarea
-              data-autofocus
+              data-autofocus={players.length === 0 || undefined}
               className={s.input}
               rows={5}
               value={paste}
@@ -116,6 +116,7 @@ export function PlayersDialog({
                 <span className={s.label}>Player {i + 1}</span>
                 <input
                   className={s.input}
+                  data-autofocus={i === 0 || undefined}
                   required
                   maxLength={120}
                   value={p.name}

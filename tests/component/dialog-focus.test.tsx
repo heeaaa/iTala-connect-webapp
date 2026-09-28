@@ -69,6 +69,21 @@ describe('closing a dialog gives focus back to the button that opened it (WCAG 2
     await user.click(screen.getByRole('button', { name: 'Done' }));
     expect(screen.getByRole('button', { name: 'Open it' })).toHaveFocus();
   });
+
+  it('an empty team starts at the bulk paste field, then returns focus to its opener', async () => {
+    const user = userEvent.setup();
+    render(
+      <Opener
+        dialog={(close) => (
+          <PlayersDialog team={{ id: 't', name: 'Hawks', coach: '', players: [] }} onCancel={close} onDone={close} />
+        )}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Open it' }));
+    expect(screen.getByRole('textbox', { name: 'Paste players' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('button', { name: 'Open it' })).toHaveFocus();
+  });
 });
 
 describe('when the confirmed action removes the button that opened it', () => {
