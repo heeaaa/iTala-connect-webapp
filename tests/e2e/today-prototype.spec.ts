@@ -23,6 +23,26 @@ async function noSidewaysScroll(page: Page) {
 }
 
 test.describe('Today screen prototype (sample data)', () => {
+  test('score fields stay inside game cards with long team names on a phone', async ({ page }, info) => {
+    test.skip(info.project.name !== 'mobile');
+    await page.goto('/prototype/today?owner=1');
+    await page.locator('[class*="cellTeamName"]').evaluateAll((names) => {
+      for (const [index, name] of names.entries()) {
+        name.textContent = index % 2 === 0 ? 'GENTLEMEN’S BASKETBALL CLUB' : 'DENTIO DENTAL ALLIANCE 35+';
+      }
+    });
+    const fields = page.getByRole('textbox', { name: /score,/ });
+    expect(await fields.count()).toBeGreaterThan(0);
+    for (const field of await fields.all()) {
+      const dimensions = await field.evaluate((input) => {
+        const card = input.closest('article')!;
+        return { fieldRight: input.getBoundingClientRect().right, cardRight: card.getBoundingClientRect().right };
+      });
+      expect(dimensions.fieldRight).toBeLessThanOrEqual(dimensions.cardRight);
+    }
+    await noSidewaysScroll(page);
+  });
+
   test("a spectator finds tonight's courts, picks their team, and it is remembered", async ({ page }) => {
     await page.goto('/prototype/today');
     await expect(page.getByRole('heading', { level: 1, name: 'Eastside Friday League' })).toBeVisible();

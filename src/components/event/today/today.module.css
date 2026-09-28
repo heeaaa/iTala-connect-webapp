@@ -834,10 +834,12 @@
 }
 
 .cellLabel {
+  min-width: 0;
   font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.25;
   letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
 }
 
 .cellStatus {
@@ -862,6 +864,7 @@
 
 .cellTeam {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: baseline;
   gap: 0.5rem;
@@ -869,11 +872,13 @@
 }
 
 .cellTeamName {
+  flex: 1 1 4rem;
+  min-width: 0;
   font-size: 0.9375rem;
   font-weight: 500;
   line-height: 1.25;
-  /* Break between words, hyphenating (lang en-NZ) only when one word cannot fit. */
-  overflow-wrap: break-word;
+  /* A long name must not push the score field outside a narrow court column. */
+  overflow-wrap: anywhere;
   hyphens: auto;
 }
 
@@ -915,6 +920,7 @@
 
 .scoreInput {
   flex: none;
+  margin-left: auto;
   width: 3.75rem;
   min-height: 2.75rem;
   padding: 0 0.375rem;

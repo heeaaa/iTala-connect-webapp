@@ -16,7 +16,7 @@ export interface DashboardEvent {
 
 /**
  * Dashboard body (PRD D-01): the organiser's events as a rundown, with
- * table semantics kept for screen readers, with draft editing and event actions.
+ * table on wider screens and an event list on phones, with draft editing and event actions.
  */
 export function DashboardView({
   events,
@@ -53,61 +53,98 @@ export function DashboardView({
       ) : !events || events.length === 0 ? (
         <p className={s.empty}>No events yet. Create your first tournament or league.</p>
       ) : (
-        <div className={s.tableScroll} tabIndex={0} role="region" aria-label="My events">
-          <table className={s.rundownTable}>
-            <thead>
-              <tr>
-                <th scope="col">Date</th>
-                <th scope="col">Name</th>
-                <th scope="col">Status</th>
-                <th scope="col">Divisions</th>
-                <th scope="col">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.map((event) => {
-                const first = [...event.schedule_days].sort()[0];
-                const date = first ? formatDate(first) : null;
-                const published = event.status === 'published';
-                return (
-                  <tr key={event.id}>
-                    <td className={s.dateCell}>
-                      <span className={s.bugDate}>
-                        {date ? (
-                          <>
-                            <b>{date.slice(0, 5)}</b>
-                            <small>{date.slice(5)}</small>
-                          </>
-                        ) : (
-                          <>
-                            <b>TBC</b>
-                            <span className="sr-only">No dates</span>
-                          </>
-                        )}
-                      </span>
-                    </td>
-                    <td className={s.bugName}>{event.name || 'Untitled event'}</td>
-                    <td>
-                      <span className={s.statusBug} data-status={published ? 'published' : 'draft'}>
-                        {published ? 'Published' : 'Draft'}
-                      </span>
-                    </td>
-                    <td>{event.divisions?.[0]?.count ?? 0}</td>
-                    <td>
-                      <EventActions
-                        id={event.id}
-                        slug={event.slug}
-                        name={event.name}
-                        published={published}
-                        results={mobileEnabled}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div
+            className={`${s.tableScroll} ${s.dashboardTable}`}
+            tabIndex={0}
+            role="region"
+            aria-label="My events table"
+          >
+            <table className={s.rundownTable}>
+              <thead>
+                <tr>
+                  <th scope="col">Date</th>
+                  <th scope="col">Name</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Divisions</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((event) => {
+                  const first = [...event.schedule_days].sort()[0];
+                  const date = first ? formatDate(first) : null;
+                  const published = event.status === 'published';
+                  return (
+                    <tr key={event.id}>
+                      <td className={s.dateCell}>
+                        <span className={s.bugDate}>
+                          {date ? (
+                            <>
+                              <b>{date.slice(0, 5)}</b>
+                              <small>{date.slice(5)}</small>
+                            </>
+                          ) : (
+                            <>
+                              <b>TBC</b>
+                              <span className="sr-only">No dates</span>
+                            </>
+                          )}
+                        </span>
+                      </td>
+                      <td className={s.bugName}>{event.name || 'Untitled event'}</td>
+                      <td>
+                        <span className={s.statusBug} data-status={published ? 'published' : 'draft'}>
+                          {published ? 'Published' : 'Draft'}
+                        </span>
+                      </td>
+                      <td>{event.divisions?.[0]?.count ?? 0}</td>
+                      <td>
+                        <EventActions
+                          id={event.id}
+                          slug={event.slug}
+                          name={event.name}
+                          published={published}
+                          results={mobileEnabled}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <ul className={s.dashboardMobile} data-testid="dashboard-mobile-list" aria-label="My events">
+            {events.map((event) => {
+              const first = [...event.schedule_days].sort()[0];
+              const published = event.status === 'published';
+              const divisionCount = event.divisions?.[0]?.count ?? 0;
+              return (
+                <li className={s.dashboardEvent} key={event.id}>
+                  <div className={s.dashboardEventTop}>
+                    <div className={s.dashboardEventTitle}>
+                      <strong>{event.name || 'Untitled event'}</strong>
+                      <span>{first ? formatDate(first) : 'Dates TBC'}</span>
+                    </div>
+                    <span className={s.statusBug} data-status={published ? 'published' : 'draft'}>
+                      {published ? 'Published' : 'Draft'}
+                    </span>
+                  </div>
+                  <p className={s.dashboardEventMeta}>
+                    {divisionCount} {divisionCount === 1 ? 'division' : 'divisions'}
+                  </p>
+                  <EventActions
+                    id={event.id}
+                    slug={event.slug}
+                    name={event.name}
+                    published={published}
+                    results={mobileEnabled}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
     </section>
   );

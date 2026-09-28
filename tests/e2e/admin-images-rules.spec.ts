@@ -94,6 +94,8 @@ test('uploads event images, saves banner crop, and shows a shared sponsor sectio
   expect((await stored()).rules_html).toBe('<h2>Fouls</h2><p>Five fouls and you sit.</p>');
 
   // The event page (the owner's draft preview) shows all of it.
+  // Check the desktop sponsor strip first, then switch to the mobile placement below.
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(`/events/${eventId}?tab=rules`);
   await expect(page.getByRole('heading', { level: 2, name: 'Fouls' })).toBeVisible();
   await expect(page.getByText('Five fouls and you sit.')).toBeVisible();
