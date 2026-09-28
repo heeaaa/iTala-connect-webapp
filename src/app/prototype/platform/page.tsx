@@ -104,6 +104,7 @@ export default async function PlatformPrototype({ searchParams }: PageProps<'/pr
             <DashboardView
               superadmin
               error={false}
+              mobileEnabled
               events={[
                 {
                   id: 'a',

@@ -520,7 +520,7 @@ All three are self-hosted through `next/font` (`src/app/event-fonts.ts`) as `--f
 ### Event pages
 A single centred column capped at 85rem, with a 1rem side gutter on phones and 2rem from 48rem up. The event name, tabs and content share that measure. Sections stack with space (2.5rem between main sections, 2rem between courts, 1.5rem above the layout), never inside cards.
 
-- **Phones (below 40rem):** courts stack one per row; with three or more courts they become a horizontal snap rail at 88% width each so the page stays short. The day grid keeps two courts in view without sideways scroll (3.5rem hour gutter, 8.25rem minimum columns) and scrolls inside itself beyond that, never the page. Below 24rem cell padding and names tighten. The team finder collapses behind a full-width outlined toggle.
+- **Phones (below 40rem):** courts stack one per row; with three or more courts they become a horizontal snap rail at 88% width each so the page stays short. The day grid keeps two courts in view without sideways scroll (3.5rem hour gutter, 8.25rem minimum columns) and scrolls inside itself beyond that, never the page. Its hour minimum tightens to 5.5rem, cell spacing and names tighten, and the lock sits in the card's top-right corner without making the division label narrower than necessary. The team finder collapses behind a full-width outlined toggle.
 - **40rem and up:** courts sit side by side (auto-fit, minimum 20rem each).
 - **68rem and up:** a 19rem sticky sidebar holds the team finder beside the main column (3rem gap).
 - **Day grid:** time-proportional rows in 5-minute steps (an hour is 6.75rem tall), a sticky hour gutter, one column per court (minimum 10.5rem). Rows grow when names wrap, so nothing is cut off.
@@ -530,7 +530,7 @@ A single centred column capped at 85rem, with a 1rem side gutter on phones and 2
 A centred column capped at 76rem, with a 1rem gutter on phones and 2rem from 48rem up. A sticky network bar (at least 3.75rem, ground fill, 1 px seam beneath) holds the mark and wordmark, the section nav, and the signed-in admin with Sign out, or Sign in. Each page opens with its title plate (1.75rem above, 1.5rem below); sections follow at 2rem, and rows in a rundown or table are separate plates 0.375rem apart.
 
 - **Home:** from 64rem, an 8 : 4 grid (side column at least 18rem, 2.5rem gap) with the rundown on the left and the organiser plate as a side column, both starting on the same top edge. Below 64rem the organiser plate follows the rundown.
-- **Event bug row:** a 4.75rem date block, the name and meta, then the status bug. Below 30rem the date block narrows to 4.25rem and the status bug drops under the name.
+- **Event bug row:** a 4.75rem date block, the name and meta, then the status bug. Below 30rem the date block narrows to 4.25rem and the status bug drops under the name, aligned to the right edge.
 - **Phones (below 40rem):** the network bar becomes a grid. Row 1 is the mark and the account control; row 2 is the nav as a horizontal strip that scrolls inside itself; row 3 is the signed-in name and role, never truncated. Signed out, the strip would only repeat the logo link, so it is hidden.
 - **Admin tables:** scroll inside their own labelled region (minimum 32rem wide, 19rem on phones and for the dashboard rundown), never the page.
 - **Forms and notices:** at most 26rem wide. Ledes at most 62ch; placeholders at most 44rem.
@@ -593,11 +593,11 @@ Components are painted outlines on the floor: confident, legible from arm's leng
 - Chips are grouped by division under a legend with the division's square swatch.
 
 #### Navigation
-- **Event tabs:** Big Shoulders 700 uppercase in muted ink over a 2 px Quiet Rule sideline. Hover lifts to body ink; the current tab is heading ink with a 4 px paint over-paint on the sideline. Tabs live in the URL.
-- **Day strip:** dates in muted small type with a 2 px transparent underline; the chosen day is heading ink with a 2 px paint underline. "Tonight" sits above today's date in paint-coloured Big Shoulders as part of the date label.
+- **Event tabs:** Big Shoulders 700 uppercase in muted ink over a 2 px Quiet Rule sideline. Hover lifts to body ink; the current tab is heading ink with a 4 px paint over-paint on the sideline. All four tabs fit in a fixed row on phones and do not scroll. Tabs live in the URL.
+- **Day strip:** dates in muted small type with a 2 px transparent underline; the chosen day is heading ink with a 2 px paint underline. "Tonight" sits above today's date in paint-coloured Big Shoulders as part of the date label. On phones, the horizontal scrollbar thumb uses muted ink, distinct from the accent paint of the chosen day.
 
 #### Inputs / Fields
-- **Score input** (event owners only): 3.75rem wide, 2.75rem tall, 1 px muted outline, 2px corners, floor fill, right-aligned Big Shoulders 700 numerals.
+- **Score input** (event owners only): 3.75rem wide (3rem on phones), 2.75rem tall, 1 px muted outline, 2px corners, floor fill, right-aligned Big Shoulders 700 numerals while editable. A locked final displays the disabled score without an input outline or fill; an unlocked or missing score retains the editable field.
 - **Invalid:** outline switches to body ink and dashed, so the error does not rely on colour.
 - **Focus:** the shared focus outline (3 px solid paint, 3 px offset).
 
@@ -656,6 +656,7 @@ The rundown row for an event on Home (a link to the event page) and the Dashboar
 
 #### Tables
 Admin tables keep real table semantics inside a scrollable, labelled region. Headers use the muted Label style; each row's cells are Bug Plate strips separated by 0.375rem of ground, first column at 700.
+Dashboard event actions use a two-column grid at intermediate widths and one horizontal row from 70rem, so action controls do not force tall event rows.
 
 #### Action rows
 The admin workspace groups the actions for a form, a team, a division or a dialog in one row: a wrapping flex row, vertically centred, 0.75rem apart (`platform-action-gap`), 1rem above and 1.5rem below. Every link and button in a row is at least 2.75rem tall and wraps its label rather than truncating, so a long action never forces sideways scroll at 360 px. The row leads with its filled plate (lime only when it is the screen's one primary action, such as "Save draft" or "Create event"; teal for a retry or a dialog's go-ahead; quiet for add, open and month actions), followed by any danger text action. When a league being imported is already linked, lime moves to "Open existing event" and "Create anyway" drops to quiet, so the one primary action is always the safe one.
@@ -714,7 +715,7 @@ Superadmin only (A-09). Two sections under the title plate.
 #### Results inbox
 Owner or superadmin, only with the mobile integration on (M-04, M-05).
 - **Header:** title plate "Pending results" with the event name, then **Refresh** (quiet; reads "Reading the mobile app…" while it runs, and stays focusable) and **Back to event**. A note lists the linked divisions and leagues.
-- **Groups:** Seam-topped sections in the old order, each headed "{title} ({count})". Each result is a Plate row like the import page's league rows: the score line first ("Harbour Hawks 58 - 51 Night Owls", bold, tabular numerals), then muted lines for league, finish time and stats, the proposed fixture, the drift and the reason. Controls sit to the right, and below on phones: **Approve** or **Re-approve** (live), **Keep published score** (quiet), and an "Attach to a fixture…" select (16rem on wider screens, full width on phones) that asks "Attach this result to the chosen fixture?" first. Review and settling results have no controls. One polite status line under the header reports each outcome and takes focus after a success, since the card moves group.
+- **Groups:** Seam-topped sections in the old order, each headed "{title} ({count})". Each result is a Plate row like the import page's league rows: the score line first ("Harbour Hawks 58 - 51 Night Owls", bold, tabular numerals), then muted lines for league, finish time and stats, the proposed fixture, the drift and the reason. Controls sit to the right, and below on phones: **Approve** or **Re-approve** (live), **Keep published score** (quiet), or an "Attach to a fixture…" select for ambiguous and unmatched results (16rem on wider screens, full width on phones) that asks "Attach this result to the chosen fixture?" first. The select is hidden wherever **Approve** is shown. Review and settling results have no controls. One polite status line under the header reports each outcome and takes focus after a success, since the card moves group.
 - **States:** a refusal (not linked, scores unreadable) is a notice line; a division the mobile app did not answer for is an alert line; with nothing to show, "Nothing waiting" and "No finished games in the linked leagues."
 - **Arriving from the link wizard:** the status line reads "Linked. Results for this division will now appear in Pending results." and takes focus.
 

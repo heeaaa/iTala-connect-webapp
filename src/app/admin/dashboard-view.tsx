@@ -106,6 +106,7 @@ export function DashboardView({
                           name={event.name}
                           published={published}
                           results={mobileEnabled}
+                          compact
                         />
                       </td>
                     </tr>

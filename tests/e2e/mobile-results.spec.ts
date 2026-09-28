@@ -55,6 +55,7 @@ test('shows the linked league’s finished games grouped, read from the mobile a
   await expect(ready).toContainText('Harbour League · finished');
   await expect(ready).toContainText('48 stats');
   await expect(ready).toContainText('Fixture: Harbour Hawks vs Night Owls');
+  await expect(ready.getByRole('combobox')).toHaveCount(0);
   await expect(main.getByRole('region', { name: /^Still settling/ })).toContainText(
     'The last stat arrived less than 5 minutes ago.',
   );

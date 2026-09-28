@@ -43,6 +43,48 @@ test.describe('Today screen prototype (sample data)', () => {
     await noSidewaysScroll(page);
   });
 
+  test('mobile dates have a neutral scrollbar and final game cells stay compact', async ({ page }, info) => {
+    test.skip(info.project.name !== 'mobile');
+    await page.goto('/prototype/today?owner=1&day=2026-09-11');
+    const strip = page.getByRole('navigation', { name: 'Game days' }).locator('ul');
+    const scrollbar = await strip.evaluate((element) => getComputedStyle(element).scrollbarColor);
+    const muted = await strip.evaluate((element) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--ev-muted)';
+      element.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+    expect(scrollbar.startsWith(muted)).toBe(true);
+
+    const first = page.getByRole('region', { name: 'Games by time and court' }).locator('article').first();
+    expect((await first.boundingBox())!.height).toBeLessThan(170);
+    const locked = first.getByRole('textbox', { name: /score,/ }).first();
+    expect(await locked.evaluate((input) => getComputedStyle(input).borderTopWidth)).toBe('1px');
+    expect((await locked.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await locked.evaluate((input: HTMLInputElement) => {
+      input.disabled = true;
+    });
+    expect(await locked.evaluate((input) => getComputedStyle(input).borderTopWidth)).toBe('0px');
+  });
+
+  test('event tabs fit without a vertical scrollbar at both viewports', async ({ page }) => {
+    await page.goto('/prototype/today');
+    const tabs = page.getByRole('navigation', { name: 'Event' }).locator('ul');
+    expect(await tabs.evaluate((element) => element.scrollHeight)).toBeLessThanOrEqual(
+      await tabs.evaluate((element) => element.clientHeight),
+    );
+    expect(await tabs.evaluate((element) => element.scrollWidth)).toBeLessThanOrEqual(
+      await tabs.evaluate((element) => element.clientWidth),
+    );
+    await page.setViewportSize({ width: 320, height: 844 });
+    expect(await tabs.evaluate((element) => element.scrollWidth)).toBeLessThanOrEqual(
+      await tabs.evaluate((element) => element.clientWidth),
+    );
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  });
+
   test("a spectator finds tonight's courts, picks their team, and it is remembered", async ({ page }) => {
     await page.goto('/prototype/today');
     await expect(page.getByRole('heading', { level: 1, name: 'Eastside Friday League' })).toBeVisible();

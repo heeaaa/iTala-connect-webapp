@@ -14,12 +14,14 @@ export function EventActions({
   name,
   published,
   results = false,
+  compact = false,
 }: {
   id: string;
   slug: string;
   name: string;
   published: boolean;
   results?: boolean;
+  compact?: boolean;
 }) {
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState('');
@@ -27,7 +29,7 @@ export function EventActions({
   const router = useRouter();
   return (
     <>
-      <div className={w.actions}>
+      <div className={`${w.actions} ${compact ? w.dashboardActions : ''}`}>
         <Link className={`${s.button} ${s.buttonQuiet}`} href={`/admin/events/${id}`}>
           Edit<span className="sr-only"> {name}</span>
         </Link>
