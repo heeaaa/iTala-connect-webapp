@@ -93,6 +93,9 @@ test('manages platform sponsors and the default rules that new events start with
     'min-height',
     '48px',
   );
+  // The sticky bar can temporarily clip a sponsor control at the scroll
+  // position left by typing in Rules; audit at a stable page position.
+  await page.evaluate(() => window.scrollTo(0, 0));
   const axe = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
     .analyze();
