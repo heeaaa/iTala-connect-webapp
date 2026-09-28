@@ -21,14 +21,14 @@ export function HomeView({ events }: { events: HomeCard[] }) {
             {groups.length === 0 ? (
               <p className={s.empty}>No events yet. Published tournaments will appear here.</p>
             ) : (
-              groups.map((g) => (
-                <section key={g.label} className={s.section} aria-labelledby={`group-${g.label}`}>
-                  <h2 id={`group-${g.label}`} className={s.sectionLabel}>
+              groups.map((g, index) => (
+                <section key={g.label} className={s.section} aria-labelledby={`event-group-${index}`}>
+                  <h2 id={`event-group-${index}`} className={s.sectionLabel}>
                     {g.label}
                   </h2>
                   <ul className={s.rundown}>
                     {g.items.map((e) => (
-                      <li key={e.id}>
+                      <li key={e.id} data-when={e.when}>
                         <EventBug event={e} />
                       </li>
                     ))}
@@ -98,7 +98,8 @@ function EventBug({ event: e }: { event: HomeCard }) {
         <span className={s.bugText}>
           <span className={s.bugName}>{e.name || 'Untitled event'}</span>
           <span className={s.bugMeta}>
-            {divisionsLabel(e.divisionCount)}, {range}
+            <span>{divisionsLabel(e.divisionCount)}</span>
+            <span>{range}</span>
           </span>
         </span>
       </span>

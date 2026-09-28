@@ -15,10 +15,10 @@ export interface EventShellProps {
   tab: EventTabId;
   bannerUrl?: string | null;
   bannerFocus?: 'left' | 'center' | 'right';
+  logoUrl?: string | null;
   /** next/font variable classes, applied by the route. */
   fontClassName: string;
-  /** Logo and sponsor rows (P-01), shown under the event name. */
-  media?: ReactNode;
+  sponsors?: ReactNode;
   /** Shown above everything, e.g. the draft preview notice (A-06). */
   notice?: ReactNode;
   children: ReactNode;
@@ -35,8 +35,9 @@ export function EventShell({
   tab,
   bannerUrl,
   bannerFocus = 'center',
+  logoUrl,
   fontClassName,
-  media,
+  sponsors,
   notice,
   children,
 }: EventShellProps) {
@@ -65,17 +66,26 @@ export function EventShell({
           </div>
         ) : null}
         <header className={`${styles.header} ${bannerUrl ? styles.headerWithBanner : ''}`}>
-          <h1 className={styles.name}>{name}</h1>
-          {first && last ? (
-            <p className={styles.dates}>
-              {first === last ? formatDate(first) : `${formatDate(first)} to ${formatDate(last)}`}
-            </p>
-          ) : null}
+          <div className={styles.headerIdentity}>
+            <div className={styles.headerCopy}>
+              <h1 className={styles.name}>{name}</h1>
+              {first && last ? (
+                <p className={styles.dates}>
+                  {first === last ? formatDate(first) : `${formatDate(first)} to ${formatDate(last)}`}
+                </p>
+              ) : null}
+            </div>
+            {logoUrl ? (
+              // Plain img: event logos are already resized on upload.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className={styles.eventLogo} src={logoUrl} alt={`${name} logo`} />
+            ) : null}
+          </div>
         </header>
       </div>
-      {media}
       <EventTabs current={tab} />
       <main className={styles.content}>{children}</main>
+      <div className={styles.sponsorPlacement}>{sponsors}</div>
       <footer className={styles.footer}>
         <p>Powered by iTala Connect</p>
       </footer>

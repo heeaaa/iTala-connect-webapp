@@ -104,7 +104,6 @@
   max-width: var(--measure);
   height: clamp(7rem, 22vw, 14rem);
   margin: 0 auto;
-  border-bottom: var(--line) solid var(--ev-accent);
   overflow: hidden;
 }
 
@@ -114,6 +113,7 @@
   height: 100%;
   object-fit: cover;
   object-position: center;
+  mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
 }
 
 .banner img[data-focus='left'] {
@@ -132,7 +132,26 @@
 }
 
 .headerWithBanner {
-  padding-top: 1.75rem;
+  padding-top: 1.25rem;
+}
+
+.headerIdentity {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.headerCopy {
+  min-width: 0;
+}
+
+.eventLogo {
+  display: block;
+  flex: none;
+  width: auto;
+  max-width: clamp(4.5rem, 12vw, 8rem);
+  max-height: 6rem;
+  object-fit: contain;
 }
 
 .name {
@@ -209,6 +228,17 @@
   padding: 0 var(--gutter) 3rem;
 }
 
+.sponsorPlacement {
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: 0 var(--gutter) 1.25rem;
+}
+
+.sponsorPlacement:empty {
+  display: none;
+}
+
 .footer {
   width: 100%;
   max-width: var(--measure);
@@ -232,5 +262,48 @@
 
   .banner {
     height: clamp(7rem, 30vw, 10rem);
+  }
+
+  .headerIdentity {
+    gap: 0.75rem;
+  }
+
+  .headerCopy {
+    flex: 1;
+  }
+
+  .eventLogo {
+    max-width: 4.5rem;
+    max-height: 4.5rem;
+  }
+
+  .sponsorPlacement {
+    padding-top: 1rem;
+  }
+
+  .content {
+    flex: none;
+  }
+
+  .footer {
+    margin-top: auto;
+  }
+}
+
+@media (min-width: 48rem) {
+  .sponsorPlacement {
+    order: 1;
+  }
+
+  .tabs {
+    order: 2;
+  }
+
+  .content {
+    order: 3;
+  }
+
+  .footer {
+    order: 4;
   }
 }

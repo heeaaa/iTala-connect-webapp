@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-import { EventMedia, RulesTab, StandingsTab, TeamsTab } from '@/components/event/event-tabs-content';
+import { EventSponsors, RulesTab, StandingsTab, TeamsTab } from '@/components/event/event-tabs-content';
 import { type Game } from '@/domain/types';
 
 const g = (t1: string, t2: string, s1: number | null, s2: number | null): Game => ({
@@ -111,12 +111,10 @@ describe('RulesTab (PRD P-11)', () => {
   });
 });
 
-describe('EventMedia (PRD P-01)', () => {
-  it('puts the logo, then major sponsors, then the small row, and hides empty rows', () => {
+describe('EventSponsors (PRD P-01)', () => {
+  it('puts major sponsors before the small row and hides empty rows', () => {
     const { container } = render(
-      <EventMedia
-        eventName="Spring Hoops"
-        logoUrl="https://x/logo.png"
+      <EventSponsors
         sponsors={{
           major: 'https://x/major.png',
           minor: ['https://x/m.png'],
@@ -125,23 +123,21 @@ describe('EventMedia (PRD P-01)', () => {
         }}
       />,
     );
-    expect(screen.getByRole('img', { name: 'Spring Hoops logo' })).toBeInTheDocument();
-    expect(within(screen.getByRole('list', { name: 'Major sponsors' })).getAllByRole('img')).toHaveLength(2);
-    expect(within(screen.getByRole('list', { name: 'Sponsors' })).getAllByRole('img')).toHaveLength(1);
+    const sponsorSection = screen.getByRole('region', { name: 'Event sponsors' });
+    const inSponsors = within(sponsorSection);
+    expect(inSponsors.getByRole('heading', { name: 'Major sponsors' })).toBeInTheDocument();
+    expect(inSponsors.getByRole('heading', { name: /^Sponsors$/ })).toBeInTheDocument();
+    expect(within(inSponsors.getByRole('list', { name: 'Major sponsors' })).getAllByRole('img')).toHaveLength(2);
+    expect(within(inSponsors.getByRole('list', { name: /^Sponsors$/ })).getAllByRole('img')).toHaveLength(1);
     const order = [...container.querySelectorAll('img, ul')].map(
       (el) => el.getAttribute('aria-label') ?? el.getAttribute('alt'),
     );
-    expect(order[0]).toBe('Spring Hoops logo');
     expect(order.indexOf('Major sponsors')).toBeLessThan(order.indexOf('Sponsors'));
   });
 
-  it('renders nothing without a logo or sponsors', () => {
+  it('renders nothing without sponsors', () => {
     const { container } = render(
-      <EventMedia
-        eventName="x"
-        logoUrl={null}
-        sponsors={{ major: null, minor: [], platformPrimary: [], platformSecondary: [] }}
-      />,
+      <EventSponsors sponsors={{ major: null, minor: [], platformPrimary: [], platformSecondary: [] }} />,
     );
     expect(container).toBeEmptyDOMElement();
   });

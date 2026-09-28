@@ -23,7 +23,7 @@ export function PlatformNav({ role }: { role: 'superadmin' | 'admin' | null }) {
   );
   return (
     // data-count lets phones drop a strip that would only repeat the logo link.
-    <nav aria-label="Main" className={styles.nav} data-count={role ? undefined : 1}>
+    <nav aria-label="Main" className={styles.nav} data-count={role === 'superadmin' ? 4 : role === 'admin' ? 2 : 1}>
       {link('events', '/', 'Events')}
       {role ? link('dashboard', '/admin', 'Dashboard') : null}
       {role === 'superadmin' ? link('settings', '/admin/settings', 'Settings') : null}

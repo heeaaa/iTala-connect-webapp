@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { signInAndWait } from './fixtures';
 import { file, webpSize } from './images';
@@ -12,7 +13,7 @@ test.afterEach(async () => {
 });
 
 // E-15 to E-18 and E-70, E-71: images and rules on an event, stored and shown on its page.
-test('uploads event images, saves sponsor backing and banner crop, and shows them on the event page', async ({
+test('uploads event images, saves banner crop, and shows a shared sponsor section on the event page', async ({
   page,
 }, info) => {
   test.setTimeout(60_000);
@@ -68,18 +69,14 @@ test('uploads event images, saves sponsor backing and banner crop, and shows the
   // Sponsors: a major one and two minor ones, then one minor removed.
   await main.getByLabel('Upload major sponsor').setInputFiles(file('major.png'));
   await expect(main.getByText('Major sponsor saved.')).toBeVisible();
-  await main.getByRole('combobox', { name: 'Logo backing' }).selectOption('dark');
-  await expect(main.getByText('Sponsor backing saved.')).toBeVisible();
-  await expect(main.getByRole('combobox', { name: 'Logo backing' })).toHaveCSS('min-height', '48px');
   await main.getByLabel('Add minor sponsors').setInputFiles([file('a.png'), file('b.png')]);
   await expect(main.getByText('2 minor sponsors added.')).toBeVisible();
   await expect(main.getByRole('img', { name: /^Minor sponsor logo/ })).toHaveCount(2);
   await main.getByRole('button', { name: 'Remove minor sponsor 2' }).click();
   await expect(main.getByText('Minor sponsor removed.')).toBeVisible();
   await expect(main.getByRole('img', { name: /^Minor sponsor logo/ })).toHaveCount(1);
-  const { data: sponsors } = await db.from('event_sponsors').select('tier, display_mode').eq('event_id', eventId);
+  const { data: sponsors } = await db.from('event_sponsors').select('tier').eq('event_id', eventId);
   expect(sponsors!.map((s) => s.tier).sort()).toEqual(['major', 'minor']);
-  expect(sponsors!.find((s) => s.tier === 'major')?.display_mode).toBe('dark');
   await expect.poll(async () => (await files()).length).toBe(4);
 
   // Rules: formatted with the toolbar, saved with the event, cleaned on the way in.
@@ -97,18 +94,60 @@ test('uploads event images, saves sponsor backing and banner crop, and shows the
   expect((await stored()).rules_html).toBe('<h2>Fouls</h2><p>Five fouls and you sit.</p>');
 
   // The event page (the owner's draft preview) shows all of it.
+  // Check the desktop sponsor strip first, then switch to the mobile placement below.
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(`/events/${eventId}?tab=rules`);
   await expect(page.getByRole('heading', { level: 2, name: 'Fouls' })).toBeVisible();
   await expect(page.getByText('Five fouls and you sit.')).toBeVisible();
   await expect(page.getByRole('img', { name: `${name} logo` })).toBeVisible();
   await expect(page.getByRole('img', { name: 'Sponsor logo' })).toHaveCount(2);
+  const sponsorSection = page.getByRole('region', { name: 'Event sponsors' });
+  await expect(sponsorSection.getByRole('heading', { name: 'Major sponsors' })).toBeVisible();
+  await expect(sponsorSection.getByRole('heading', { name: 'Sponsors', exact: true })).toBeVisible();
+  expect(await sponsorSection.evaluate((section) => getComputedStyle(section).backgroundColor)).not.toBe(
+    'rgba(0, 0, 0, 0)',
+  );
+  const tabs = page.getByRole('navigation', { name: 'Event' });
+  expect((await sponsorSection.boundingBox())!.y).toBeLessThan((await tabs.boundingBox())!.y);
+  const majorHeading = (await sponsorSection.getByRole('heading', { name: 'Major sponsors' }).boundingBox())!;
+  const regularHeading = (await sponsorSection.getByRole('heading', { name: 'Sponsors', exact: true }).boundingBox())!;
+  expect(Math.abs(majorHeading.y - regularHeading.y)).toBeLessThan(4);
+  for (const list of await sponsorSection.getByRole('list').all()) {
+    expect(await list.evaluate((element) => getComputedStyle(element).flexWrap)).toBe('nowrap');
+  }
+  for (const item of await sponsorSection.locator('li').all()) {
+    expect(await item.evaluate((li) => getComputedStyle(li).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  }
   await expect(page.getByRole('link', { name: 'All events' })).toHaveAttribute('href', '/');
   await expect(page.locator('img[data-focus="right"]')).toBeVisible();
-  await expect(page.locator('[data-mode="dark"] img[alt="Sponsor logo"]')).toHaveCount(1);
+  expect(await page.locator('img[data-focus="right"]').evaluate((img) => getComputedStyle(img).maskImage)).toContain(
+    'linear-gradient',
+  );
+  expect(
+    await page
+      .locator('img[data-focus="right"]')
+      .evaluate((img) => getComputedStyle(img.parentElement!).borderBottomWidth),
+  ).toBe('0px');
+  const axe = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .analyze();
+  expect(axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([]);
   await page.setViewportSize({ width: 375, height: 812 });
   expect(await page.locator('img[data-focus="right"]').evaluate((img) => getComputedStyle(img).objectPosition)).toBe(
     '100% 50%',
   );
+  const titleBox = (await page.getByRole('heading', { level: 1, name }).boundingBox())!;
+  const logoBox = (await page.getByRole('img', { name: `${name} logo` }).boundingBox())!;
+  expect(logoBox.x).toBeGreaterThan(titleBox.x);
+  expect(logoBox.y).toBeLessThan(titleBox.y + titleBox.height);
+  const mainBox = (await page.getByRole('main').boundingBox())!;
+  const mobileSponsorsBox = (await sponsorSection.boundingBox())!;
+  expect(mobileSponsorsBox.y).toBeGreaterThanOrEqual(mainBox.y + mainBox.height);
+  expect(
+    await sponsorSection
+      .getByRole('list', { name: 'Sponsors', exact: true })
+      .evaluate((list) => getComputedStyle(list).gridTemplateColumns.split(' ').length),
+  ).toBe(2);
   await page.setViewportSize({ width: 1280, height: 800 });
 
   // Removing the logo deletes its file too.

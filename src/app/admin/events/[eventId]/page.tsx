@@ -16,7 +16,7 @@ export default async function EventEditorPage({ params, searchParams }: PageProp
   const { data: event, error } = await db
     .from('events')
     .select(
-      '*, divisions(*, teams(*, players(*)), division_mobile_links(league_name, season)), games(id, division_id, day, start_time, court, group_id, team1_id, team2_id, label, type, is_playoff, bracket_game_id, team1_source, team2_source, playoff_round, position, game_scores(s1, s2)), event_sponsors(id, tier, image_path, sort_order, display_mode)',
+      '*, divisions(*, teams(*, players(*)), division_mobile_links(league_name, season)), games(id, division_id, day, start_time, court, group_id, team1_id, team2_id, label, type, is_playoff, bracket_game_id, team1_source, team2_source, playoff_round, position, game_scores(s1, s2)), event_sponsors(id, tier, image_path, sort_order)',
     )
     .eq('id', eventId)
     .single();
@@ -78,13 +78,11 @@ export default async function EventEditorPage({ params, searchParams }: PageProp
         banner: imageUrl(supabaseUrl, event.banner_path),
         bannerFocus: event.banner_focus === 'left' || event.banner_focus === 'right' ? event.banner_focus : 'center',
         major: major ? imageUrl(supabaseUrl, major.image_path) : null,
-        majorDisplayMode: major?.display_mode === 'dark' ? 'dark' : 'light',
         minors: sponsors
           .filter((s) => s.tier === 'minor')
           .map((s) => ({
             id: s.id,
             url: imageUrl(supabaseUrl, s.image_path)!,
-            displayMode: s.display_mode === 'dark' ? 'dark' : 'light',
           })),
       }}
       games={gamesFromRows(event.games).map((g) => ({
