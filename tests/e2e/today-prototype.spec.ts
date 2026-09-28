@@ -71,7 +71,7 @@ test.describe('Today screen prototype (sample data)', () => {
 
   test('event tabs fit without a vertical scrollbar at both viewports', async ({ page }) => {
     await page.goto('/prototype/today');
-    const tabs = page.getByRole('navigation', { name: 'Event' }).locator('ul');
+    const tabs = page.getByRole('navigation', { name: 'Event', exact: true }).locator('ul');
     expect(await tabs.evaluate((element) => element.scrollHeight)).toBeLessThanOrEqual(
       await tabs.evaluate((element) => element.clientHeight),
     );

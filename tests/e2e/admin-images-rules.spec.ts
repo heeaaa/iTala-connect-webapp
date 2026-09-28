@@ -112,7 +112,7 @@ test('uploads event images, saves banner crop, and shows a shared sponsor sectio
   expect(await sponsorSection.evaluate((section) => getComputedStyle(section).backgroundColor)).not.toBe(
     'rgba(0, 0, 0, 0)',
   );
-  const tabs = page.getByRole('navigation', { name: 'Event' });
+  const tabs = page.getByRole('navigation', { name: 'Event', exact: true });
   expect((await sponsorSection.boundingBox())!.y).toBeLessThan((await tabs.boundingBox())!.y);
   const majorHeading = (await sponsorSection.getByRole('heading', { name: 'Major sponsors' }).boundingBox())!;
   const regularHeading = (await sponsorSection.getByRole('heading', { name: 'Sponsors', exact: true }).boundingBox())!;
