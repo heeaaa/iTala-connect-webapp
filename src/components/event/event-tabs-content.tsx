@@ -166,24 +166,21 @@ export function RulesTab({ html, empty }: { html: string; empty: boolean }) {
 }
 
 /**
- * P-01 sponsor rows and event logo. Sponsor logos share one neutral section;
- * the event logo stays outside it. Empty rows are left out.
+ * P-01 sponsor rows share one neutral section. Empty rows are left out.
  */
-export function EventMedia(props: {
-  logoUrl: string | null;
+export function EventSponsors(props: {
   sponsors: {
     major: { url: string } | string | null;
     minor: ({ url: string } | string)[];
     platformPrimary: ({ url: string } | string)[];
     platformSecondary: ({ url: string } | string)[];
   };
-  eventName: string;
 }) {
-  const { logoUrl, sponsors, eventName } = props;
+  const { sponsors } = props;
   const toSponsor = (item: { url: string } | string) => (typeof item === 'string' ? { url: item } : item);
   const small = [...sponsors.platformSecondary, ...sponsors.minor].map(toSponsor);
   const large = [...sponsors.platformPrimary, ...(sponsors.major ? [sponsors.major] : [])].map(toSponsor);
-  if (!logoUrl && small.length === 0 && large.length === 0) return null;
+  if (small.length === 0 && large.length === 0) return null;
   const sponsor = (item: { url: string }) => (
     <li key={item.url}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -191,32 +188,23 @@ export function EventMedia(props: {
     </li>
   );
   return (
-    <div className={styles.media}>
-      {logoUrl ? (
-        // Plain img: storage URLs are already sized on upload (E-18), and the free tier has no image optimiser budget.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img className={styles.logo} src={logoUrl} alt={`${eventName} logo`} />
+    <section className={styles.sponsorSection} aria-label="Event sponsors">
+      {large.length ? (
+        <div className={styles.sponsorGroup}>
+          <h2 className={styles.sponsorHeading}>Major sponsors</h2>
+          <ul className={styles.sponsorsLarge} aria-label="Major sponsors">
+            {large.map(sponsor)}
+          </ul>
+        </div>
       ) : null}
-      {large.length || small.length ? (
-        <section className={styles.sponsorSection} aria-label="Event sponsors">
-          {large.length ? (
-            <div className={styles.sponsorGroup}>
-              <h2 className={styles.sponsorHeading}>Major sponsors</h2>
-              <ul className={styles.sponsorsLarge} aria-label="Major sponsors">
-                {large.map(sponsor)}
-              </ul>
-            </div>
-          ) : null}
-          {small.length ? (
-            <div className={styles.sponsorGroup}>
-              <h2 className={styles.sponsorHeading}>Sponsors</h2>
-              <ul className={styles.sponsorsSmall} aria-label="Sponsors">
-                {small.map(sponsor)}
-              </ul>
-            </div>
-          ) : null}
-        </section>
+      {small.length ? (
+        <div className={styles.sponsorGroup}>
+          <h2 className={styles.sponsorHeading}>Sponsors</h2>
+          <ul className={styles.sponsorsSmall} aria-label="Sponsors">
+            {small.map(sponsor)}
+          </ul>
+        </div>
       ) : null}
-    </div>
+    </section>
   );
 }

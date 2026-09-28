@@ -2,7 +2,7 @@ import { type Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 
 import { EventShell } from '@/components/event/event-shell';
-import { EventMedia, RulesTab, TeamsTab } from '@/components/event/event-tabs-content';
+import { EventSponsors, RulesTab, TeamsTab } from '@/components/event/event-tabs-content';
 import { LiveEvent } from '@/components/event/live-event';
 import { parseEventTab } from '@/components/event/tabs';
 import { eventPath } from '@/lib/event-slug';
@@ -77,9 +77,10 @@ export default async function EventPage({ params, searchParams }: Props) {
       tab={tab}
       bannerUrl={model.bannerUrl}
       bannerFocus={model.bannerFocus}
+      logoUrl={model.logoUrl}
       fontClassName={eventFontClassName}
       notice={model.status === 'draft' ? 'Draft preview. Only you can see this until the event is published.' : null}
-      media={<EventMedia logoUrl={model.logoUrl} sponsors={model.sponsors} eventName={model.name} />}
+      sponsors={<EventSponsors sponsors={model.sponsors} />}
     >
       {tab === 'schedule' || tab === 'standings' ? (
         <LiveEvent model={model} tab={tab} selectedDay={day} canEdit={canEdit} renderedAt={loadedAt} />

@@ -285,9 +285,48 @@
 .rundown {
   display: grid;
   gap: 0.375rem;
+  position: relative;
   margin: 0;
-  padding: 0;
+  padding: 0 0 0 1.125rem;
   list-style: none;
+}
+
+.rundown::before {
+  content: '';
+  position: absolute;
+  top: 2rem;
+  bottom: 2rem;
+  left: 0.375rem;
+  width: 2px;
+  background: var(--brand-border);
+}
+
+.rundown > li {
+  position: relative;
+  min-width: 0;
+}
+
+.rundown > li::before {
+  content: '';
+  position: absolute;
+  top: 2rem;
+  left: -1.125rem;
+  z-index: 1;
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 2px solid var(--brand-accent);
+  border-radius: 50%;
+  background: var(--brand-bg);
+}
+
+.rundown > li[data-when='current']::before {
+  border-color: var(--brand-live);
+  background: var(--brand-live);
+}
+
+.rundown > li[data-when='past']::before,
+.rundown > li[data-when='undated']::before {
+  border-color: var(--brand-muted);
 }
 
 .bug {
@@ -361,8 +400,17 @@ a.bug:hover {
 }
 
 .bugMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.5rem;
   color: var(--brand-muted);
   font-size: 0.875rem;
+}
+
+.bugMeta span + span::before {
+  content: '·';
+  margin-right: 0.5rem;
+  color: var(--brand-accent);
 }
 
 .status {
@@ -414,6 +462,14 @@ a.bug:hover {
 }
 
 @media (max-width: 29.99rem) {
+  .bugMeta {
+    display: grid;
+  }
+
+  .bugMeta span + span::before {
+    content: none;
+  }
+
   .bug {
     grid-template-columns: 4.25rem minmax(0, 1fr);
   }

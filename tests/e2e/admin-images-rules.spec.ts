@@ -105,7 +105,14 @@ test('uploads event images, saves banner crop, and shows a shared sponsor sectio
   expect(await sponsorSection.evaluate((section) => getComputedStyle(section).backgroundColor)).not.toBe(
     'rgba(0, 0, 0, 0)',
   );
-  expect(await sponsorSection.evaluate((section) => section.getBoundingClientRect().width)).toBeLessThanOrEqual(400);
+  const tabs = page.getByRole('navigation', { name: 'Event' });
+  expect((await sponsorSection.boundingBox())!.y).toBeLessThan((await tabs.boundingBox())!.y);
+  const majorHeading = (await sponsorSection.getByRole('heading', { name: 'Major sponsors' }).boundingBox())!;
+  const regularHeading = (await sponsorSection.getByRole('heading', { name: 'Sponsors', exact: true }).boundingBox())!;
+  expect(Math.abs(majorHeading.y - regularHeading.y)).toBeLessThan(4);
+  for (const list of await sponsorSection.getByRole('list').all()) {
+    expect(await list.evaluate((element) => getComputedStyle(element).flexWrap)).toBe('nowrap');
+  }
   for (const item of await sponsorSection.locator('li').all()) {
     expect(await item.evaluate((li) => getComputedStyle(li).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
   }
@@ -127,6 +134,18 @@ test('uploads event images, saves banner crop, and shows a shared sponsor sectio
   expect(await page.locator('img[data-focus="right"]').evaluate((img) => getComputedStyle(img).objectPosition)).toBe(
     '100% 50%',
   );
+  const titleBox = (await page.getByRole('heading', { level: 1, name }).boundingBox())!;
+  const logoBox = (await page.getByRole('img', { name: `${name} logo` }).boundingBox())!;
+  expect(logoBox.x).toBeGreaterThan(titleBox.x);
+  expect(logoBox.y).toBeLessThan(titleBox.y + titleBox.height);
+  const mainBox = (await page.getByRole('main').boundingBox())!;
+  const mobileSponsorsBox = (await sponsorSection.boundingBox())!;
+  expect(mobileSponsorsBox.y).toBeGreaterThanOrEqual(mainBox.y + mainBox.height);
+  expect(
+    await sponsorSection
+      .getByRole('list', { name: 'Sponsors', exact: true })
+      .evaluate((list) => getComputedStyle(list).gridTemplateColumns.split(' ').length),
+  ).toBe(2);
   await page.setViewportSize({ width: 1280, height: 800 });
 
   // Removing the logo deletes its file too.
