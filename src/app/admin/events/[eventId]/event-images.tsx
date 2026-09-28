@@ -1,15 +1,27 @@
 'use client';
 import { useId, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { ImageProblem, compressImage } from '@/lib/compress-image';
 import { uploadFailed, type ImageKind } from '@/lib/event-images';
-import { removeEventImage, uploadEventImage, type ImageOutcome, type RemoveImageInput } from '@/server/actions/images';
+import { platformStyles as s } from '@/components/platform/platform-frame';
+import {
+  removeEventImage,
+  setEventBannerFocus,
+  setEventSponsorDisplayMode,
+  uploadEventImage,
+  type ImageOutcome,
+  type RemoveImageInput,
+} from '@/server/actions/images';
 import { ImagePick as Pick } from '../../_components/image-pick';
 import w from '../../admin-workspace.module.css';
 
 export interface EventImagesData {
   logo: string | null;
+  banner?: string | null;
+  bannerFocus?: 'left' | 'center' | 'right';
   major: string | null;
-  minors: { id: string; url: string }[];
+  minors: { id: string; url: string; displayMode?: 'light' | 'dark' }[];
+  majorDisplayMode?: 'light' | 'dark';
 }
 
 type Result = { ok: true; data: ImageOutcome } | { ok: false; error: string };
@@ -21,7 +33,12 @@ export type RunImageTask = (task: (version: string) => Promise<Result>) => Promi
 
 type Status = { tone: 'busy' | 'done' | 'error'; text: string } | null;
 
-const NAMES: Record<ImageKind, string> = { logo: 'Logo', major: 'Major sponsor', minor: 'Minor sponsor' };
+const NAMES: Record<ImageKind, string> = {
+  logo: 'Logo',
+  banner: 'Event banner',
+  major: 'Major sponsor',
+  minor: 'Minor sponsor',
+};
 
 /**
  * Event logo, major sponsor and minor sponsors (PRD E-15 to E-18). Each
@@ -30,13 +47,20 @@ const NAMES: Record<ImageKind, string> = { logo: 'Logo', major: 'Major sponsor',
  */
 export function EventImages({ eventId, images, run }: { eventId: string; images: EventImagesData; run: RunImageTask }) {
   const [status, setStatus] = useState<Status>(null);
+  const [bannerFocus, setBannerFocus] = useState<'left' | 'center' | 'right'>(images.bannerFocus ?? 'center');
+  const [majorMode, setMajorMode] = useState<'light' | 'dark'>(images.majorDisplayMode ?? 'light');
+  const [minorModes, setMinorModes] = useState<Record<string, 'light' | 'dark'>>(() =>
+    Object.fromEntries(images.minors.map((m) => [m.id, m.displayMode ?? 'light'])),
+  );
   const logoId = useId();
+  const bannerId = useId();
   const majorId = useId();
   const minorId = useId();
   const logoPick = useRef<HTMLInputElement>(null);
+  const bannerPick = useRef<HTMLInputElement>(null);
   const majorPick = useRef<HTMLInputElement>(null);
   const minorPick = useRef<HTMLInputElement>(null);
-  const picks = { logo: logoPick, major: majorPick, minor: minorPick };
+  const picks = { logo: logoPick, banner: bannerPick, major: majorPick, minor: minorPick };
 
   const send = async (kind: ImageKind, file: File): Promise<Result> => {
     let blob: Blob;
@@ -98,32 +122,76 @@ export function EventImages({ eventId, images, run }: { eventId: string; images:
     if (result.ok) picks[input.kind].current?.focus();
   };
 
+  const changeSponsorMode = async (input: { kind: 'major' | 'minor'; sponsorId?: string; mode: 'light' | 'dark' }) => {
+    const previous = input.kind === 'major' ? majorMode : minorModes[input.sponsorId!];
+    if (input.kind === 'major') setMajorMode(input.mode);
+    else setMinorModes((m) => ({ ...m, [input.sponsorId!]: input.mode }));
+    setStatus({ tone: 'busy', text: 'Saving sponsor backing…' });
+    try {
+      const result = await setEventSponsorDisplayMode({
+        eventId,
+        kind: input.kind,
+        ...(input.sponsorId ? { sponsorId: input.sponsorId } : {}),
+        displayMode: input.mode,
+      });
+      if (!result.ok) throw new Error(result.error);
+      setStatus({ tone: 'done', text: 'Sponsor backing saved.' });
+    } catch (e) {
+      if (input.kind === 'major') setMajorMode(previous as 'light' | 'dark');
+      else setMinorModes((m) => ({ ...m, [input.sponsorId!]: previous as 'light' | 'dark' }));
+      setStatus({ tone: 'error', text: e instanceof Error ? e.message : 'Could not update the sponsor backing.' });
+    }
+  };
+
+  const changeBannerFocus = async (focus: 'left' | 'center' | 'right') => {
+    const previous = bannerFocus;
+    setBannerFocus(focus);
+    setStatus({ tone: 'busy', text: 'Saving banner focal point…' });
+    try {
+      const result = await run((version) => setEventBannerFocus({ eventId, focus, version }));
+      if (!result.ok) throw new Error(result.error);
+      setStatus({ tone: 'done', text: 'Banner focal point saved.' });
+    } catch (e) {
+      setBannerFocus(previous);
+      setStatus({ tone: 'error', text: e instanceof Error ? e.message : 'Could not save the banner focal point.' });
+    }
+  };
+
   const single = (kind: 'logo' | 'major', id: string, url: string | null) => (
     <section aria-labelledby={id} className={w.imageSlot}>
-      <h3 id={id}>{kind === 'logo' ? 'Event logo' : 'Major sponsor'}</h3>
+      <h3 id={id}>{NAMES[kind]}</h3>
       {url ? (
         // Plain img: previews of the organiser's own uploads, straight from storage.
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt={kind === 'logo' ? 'Event logo' : 'Major sponsor logo'} className={w.imagePreview} />
       ) : (
-        <p className={w.note}>{kind === 'logo' ? 'No logo yet.' : 'No major sponsor yet.'}</p>
+        <p className={w.note}>No {NAMES[kind].toLowerCase()} yet.</p>
       )}
       <div className={w.actions}>
         <Pick
-          label={
-            url
-              ? `Replace ${kind === 'logo' ? 'logo' : 'major sponsor'}`
-              : `Upload ${kind === 'logo' ? 'logo' : 'major sponsor'}`
-          }
+          label={url ? `Replace ${NAMES[kind].toLowerCase()}` : `Upload ${NAMES[kind].toLowerCase()}`}
           inputRef={picks[kind]}
           onPick={(files) => upload(kind, files.slice(0, 1))}
         />
         {url && (
           <button type="button" className={w.danger} onClick={() => remove({ kind, eventId })}>
-            Remove {kind === 'logo' ? 'logo' : 'major sponsor'}
+            Remove {NAMES[kind].toLowerCase()}
           </button>
         )}
       </div>
+      {kind === 'major' && url ? (
+        <label className={w.field}>
+          <span className={s.label}>Logo backing</span>
+          <select
+            className={s.input}
+            value={majorMode}
+            onChange={(e) => changeSponsorMode({ kind: 'major', mode: e.target.value as 'light' | 'dark' })}
+          >
+            <option value="light">Light plaque</option>
+            <option value="dark">Dark plaque</option>
+          </select>
+        </label>
+      ) : null}
     </section>
   );
 
@@ -132,6 +200,60 @@ export function EventImages({ eventId, images, run }: { eventId: string; images:
       <p className={w.note}>
         Images save as soon as they upload. PNG, JPEG or WebP up to 5 MB; larger pictures are resized to 1600 pixels.
       </p>
+      <section aria-labelledby={bannerId} className={w.imageSlot}>
+        <h3 id={bannerId}>Event banner</h3>
+        <p className={w.note}>Use a wide decorative image without important text. It crops responsively on phones.</p>
+        {images.banner ? (
+          <div className={w.bannerPreviews} style={{ '--banner-focus': bannerFocus } as CSSProperties}>
+            <div className={w.bannerPreviewGroup}>
+              <span>Desktop</span>
+              <div className={w.bannerPreview} role="img" aria-label="Desktop banner preview">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={images.banner} alt="" />
+              </div>
+            </div>
+            <div className={w.bannerPreviewGroup}>
+              <span>Mobile</span>
+              <div
+                className={`${w.bannerPreview} ${w.bannerPreviewMobile}`}
+                role="img"
+                aria-label="Mobile banner preview"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={images.banner} alt="" />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className={w.note}>No event banner yet.</p>
+        )}
+        <div className={w.actions}>
+          <Pick
+            label={images.banner ? 'Replace event banner' : 'Upload event banner'}
+            inputRef={bannerPick}
+            onPick={(files) => upload('banner', files.slice(0, 1))}
+          />
+          {images.banner ? (
+            <button type="button" className={w.danger} onClick={() => remove({ kind: 'banner', eventId })}>
+              Remove event banner
+            </button>
+          ) : null}
+        </div>
+        {images.banner ? (
+          <label className={w.field}>
+            <span className={s.label}>Banner focal point</span>
+            <select
+              className={s.input}
+              value={bannerFocus}
+              onChange={(e) => changeBannerFocus(e.target.value as 'left' | 'center' | 'right')}
+            >
+              <option value="left">Left</option>
+              <option value="center">Centre</option>
+              <option value="right">Right</option>
+            </select>
+          </label>
+        ) : null}
+      </section>
       {single('logo', logoId, images.logo)}
       {single('major', majorId, images.major)}
       <section aria-labelledby={minorId} className={w.imageSlot}>
@@ -142,6 +264,19 @@ export function EventImages({ eventId, images, run }: { eventId: string; images:
               <li key={m.id}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={m.url} alt={`Minor sponsor logo ${i + 1}`} className={w.sponsorThumb} />
+                <label className={w.field}>
+                  <span className="sr-only">Logo backing for minor sponsor {i + 1}</span>
+                  <select
+                    className={s.input}
+                    value={minorModes[m.id] ?? 'light'}
+                    onChange={(e) =>
+                      changeSponsorMode({ kind: 'minor', sponsorId: m.id, mode: e.target.value as 'light' | 'dark' })
+                    }
+                  >
+                    <option value="light">Light plaque</option>
+                    <option value="dark">Dark plaque</option>
+                  </select>
+                </label>
                 <button
                   type="button"
                   className={w.danger}

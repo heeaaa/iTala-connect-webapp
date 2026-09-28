@@ -16,14 +16,22 @@ export default async function SettingsPage() {
   await requireSuperadmin();
   const supabase = await createClient();
   const [sponsors, settings] = await Promise.all([
-    supabase.from('platform_sponsors').select('id, tier, image_path').order('sort_order').order('created_at'),
+    supabase
+      .from('platform_sponsors')
+      .select('id, tier, image_path, display_mode')
+      .order('sort_order')
+      .order('created_at'),
     supabase.from('platform_settings').select('default_rules_html').eq('id', true).maybeSingle(),
   ]);
   const supabaseUrl = clientEnv().NEXT_PUBLIC_SUPABASE_URL;
   const tier = (t: string): PlatformSponsor[] =>
     (sponsors.data ?? [])
       .filter((s) => s.tier === t)
-      .map((s) => ({ id: s.id, url: imageUrl(supabaseUrl, s.image_path)! }));
+      .map((s) => ({
+        id: s.id,
+        url: imageUrl(supabaseUrl, s.image_path)!,
+        displayMode: s.display_mode === 'dark' ? 'dark' : 'light',
+      }));
   // New events copy the stored template, or the built-in rules when it is empty (create_draft_event).
   const stored = sanitizeRulesHtml(settings.data?.default_rules_html);
 

@@ -13,6 +13,7 @@ const tiers = z.enum(['primary', 'secondary']);
 const NOT_STORED = 'only PNG, JPEG or WebP images can be stored.';
 const NOT_SAVED = 'it could not be saved to the platform. Please try again.';
 const NOT_REMOVED = 'Could not remove the sponsor. Refresh and try again.';
+const NOT_UPDATED = 'Could not update the sponsor backing. Refresh and try again.';
 
 const bucket = (db: Db) => db.storage.from(serverEnv().SUPABASE_STORAGE_BUCKET);
 
@@ -75,6 +76,28 @@ export async function removePlatformSponsor(sponsorId: string): Promise<ActionRe
   const { data, error } = await db.from('platform_sponsors').delete().eq('id', id.data).select('image_path').single();
   if (error || !data) return { ok: false, error: NOT_REMOVED };
   await bucket(db).remove([data.image_path]);
+  refreshSponsors();
+  return { ok: true, data: undefined };
+}
+
+/** Choose the light or dark plaque used behind a platform sponsor. */
+export async function setPlatformSponsorDisplayMode(
+  sponsorId: string,
+  displayMode: 'light' | 'dark',
+): Promise<ActionResult> {
+  const auth = await authorizeSuperadmin();
+  if (!auth.ok) return auth;
+  const id = z.uuid().safeParse(sponsorId);
+  const mode = z.enum(['light', 'dark']).safeParse(displayMode);
+  if (!id.success || !mode.success) return { ok: false, error: NOT_UPDATED };
+  const db = await createClient();
+  const { data, error } = await db
+    .from('platform_sponsors')
+    .update({ display_mode: mode.data })
+    .eq('id', id.data)
+    .select('id')
+    .maybeSingle();
+  if (error || !data) return { ok: false, error: NOT_UPDATED };
   refreshSponsors();
   return { ok: true, data: undefined };
 }

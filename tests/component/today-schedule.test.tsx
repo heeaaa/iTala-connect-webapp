@@ -238,6 +238,24 @@ describe('Today screen: owner score entry (PRD P-08)', () => {
 });
 
 describe('EventShell (PRD P-01 to P-03)', () => {
+  it('links to all public events and applies the selected banner crop above the title', () => {
+    render(
+      <EventShell
+        name="One day"
+        days={['2026-10-09']}
+        theme={{ primary: '#FFCC00', bg: '#0D0D0D', text: '#E0E0E0', textSecondary: '#888888', heading: '#FFFFFF' }}
+        tab="schedule"
+        bannerUrl="https://x.test/banner.webp"
+        bannerFocus="right"
+        fontClassName=""
+      >
+        <p>content</p>
+      </EventShell>,
+    );
+    expect(screen.getByRole('link', { name: 'All events' })).toHaveAttribute('href', '/');
+    expect(document.querySelector('img[src="https://x.test/banner.webp"]')).toHaveAttribute('data-focus', 'right');
+    expect(screen.getByRole('heading', { name: 'One day' })).toBeInTheDocument();
+  });
   it('sets the organiser colours as event tokens and keeps the tab in the URL', () => {
     const { container } = render(
       <EventShell

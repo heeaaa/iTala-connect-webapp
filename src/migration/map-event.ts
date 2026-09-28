@@ -1,4 +1,4 @@
-import { sanitizeRulesHtml } from '@/lib/rules-html';
+import { formatLegacyRules } from './format-legacy-rules';
 
 import { child, entries, isRecord, pushIdTime, text, values } from './firebase-tree';
 
@@ -331,7 +331,7 @@ export function mapEvent(legacyId: string, raw: unknown, options: MapOptions): M
   };
 
   const rawRules = text(raw.rulesHtml);
-  const rules = sanitizeRulesHtml(rawRules);
+  const rules = formatLegacyRules(legacyId, rawRules);
   // Line breaks are written as <br /> now; only other changes are worth a note.
   const sameRules = (a: string) =>
     a

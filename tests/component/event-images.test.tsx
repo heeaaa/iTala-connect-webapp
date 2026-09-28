@@ -4,12 +4,24 @@ import userEvent from '@testing-library/user-event';
 
 // jsdom has no canvas, so the resizing step (proven in Chromium) is replaced;
 // everything after it is the component's own behaviour.
-const fake = vi.hoisted(() => ({ compress: vi.fn(), upload: vi.fn(), remove: vi.fn(), run: vi.fn() }));
+const fake = vi.hoisted(() => ({
+  compress: vi.fn(),
+  upload: vi.fn(),
+  remove: vi.fn(),
+  focus: vi.fn(),
+  mode: vi.fn(),
+  run: vi.fn(),
+}));
 vi.mock('@/lib/compress-image', () => ({
   ImageProblem: class ImageProblem extends Error {},
   compressImage: fake.compress,
 }));
-vi.mock('@/server/actions/images', () => ({ uploadEventImage: fake.upload, removeEventImage: fake.remove }));
+vi.mock('@/server/actions/images', () => ({
+  uploadEventImage: fake.upload,
+  removeEventImage: fake.remove,
+  setEventBannerFocus: fake.focus,
+  setEventSponsorDisplayMode: fake.mode,
+}));
 import { ImageProblem } from '@/lib/compress-image';
 import { EventImages, type EventImagesData } from '@/app/admin/events/[eventId]/event-images';
 
@@ -32,11 +44,21 @@ beforeEach(() => {
   fake.compress.mockImplementation(async (f: File) => new Blob([await f.arrayBuffer()], { type: 'image/webp' }));
   fake.upload.mockResolvedValue({ ok: true, data: {} });
   fake.remove.mockResolvedValue({ ok: true, data: {} });
+  fake.focus.mockResolvedValue({ ok: true, data: { version: 'v2' } });
+  fake.mode.mockResolvedValue({ ok: true, data: undefined });
   // The editor's queue hands each task the version current when it runs.
   fake.run.mockImplementation((task: (version: string) => Promise<unknown>) => task('v1'));
 });
 
 describe('Event images (E-15 to E-18)', () => {
+  it('previews a banner at desktop and mobile widths and saves its focal point', async () => {
+    const user = userEvent.setup();
+    renderImages({ ...NONE, banner: 'https://x.test/banner.webp', bannerFocus: 'center' });
+    expect(screen.getByLabelText('Desktop banner preview')).toBeInTheDocument();
+    expect(screen.getByLabelText('Mobile banner preview')).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Banner focal point'), 'right');
+    expect(fake.focus).toHaveBeenCalledWith({ eventId: EVENT, focus: 'right', version: 'v1' });
+  });
   it('says what is missing and offers the uploads', () => {
     renderImages();
     expect(screen.getByText('No logo yet.')).toBeInTheDocument();

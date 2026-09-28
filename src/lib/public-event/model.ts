@@ -31,7 +31,7 @@ export type EventRow = Pick<
   | 'theme_text_secondary'
   | 'theme_heading'
   | 'rules_html'
->;
+> & { banner_path?: string | null; banner_focus?: string };
 export type DivisionRow = Pick<Rows['divisions']['Row'], 'id' | 'name' | 'color' | 'sort_order' | 'created_at'>;
 export type TeamRow = Pick<Rows['teams']['Row'], 'id' | 'division_id' | 'name' | 'coach' | 'sort_order' | 'created_at'>;
 export type PlayerRow = Pick<Rows['players']['Row'], 'id' | 'team_id' | 'name' | 'number' | 'sort_order'>;
@@ -55,7 +55,7 @@ export type GameRow = Pick<
   | 'position'
 >;
 export type ScoreRow = Pick<Rows['game_scores']['Row'], 'game_id' | 's1' | 's2'>;
-export type SponsorRow = { tier: string; image_path: string; sort_order: number };
+export type SponsorRow = { tier: string; image_path: string; sort_order: number; display_mode?: string };
 
 export interface Score {
   score1: number | null;
@@ -71,7 +71,14 @@ export interface EventModel {
   courtNames: string[];
   theme: EventTheme;
   logoUrl: string | null;
-  sponsors: { major: string | null; minor: string[]; platformPrimary: string[]; platformSecondary: string[] };
+  bannerUrl: string | null;
+  bannerFocus: 'left' | 'center' | 'right';
+  sponsors: {
+    major: { url: string; displayMode: 'light' | 'dark' } | null;
+    minor: { url: string; displayMode: 'light' | 'dark' }[];
+    platformPrimary: { url: string; displayMode: 'light' | 'dark' }[];
+    platformSecondary: { url: string; displayMode: 'light' | 'dark' }[];
+  };
   divisions: { id: string; name: string; color: string; teamIds: string[] }[];
   teams: {
     id: string;
@@ -172,7 +179,13 @@ export function toEventModel(rows: EventRows, supabaseUrl: string): EventModel {
     [...list]
       .filter((s) => s.tier === tier)
       .sort((a, b) => a.sort_order - b.sort_order)
-      .map((s) => imageUrl(supabaseUrl, s.image_path)!);
+      .map(
+        (s) =>
+          ({
+            url: imageUrl(supabaseUrl, s.image_path)!,
+            displayMode: s.display_mode === 'dark' ? 'dark' : 'light',
+          }) as const,
+      );
 
   const games = gamesFromRows(rows.games);
 
@@ -191,6 +204,8 @@ export function toEventModel(rows: EventRows, supabaseUrl: string): EventModel {
       heading: event.theme_heading,
     },
     logoUrl: imageUrl(supabaseUrl, event.logo_path),
+    bannerUrl: imageUrl(supabaseUrl, event.banner_path),
+    bannerFocus: event.banner_focus === 'left' || event.banner_focus === 'right' ? event.banner_focus : 'center',
     sponsors: {
       major: sponsorUrls(rows.eventSponsors, 'major')[0] ?? null,
       minor: sponsorUrls(rows.eventSponsors, 'minor'),

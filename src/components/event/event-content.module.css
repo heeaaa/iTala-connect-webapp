@@ -250,10 +250,10 @@
 .rules h3 {
   margin: 2rem 0 0.5rem;
   color: var(--ev-heading);
-  font-family: var(--font-ev-display), system-ui, sans-serif;
-  font-weight: 800;
-  line-height: 1.15;
-  text-transform: uppercase;
+  font-family: var(--font-ev-body), system-ui, sans-serif;
+  font-weight: 650;
+  line-height: 1.3;
+  text-transform: none;
 }
 
 .rules h2 {
@@ -339,6 +339,33 @@
   max-width: 7rem;
   max-height: 2.5rem;
   object-fit: contain;
+}
+
+.sponsorPlaque {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 8.5rem;
+  height: 3.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--ev-muted) 45%, var(--ev-bg));
+  background: color-mix(in srgb, #fff 94%, var(--ev-accent));
+}
+
+.sponsorPlaque[data-mode='dark'] {
+  background: color-mix(in srgb, #111 88%, var(--ev-accent));
+  border-color: color-mix(in srgb, #555 75%, var(--ev-accent));
+}
+
+.sponsorPlaque img {
+  margin: 0;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.sponsorsLarge .sponsorPlaque {
+  width: 16rem;
+  height: 6rem;
 }
 
 /* Desktop: sponsor rows first (small, then large), logo to the right. */

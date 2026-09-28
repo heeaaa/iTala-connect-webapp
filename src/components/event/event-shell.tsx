@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import Link from 'next/link';
 
 import { formatDate } from '@/lib/format';
 
@@ -12,6 +13,8 @@ export interface EventShellProps {
   days: string[];
   theme: EventTheme;
   tab: EventTabId;
+  bannerUrl?: string | null;
+  bannerFocus?: 'left' | 'center' | 'right';
   /** next/font variable classes, applied by the route. */
   fontClassName: string;
   /** Logo and sponsor rows (P-01), shown under the event name. */
@@ -25,7 +28,18 @@ export interface EventShellProps {
  * Public event page frame (PRD P-01 to P-03). The organiser's colours are
  * set here as --ev-* tokens and nothing inside reads --brand-*.
  */
-export function EventShell({ name, days, theme, tab, fontClassName, media, notice, children }: EventShellProps) {
+export function EventShell({
+  name,
+  days,
+  theme,
+  tab,
+  bannerUrl,
+  bannerFocus = 'center',
+  fontClassName,
+  media,
+  notice,
+  children,
+}: EventShellProps) {
   const sorted = [...days].sort();
   const first = sorted[0];
   const last = sorted.at(-1);
@@ -36,14 +50,29 @@ export function EventShell({ name, days, theme, tab, fontClassName, media, notic
           {notice}
         </p>
       ) : null}
-      <header className={styles.header}>
-        <h1 className={styles.name}>{name}</h1>
-        {first && last ? (
-          <p className={styles.dates}>
-            {first === last ? formatDate(first) : `${formatDate(first)} to ${formatDate(last)}`}
-          </p>
+      <div className={styles.hero}>
+        <Link href="/" className={styles.allEvents} aria-label="All events" title="All events">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 5h4v4H5zM15 5h4v4h-4zM5 15h4v4H5zM15 15h4v4h-4z" />
+          </svg>
+          <span>All events</span>
+        </Link>
+        {bannerUrl ? (
+          <div className={styles.banner}>
+            {/* Plain img: event banners are already resized on upload. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={bannerUrl} alt="" data-focus={bannerFocus} />
+          </div>
         ) : null}
-      </header>
+        <header className={`${styles.header} ${bannerUrl ? styles.headerWithBanner : ''}`}>
+          <h1 className={styles.name}>{name}</h1>
+          {first && last ? (
+            <p className={styles.dates}>
+              {first === last ? formatDate(first) : `${formatDate(first)} to ${formatDate(last)}`}
+            </p>
+          ) : null}
+        </header>
+      </div>
       {media}
       <EventTabs current={tab} />
       <main className={styles.content}>{children}</main>

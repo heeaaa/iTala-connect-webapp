@@ -18,7 +18,7 @@ vi.mock('@/lib/supabase/server', () => ({
     from: (table: string) => {
       let first = '';
       const chain: Record<string, unknown> = {};
-      for (const op of ['select', 'insert', 'delete', 'eq', 'order', 'limit'])
+      for (const op of ['select', 'insert', 'update', 'delete', 'eq', 'order', 'limit'])
         chain[op] = (...args: unknown[]) => {
           if (!first) first = op;
           fake.calls.push({ table, op, args });
@@ -49,7 +49,12 @@ vi.mock('@/lib/supabase/server', () => ({
     },
   }),
 }));
-import { removeEventImage, uploadEventImage } from '@/server/actions/images';
+import {
+  removeEventImage,
+  setEventBannerFocus,
+  setEventSponsorDisplayMode,
+  uploadEventImage,
+} from '@/server/actions/images';
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const EVENT = uuid(1);
@@ -82,6 +87,13 @@ beforeEach(() => {
 });
 
 describe('uploadEventImage (E-15 to E-18)', () => {
+  it('stores a banner in the event folder and records its version', async () => {
+    fake.results['rpc.set_event_banner'] = { data: { old_path: null, version: 'v2' }, error: null };
+    expect(await uploadEventImage(form('banner'))).toEqual({ ok: true, data: { version: 'v2' } });
+    const [, path] = (of('storage', 'upload') as [string, string][])[0]!;
+    expect(path).toMatch(new RegExp(`^events/${EVENT}/banner-[0-9a-f-]{36}\\.png$`));
+    expect(of('rpc', 'set_event_banner')).toEqual([[{ p_event_id: EVENT, p_path: path }]]);
+  });
   it("stores the logo in the event's folder, records it, deletes the file it replaced and returns the new version", async () => {
     fake.results['rpc.set_event_logo'] = {
       data: { old_path: `events/${EVENT}/logo-old.webp`, version: 'v2' },
@@ -124,7 +136,7 @@ describe('uploadEventImage (E-15 to E-18)', () => {
   it('refuses before any write: signed out, bad fields, no file, over 5 MB, not an image, not your event', async () => {
     fake.authorize.mockResolvedValueOnce({ ok: false, error: 'Please sign in again.' });
     expect(await uploadEventImage(form('logo'))).toEqual({ ok: false, error: 'Please sign in again.' });
-    expect(await uploadEventImage(form('banner'))).toEqual({
+    expect(await uploadEventImage(form('banner', null))).toEqual({
       ok: false,
       error: 'Upload failed: no image was received.',
     });
@@ -165,6 +177,14 @@ describe('uploadEventImage (E-15 to E-18)', () => {
 });
 
 describe('removeEventImage (E-15 to E-18)', () => {
+  it('clears a banner and removes its stored file', async () => {
+    fake.results['rpc.set_event_banner'] = {
+      data: { old_path: `events/${EVENT}/banner-a.webp`, version: 'v3' },
+      error: null,
+    };
+    expect(await removeEventImage({ kind: 'banner', eventId: EVENT })).toEqual({ ok: true, data: { version: 'v3' } });
+    expect(of('storage', 'remove')).toEqual([['images', [`events/${EVENT}/banner-a.webp`]]]);
+  });
   it('clears the logo, deletes its file and returns the new version', async () => {
     fake.results['rpc.set_event_logo'] = {
       data: { old_path: `events/${EVENT}/logo-a.webp`, version: 'v3' },
@@ -216,5 +236,32 @@ describe('removeEventImage (E-15 to E-18)', () => {
       error: 'Please sign in again.',
     });
     expect(of('storage', 'remove')).toEqual([]);
+  });
+});
+
+describe('image presentation settings', () => {
+  it('saves the banner focal point and returns the new edit version', async () => {
+    fake.results['rpc.set_event_banner_focus'] = { data: 'v2', error: null };
+    expect(await setEventBannerFocus({ eventId: EVENT, focus: 'right', version: 'v1' })).toEqual({
+      ok: true,
+      data: { version: 'v2' },
+    });
+    expect(of('rpc', 'set_event_banner_focus')).toEqual([[{ p_event_id: EVENT, p_focus: 'right', p_version: 'v1' }]]);
+  });
+
+  it('updates only the selected minor sponsor and reports a missing row', async () => {
+    fake.results['event_sponsors.update'] = { data: { id: uuid(7) }, error: null };
+    expect(
+      await setEventSponsorDisplayMode({ eventId: EVENT, kind: 'minor', sponsorId: uuid(7), displayMode: 'dark' }),
+    ).toEqual({ ok: true, data: undefined });
+    expect(of('event_sponsors', 'eq')).toEqual([
+      ['event_id', EVENT],
+      ['tier', 'minor'],
+      ['id', uuid(7)],
+    ]);
+    fake.results['event_sponsors.update'] = { data: null, error: null };
+    expect(
+      (await setEventSponsorDisplayMode({ eventId: EVENT, kind: 'minor', sponsorId: uuid(8), displayMode: 'dark' })).ok,
+    ).toBe(false);
   });
 });
