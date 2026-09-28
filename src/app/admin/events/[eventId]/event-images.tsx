@@ -183,7 +183,7 @@ export function EventImages({ eventId, images, run }: { eventId: string; images:
         <label className={w.field}>
           <span className={s.label}>Logo backing</span>
           <select
-            className={w.input}
+            className={s.input}
             value={majorMode}
             onChange={(e) => changeSponsorMode({ kind: 'major', mode: e.target.value as 'light' | 'dark' })}
           >
@@ -243,7 +243,7 @@ export function EventImages({ eventId, images, run }: { eventId: string; images:
           <label className={w.field}>
             <span className={s.label}>Banner focal point</span>
             <select
-              className={w.input}
+              className={s.input}
               value={bannerFocus}
               onChange={(e) => changeBannerFocus(e.target.value as 'left' | 'center' | 'right')}
             >
@@ -267,7 +267,7 @@ export function EventImages({ eventId, images, run }: { eventId: string; images:
                 <label className={w.field}>
                   <span className="sr-only">Logo backing for minor sponsor {i + 1}</span>
                   <select
-                    className={w.input}
+                    className={s.input}
                     value={minorModes[m.id] ?? 'light'}
                     onChange={(e) =>
                       changeSponsorMode({ kind: 'minor', sponsorId: m.id, mode: e.target.value as 'light' | 'dark' })

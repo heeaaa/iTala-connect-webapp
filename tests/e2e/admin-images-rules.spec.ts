@@ -70,6 +70,7 @@ test('uploads event images, saves sponsor backing and banner crop, and shows the
   await expect(main.getByText('Major sponsor saved.')).toBeVisible();
   await main.getByRole('combobox', { name: 'Logo backing' }).selectOption('dark');
   await expect(main.getByText('Sponsor backing saved.')).toBeVisible();
+  await expect(main.getByRole('combobox', { name: 'Logo backing' })).toHaveCSS('min-height', '48px');
   await main.getByLabel('Add minor sponsors').setInputFiles([file('a.png'), file('b.png')]);
   await expect(main.getByText('2 minor sponsors added.')).toBeVisible();
   await expect(main.getByRole('img', { name: /^Minor sponsor logo/ })).toHaveCount(2);

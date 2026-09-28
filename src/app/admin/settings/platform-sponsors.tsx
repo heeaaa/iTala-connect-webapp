@@ -1,6 +1,7 @@
 'use client';
 import { useId, useRef, useState } from 'react';
 import { ImageProblem, compressImage } from '@/lib/compress-image';
+import { platformStyles as s } from '@/components/platform/platform-frame';
 import { uploadFailed, type PlatformTier } from '@/lib/event-images';
 import { removePlatformSponsor, setPlatformSponsorDisplayMode, uploadPlatformSponsor } from '@/server/actions/platform';
 import { ImagePick } from '../_components/image-pick';
@@ -128,7 +129,7 @@ export function PlatformSponsors({ sponsors }: { sponsors: Record<PlatformTier, 
                   Logo backing for {TIERS[t].one} {i + 1}
                 </span>
                 <select
-                  className={w.input}
+                  className={s.input}
                   value={modes[sponsor.id] ?? 'light'}
                   onChange={(e) => changeMode(sponsor.id, e.target.value as 'light' | 'dark')}
                 >
