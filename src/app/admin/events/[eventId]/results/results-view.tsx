@@ -22,8 +22,8 @@ export function fixtureLabel(inbox: Pick<Inbox, 'teamNames' | 'event'>, g: Inbox
 }
 
 const keyOf = (item: InboxItem) => `${item.divisionId}-${item.final.game_id}`;
-/** Attach is offered for these only: never for review or settling, which are not results (M-06). */
-const ATTACHABLE = new Set(['proposed', 'ambiguous', 'unmatched']);
+/** A proposed fixture already has Approve; offer manual attachment only when there is no pick. */
+const ATTACHABLE = new Set(['ambiguous', 'unmatched']);
 
 interface CardProps {
   inbox: Inbox;

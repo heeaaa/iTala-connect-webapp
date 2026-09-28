@@ -112,6 +112,8 @@ describe('Results inbox (M-04, M-05)', () => {
         'Fixture: Harbour Hawks vs Night Owls · Sun 27/09/2026 7:00 pm · Centre Court. Note: a different day',
       ),
     ).toBeInTheDocument();
+    expect(within(ready).getByRole('button', { name: 'Approve Harbour Hawks 58 - 51 Night Owls' })).toBeInTheDocument();
+    expect(within(ready).queryByRole('combobox')).not.toBeInTheDocument();
     const changed = screen.getByRole('region', { name: 'Changed since you approved them (1)' });
     expect(
       within(changed).getByText('Published 58-51, the mobile app now says 60-51 (40 to 48 stats)'),

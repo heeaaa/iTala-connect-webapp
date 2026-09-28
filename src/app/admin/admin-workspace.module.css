@@ -14,6 +14,18 @@
   white-space: normal;
   text-align: center;
 }
+.dashboardActions {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  gap: 0.5rem;
+  margin: 0;
+}
+@media (min-width: 70rem) {
+  .dashboardActions {
+    display: flex;
+    flex-wrap: nowrap;
+  }
+}
 .stack {
   display: grid;
   /* Children may shrink below their content, so wide tables scroll inside

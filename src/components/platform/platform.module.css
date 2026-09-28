@@ -476,6 +476,7 @@ a.bug:hover {
 
   .status {
     grid-column: 2;
+    justify-content: flex-end;
     padding: 0 0.875rem 0.625rem;
   }
 

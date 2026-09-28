@@ -142,12 +142,14 @@
 }
 
 .headerCopy {
+  flex: 1;
   min-width: 0;
 }
 
 .eventLogo {
   display: block;
   flex: none;
+  margin-left: auto;
   width: auto;
   max-width: clamp(4.5rem, 12vw, 8rem);
   max-height: 6rem;
@@ -181,13 +183,13 @@
 }
 
 .tabs ul {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, max-content);
   gap: 0.25rem;
   margin: 0;
   padding: 0;
   list-style: none;
   border-bottom: var(--line) solid var(--rule);
-  overflow-x: auto;
 }
 
 .tabs a {
@@ -195,7 +197,6 @@
   align-items: center;
   min-height: 2.75rem;
   padding: 0 0.875rem;
-  margin-bottom: calc(var(--line) * -1);
   border-bottom: 4px solid transparent;
   color: var(--ev-muted);
   font-family: var(--font-ev-display), system-ui, sans-serif;
@@ -218,6 +219,24 @@
 .tabs a[aria-current='page'] {
   color: var(--ev-heading);
   border-bottom-color: var(--paint);
+}
+
+@media (max-width: 39.99rem) {
+  .tabs ul {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  .tabs a {
+    justify-content: center;
+    padding-inline: 0.25rem;
+    font-size: clamp(1rem, 4.4vw, 1.125rem);
+    white-space: nowrap;
+  }
+
+  .tabs li:first-child a {
+    padding-left: 0.25rem;
+  }
 }
 
 .content {

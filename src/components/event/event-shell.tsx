@@ -52,12 +52,14 @@ export function EventShell({
         </p>
       ) : null}
       <div className={styles.hero}>
-        <Link href="/" className={styles.allEvents} aria-label="All events" title="All events">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 5h4v4H5zM15 5h4v4h-4zM5 15h4v4H5zM15 15h4v4h-4z" />
-          </svg>
-          <span>All events</span>
-        </Link>
+        <nav aria-label="Event home">
+          <Link href="/" className={styles.allEvents} aria-label="All events" title="All events">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 5h4v4H5zM15 5h4v4h-4zM5 15h4v4H5zM15 15h4v4h-4z" />
+            </svg>
+            <span>All events</span>
+          </Link>
+        </nav>
         {bannerUrl ? (
           <div className={styles.banner}>
             {/* Plain img: event banners are already resized on upload. */}

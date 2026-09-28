@@ -100,6 +100,11 @@ test('uploads event images, saves banner crop, and shows a shared sponsor sectio
   await expect(page.getByRole('heading', { level: 2, name: 'Fouls' })).toBeVisible();
   await expect(page.getByText('Five fouls and you sit.')).toBeVisible();
   await expect(page.getByRole('img', { name: `${name} logo` })).toBeVisible();
+  const desktopHeader = (await page
+    .locator('header[class*="headerWithBanner"] [class*="headerIdentity"]')
+    .boundingBox())!;
+  const desktopLogo = (await page.getByRole('img', { name: `${name} logo` }).boundingBox())!;
+  expect(Math.abs(desktopHeader.x + desktopHeader.width - (desktopLogo.x + desktopLogo.width))).toBeLessThan(3);
   await expect(page.getByRole('img', { name: 'Sponsor logo' })).toHaveCount(2);
   const sponsorSection = page.getByRole('region', { name: 'Event sponsors' });
   await expect(sponsorSection.getByRole('heading', { name: 'Major sponsors' })).toBeVisible();
@@ -107,7 +112,7 @@ test('uploads event images, saves banner crop, and shows a shared sponsor sectio
   expect(await sponsorSection.evaluate((section) => getComputedStyle(section).backgroundColor)).not.toBe(
     'rgba(0, 0, 0, 0)',
   );
-  const tabs = page.getByRole('navigation', { name: 'Event' });
+  const tabs = page.getByRole('navigation', { name: 'Event', exact: true });
   expect((await sponsorSection.boundingBox())!.y).toBeLessThan((await tabs.boundingBox())!.y);
   const majorHeading = (await sponsorSection.getByRole('heading', { name: 'Major sponsors' }).boundingBox())!;
   const regularHeading = (await sponsorSection.getByRole('heading', { name: 'Sponsors', exact: true }).boundingBox())!;
