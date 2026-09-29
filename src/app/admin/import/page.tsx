@@ -63,7 +63,7 @@ export default async function ImportPage({ searchParams }: PageProps<'/admin/imp
                 {links
                   .filter((l) => l.leagueId === league.id)
                   .map((l) => (
-                    <p key={l.eventId}>
+                    <p key={l.divisionId}>
                       <Link href={`/admin/events/${l.eventId}`}>Linked to {l.eventName}</Link>
                     </p>
                   ))}

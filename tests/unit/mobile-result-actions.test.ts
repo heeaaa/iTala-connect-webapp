@@ -106,6 +106,8 @@ describe('approveResult (M-06)', () => {
       p_source: {
         mobile_game_id: 'fin-1',
         league_id: 'L1',
+        home_team_id: 'm-hawks',
+        away_team_id: 'm-owls',
         home_pts: 58,
         away_pts: 51,
         event_count: 48,
@@ -147,6 +149,16 @@ describe('approveResult (M-06)', () => {
       expect(await approve(G1, 'attach')).toEqual({ ok: false, error: CHANGED });
     }
     expect(fake.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it('never offers generic attachment for a scheduled claim, even if browser state is forged', async () => {
+    const claimed = { ...final, game_id: `cg_${G1}` };
+    fake.load.mockResolvedValue(inbox([{ ...item('unmatched'), final: claimed }]));
+    expect(await approveResult({ eventId: EVENT, mobileGameId: claimed.game_id, gameId: G2, mode: 'attach' })).toEqual({
+      ok: false,
+      error: CHANGED,
+    });
+    expect(fake.rpc).not.toHaveBeenCalled();
   });
 
   it('needs both teams linked, and a fixture with those two teams', async () => {

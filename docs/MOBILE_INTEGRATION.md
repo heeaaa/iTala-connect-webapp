@@ -11,7 +11,7 @@ We start small. Both apps are new, and the mobile app has only one or two league
 | **1. League import (first slice)** | Fetch mobile leagues, pick one, create a Connect event from it with its teams and players, already linked | Mobile to Connect, read only | **Build first**, straight after foundations and the design choice |
 | 1b. Roster refresh | On a linked division, show mobile teams and players not yet in Connect and add them on request | Mobile to Connect, read only | Soon after stage 1 |
 | 2. Results inbox | Pull finished mobile games, match to fixtures, admin approves (the old platform's feature, PRD M-01 to M-09) | Mobile to Connect, read only | With the rest of the admin parity work |
-| 3. Schedule sync | Mobile app shows Connect's scheduled games per league with a Start button; optionally pushes finals back | Connect to mobile (and back) | After cutover. Parked plan: [SCHEDULER_INTEGRATION_PLAN.md](SCHEDULER_INTEGRATION_PLAN.md) |
+| 3. Scheduled games | Mobile shows published Connect fixtures; a final claims its exact Connect fixture for manual approval | Connect schedule read by mobile; mobile final read by Connect | Mobile PR #50 and [Connect requirements CSI-01 to CSI-11](PRD_CONNECT_SCHEDULE_INTEGRATION.md). Release coordination pending. Optional score push remains parked. |
 
 ## 1. Stage 1: League import
 
@@ -116,4 +116,18 @@ Tests assert that no insert, update, delete or RPC call is ever sent to the mobi
 ## 4. How the later stages reuse this
 
 - **Stage 2 (results inbox)** needs a division link and team map. Imported divisions already have both, so no link wizard step and no name matching are needed for them. The link wizard stays for divisions created by hand.
-- **Stage 3 (schedule sync)** in the parked plan pairs a mobile league with a scheduler division by name and team matching. With imported divisions that pairing already exists, and Connect already has stable game ids, per-event time zones and scores keyed by game id, which were the parked plan's Phase 0 prerequisites. What remains for stage 3 is a small read-only schedule endpoint on Connect for the mobile app and, optionally, a score push. It will be planned after cutover with the parked plan as the starting point.
+- **Stage 3 scheduled games:** the mobile Schedule flow uses published Connect fixtures linked by division and team map. Connect admins can open a league deep link, create an event or choose an editable existing division, review pairs and save the link. A `cg_<UUID>` mobile final is offered only for its validated fixture; the admin still approves it. A draft must be published before its schedule is available to mobile. The optional score push in [SCHEDULER_INTEGRATION_PLAN.md](SCHEDULER_INTEGRATION_PLAN.md) remains parked.
+
+### Scheduled-result migration preflight (CSI-10)
+
+Before applying `20260930000100_scheduled_mobile_results.sql` to an existing Connect database, run this read-only query with authorised database access:
+
+```sql
+select mobile_game_id, count(*) as approvals, array_agg(game_id order by game_id) as fixture_ids
+from public.score_sources
+where mobile_game_id is not null
+group by mobile_game_id
+having count(*) > 1;
+```
+
+The expected result is zero rows. If it returns rows, inspect each published score and provenance with the event owners, decide which approval is correct, and repair it explicitly before retrying. The migration aborts on duplicates and does not delete or reassign scores. Apply and verify the Connect migration before relying on mobile fixture claims. A production migration and real mobile-project check need the release approval described in `CLAUDE.md`.

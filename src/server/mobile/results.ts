@@ -1,5 +1,12 @@
 import 'server-only';
-import { matchFinals, scoredGameIds, toMs, type ApprovedSource, type MatchResult } from '@/domain/mobile-matching';
+import {
+  matchFinals,
+  parseFixtureClaim,
+  scoredGameIds,
+  toMs,
+  type ApprovedSource,
+  type MatchResult,
+} from '@/domain/mobile-matching';
 import { resolveAllPlayoffs } from '@/domain/playoffs';
 import type { Game } from '@/domain/types';
 import type { InboxFinal } from '@/lib/mobile-results';
@@ -118,36 +125,63 @@ export async function loadInbox(eventId: string, nowMs = Date.now()): Promise<In
 
   const items: InboxItem[] = [];
   const errors: string[] = [];
-  // One request per linked division, in turn: a failure is reported against its own division.
+  // Read each league once. A scheduled final belongs to its claimed fixture's
+  // linked division; a missing/foreign claim is shown once without details.
+  const byLeague = new Map<string, typeof linked>();
   for (const d of linked) {
-    const link = d.division_mobile_links!;
+    const leagueId = d.division_mobile_links!.league_id;
+    byLeague.set(leagueId, [...(byLeague.get(leagueId) ?? []), d]);
+  }
+  for (const [leagueId, leagueDivisions] of byLeague) {
     let finals: InboxFinal[];
     try {
-      finals = ((await mobileReader().finals(link.league_id)) as InboxFinal[]).map((f) => ({
+      finals = ((await mobileReader().finals(leagueId)) as InboxFinal[]).map((f) => ({
         ...f,
         last_event_at: toMs(f.last_event_at),
       }));
     } catch {
-      errors.push(`Could not read ${d.name}'s finished games from the mobile app. Refresh to try again.`);
+      for (const d of leagueDivisions)
+        errors.push(`Could not read ${d.name}'s finished games from the mobile app. Refresh to try again.`);
       continue;
     }
-    const teamMap = Object.fromEntries(link.division_mobile_team_links.map((t) => [t.team_id, t.mobile_team_id]));
-    for (const result of matchFinals({
-      games,
-      divisionId: d.id,
-      teamMap,
-      sources: approved,
-      finals,
-      scoredGameIds: scored,
-      nowMs,
-      timeZone: event.timezone,
-    })) {
-      items.push({
-        divisionId: d.id,
-        final: result.final as InboxFinal,
-        result,
-        published: result.existing ? (published[result.existing.gameId] ?? null) : null,
-      });
+    const { data: conflicts, error: conflictError } = finals.length
+      ? await db.rpc('mobile_result_conflicts', {
+          p_event_id: eventId,
+          p_mobile_game_ids: finals.map((f) => f.game_id),
+        })
+      : { data: [], error: null };
+    if (conflictError || !conflicts)
+      return { ...base, games, scored: [...scored], items: [], notice: SCORES_UNREADABLE, errors: [] };
+    const conflictingMobileGameIds = new Set(conflicts.map((row) => row.mobile_game_id));
+    for (const final of finals) {
+      const claim = parseFixtureClaim(final.game_id);
+      const target = claim.kind === 'valid' ? games.find((g) => g.id === claim.gameId) : null;
+      const divisions =
+        claim.kind === 'legacy'
+          ? leagueDivisions
+          : [leagueDivisions.find((d) => d.id === target?.divisionId) ?? leagueDivisions[0]!];
+      for (const d of divisions) {
+        const link = d.division_mobile_links!;
+        const teamMap = Object.fromEntries(link.division_mobile_team_links.map((t) => [t.team_id, t.mobile_team_id]));
+        const result = matchFinals({
+          games,
+          divisionId: d.id,
+          leagueId,
+          teamMap,
+          sources: approved,
+          conflictingMobileGameIds,
+          finals: [final],
+          scoredGameIds: scored,
+          nowMs,
+          timeZone: event.timezone,
+        })[0]!;
+        items.push({
+          divisionId: d.id,
+          final,
+          result,
+          published: result.existing ? (published[result.existing.gameId] ?? null) : null,
+        });
+      }
     }
   }
   return { ...base, games, scored: [...scored], items, notice: null, errors };

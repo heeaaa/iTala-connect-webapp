@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { clockInZone } from '@/lib/event-time';
 import { signInAndWait } from './fixtures';
 import { adminClient, createUser, deleteUsers, type TestUser } from '../support/supabase';
 
@@ -120,4 +121,63 @@ test('shows the linked league’s finished games grouped, read from the mobile a
   expect(requests.filter((r) => r.path.startsWith('/rest/')).every((r) => r.method === 'GET')).toBe(true);
   expect(requests.some((r) => r.path.includes('/rpc/'))).toBe(false);
   expect(clientMobileRequests).toEqual([]);
+});
+
+test('approves a scheduled final on its exact moved fixture despite same-day repeated opponents', async ({
+  page,
+  request,
+}) => {
+  await signInAndWait(page, organiser);
+  await page.goto('/admin/import/league-open');
+  await page.getByLabel('Event name', { exact: true }).fill('Scheduled result');
+  await page.getByRole('button', { name: 'Create event', exact: true }).click();
+  const eventId = new URL(page.url()).pathname.split('/').pop()!;
+  await page.getByRole('group', { name: 'Choose event dates' }).getByRole('button').first().click();
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await expect(page.getByRole('main').getByRole('status')).toContainText('Published with 1 game.');
+  const db = adminClient();
+  const { data: target, error } = await db
+    .from('games')
+    .select('id, division_id, team1_id, team2_id, start_time, court, label')
+    .eq('event_id', eventId)
+    .single();
+  if (error || !target) throw error;
+  const moved = clockInZone(new Date(Date.now() + 7 * 86400e3), 'Pacific/Auckland').date;
+  const sameDay = clockInZone(new Date(Date.now() - 2 * 3600e3), 'Pacific/Auckland').date;
+  const { error: moveError } = await db.from('games').update({ day: moved }).eq('id', target.id);
+  if (moveError) throw moveError;
+  const { data: repeat, error: repeatError } = await db
+    .from('games')
+    .insert({
+      event_id: eventId,
+      division_id: target.division_id,
+      day: sameDay,
+      start_time: target.start_time,
+      court: target.court,
+      team1_id: target.team1_id,
+      team2_id: target.team2_id,
+      label: target.label,
+      type: 'group',
+      is_playoff: false,
+      position: 1,
+    })
+    .select('id')
+    .single();
+  if (repeatError || !repeat) throw repeatError;
+  await request.post(`${mobile}/__control`, { data: { mode: 'normal', scheduledFixtureId: target.id } });
+  await page.goto(`/admin/events/${eventId}/results`);
+  const ready = page.getByRole('region', { name: 'Ready to approve (1)' });
+  await expect(ready).toContainText('Note: a different day');
+  await ready.getByRole('button', { name: 'Approve Harbour Hawks 58 - 51 Night Owls' }).click();
+  await expect(page.getByRole('main').locator('p[aria-live="polite"][tabindex="-1"]')).toContainText('Approved:');
+  const { data: source } = await db
+    .from('score_sources')
+    .select('game_id, mobile_game_id')
+    .eq('mobile_game_id', `cg_${target.id}`)
+    .single();
+  expect(source).toMatchObject({ game_id: target.id, mobile_game_id: `cg_${target.id}` });
+  expect((await db.from('game_scores').select('game_id').eq('game_id', repeat.id)).data).toEqual([]);
+  await request.post(`${mobile}/__control`, { data: { mode: 'changed', scheduledFixtureId: target.id } });
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  await expect(page.getByRole('region', { name: 'Changed since you approved them (1)' })).toBeVisible();
 });

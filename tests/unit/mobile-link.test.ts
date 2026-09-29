@@ -72,6 +72,8 @@ const input = (pairs: { teamId: string; mobileTeamId: string }[]) => ({
   eventId: EVENT,
   divisionId: DIV,
   leagueId: 'league-open',
+  expectedLeagueId: null,
+  confirmReplace: false,
   pairs,
 });
 
@@ -80,7 +82,7 @@ beforeEach(() => {
   fake.configured = true;
   fake.authorize.mockResolvedValue({ ok: true, data: { id: 'u' } });
   fake.canEdit.mockResolvedValue(true);
-  fake.division = { id: DIV, event_id: EVENT, teams: [{ id: HAWKS }, { id: OWLS }] };
+  fake.division = { id: DIV, event_id: EVENT, teams: [{ id: HAWKS }, { id: OWLS }], division_mobile_links: null };
   fake.leagues.mockResolvedValue([{ id: 'league-open', name: 'Harbour League', season: '2026' }]);
   fake.teams.mockResolvedValue([
     { id: 'team-hawks', name: 'Harbour Hawks' },
@@ -106,6 +108,8 @@ describe('saveMobileLink (M-03)', () => {
       p_league_name: 'Harbour League',
       p_season: '2026',
       p_teams: [{ team_id: HAWKS, mobile_team_id: 'team-hawks' }],
+      p_expected_league_id: null,
+      p_confirm_replace: false,
     });
     expect(fake.revalidate).toHaveBeenCalledWith(`/admin/events/${EVENT}/results`);
   });
@@ -145,6 +149,21 @@ describe('saveMobileLink (M-03)', () => {
     fake.division = null;
     expect(await saveMobileLink(input([]))).toEqual({ ok: false, error: CHECK });
     expect(fake.rpc).not.toHaveBeenCalled();
+  });
+
+  it('refuses a stale link and an unconfirmed replacement', async () => {
+    fake.division = {
+      id: DIV,
+      event_id: EVENT,
+      teams: [{ id: HAWKS }],
+      division_mobile_links: { league_id: 'league-old' },
+    };
+    expect(await saveMobileLink(input([]))).toEqual({ ok: false, error: CHECK });
+    expect(await saveMobileLink({ ...input([]), expectedLeagueId: 'league-old' })).toEqual({ ok: false, error: CHECK });
+    expect((await saveMobileLink({ ...input([]), expectedLeagueId: 'league-old', confirmReplace: true })).ok).toBe(
+      true,
+    );
+    expect(fake.rpc).toHaveBeenCalledTimes(1);
   });
 
   it('says so when the league is gone or the mobile app does not answer', async () => {

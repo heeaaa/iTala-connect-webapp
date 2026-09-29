@@ -137,6 +137,29 @@ describe('New event', () => {
 });
 
 describe('Importing a league', () => {
+  it('warns about another organiser’s link without exposing their event and requires Create anyway', async () => {
+    fake.importLeague.mockResolvedValue({ ok: true, data: { eventId: EVENT_ID, leagueName: 'Harbour League' } });
+    const user = userEvent.setup();
+    render(
+      <ImportForm
+        league={{
+          id: 'league',
+          name: 'Harbour League',
+          season: '2026',
+          kind: 'league',
+          is_closed: false,
+          is_archived: false,
+        }}
+        links={[]}
+        otherLinkCount={1}
+        year={2026}
+        siteUrl={SITE}
+      />,
+    );
+    expect(screen.getByText(/linked to 1 other division you cannot edit/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Create anyway' }));
+    expect(fake.importLeague).toHaveBeenCalledWith(expect.objectContaining({ allowDuplicate: true }));
+  });
   it('starts from the league name and sends the address with the import', async () => {
     fake.importLeague.mockResolvedValue({ ok: true, data: { eventId: EVENT_ID, leagueName: 'Harbour League' } });
     const user = userEvent.setup();
@@ -151,6 +174,7 @@ describe('Importing a league', () => {
           is_archived: false,
         }}
         links={[]}
+        otherLinkCount={0}
         year={2026}
         siteUrl={SITE}
       />,

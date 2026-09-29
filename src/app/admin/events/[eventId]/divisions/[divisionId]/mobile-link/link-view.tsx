@@ -5,19 +5,24 @@ import { useId, useState, useTransition } from 'react';
 import { platformStyles as s, TitlePlate } from '@/components/platform/platform-frame';
 import { DUPLICATE, duplicateMobileTeams, leagueLabel, startingPairs, unpairedHint } from '@/lib/mobile-link';
 import { saveMobileLink } from '@/server/actions/mobile-link';
+import { ConfirmDialog } from '../../../../../_components/confirm-dialog';
 import w from '../../../../../admin-workspace.module.css';
 
 export interface LinkPageData {
   eventId: string;
   eventName: string;
+  eventStatus: string;
   divisionId: string;
   divisionName: string;
+  currentLeagueId: string | null;
+  currentLeagueName: string | null;
   teams: { id: string; name: string }[];
   /** Other divisions of this event that are linked, for the same-league note. */
   others: { name: string; leagueId: string }[];
   leagues: { id: string; name: string; season: string; is_archived: boolean; is_closed: boolean }[];
   leagueId: string;
   mobileTeams: { id: string; name: string }[];
+  otherLinkCount: number;
   existing: Record<string, string>;
   unreachable: boolean;
 }
@@ -32,6 +37,7 @@ export function LinkView({ data }: { data: LinkPageData }) {
   const idBase = useId();
   const [pairs, setPairs] = useState(() => startingPairs(data.teams, data.mobileTeams, data.existing));
   const [error, setError] = useState('');
+  const [confirming, setConfirming] = useState(false);
   const [saving, save] = useTransition();
   const clash = data.leagueId ? data.others.find((o) => o.leagueId === data.leagueId) : undefined;
   const unpaired = data.teams.filter((t) => !pairs[t.id]).length;
@@ -39,10 +45,16 @@ export function LinkView({ data }: { data: LinkPageData }) {
   // After a refused save, the pairs still in the way are marked, and clear as they are fixed.
   const clashing = new Set(error === DUPLICATE ? duplicateMobileTeams(list) : []);
 
-  const submit = () => {
+  const replacing = !!data.currentLeagueId && data.currentLeagueId !== data.leagueId;
+  const proposedName = data.leagues.find((l) => l.id === data.leagueId)?.name ?? data.leagueId;
+  const submit = (confirmed = false) => {
     if (saving) return;
     if (duplicateMobileTeams(list).length) {
       setError(DUPLICATE);
+      return;
+    }
+    if (replacing && !confirmed) {
+      setConfirming(true);
       return;
     }
     setError('');
@@ -53,6 +65,8 @@ export function LinkView({ data }: { data: LinkPageData }) {
           eventId: data.eventId,
           divisionId: data.divisionId,
           leagueId: data.leagueId,
+          expectedLeagueId: data.currentLeagueId,
+          confirmReplace: confirmed,
           pairs: list,
         });
       } catch {
@@ -81,6 +95,11 @@ export function LinkView({ data }: { data: LinkPageData }) {
           <p className={w.note}>
             Results are matched by these pairs, never by name. Names are only used to fill this form in.
           </p>
+          <p className={w.note}>
+            {data.eventStatus === 'published'
+              ? 'The linked published schedule can appear in the mobile app on refresh. Only paired teams can start its games.'
+              : 'Publish this event before its schedule appears in the mobile app. Only paired teams can start its games.'}
+          </p>
           {/* A plain form: choosing a league loads its teams only when asked (no change on selection alone). */}
           <form method="get" className={w.fields}>
             <label className={w.field}>
@@ -107,6 +126,12 @@ export function LinkView({ data }: { data: LinkPageData }) {
             <section aria-labelledby={`${idBase}-pairs`} className={w.section}>
               <h2 id={`${idBase}-pairs`}>Teams</h2>
               {clash ? <p className={w.notice}>Note: “{clash.name}” is already linked to this same league.</p> : null}
+              {data.otherLinkCount > 0 ? (
+                <p className={w.notice}>
+                  This league is also linked to {data.otherLinkCount} other event division
+                  {data.otherLinkCount === 1 ? '' : 's'}.
+                </p>
+              ) : null}
               <div className={s.tableScroll} tabIndex={0} role="region" aria-label="Team pairs">
                 <table className={s.table}>
                   <thead>
@@ -151,7 +176,12 @@ export function LinkView({ data }: { data: LinkPageData }) {
                 {error}
               </p>
               <div className={w.actions}>
-                <button type="button" className={`${s.button} ${s.buttonLive}`} aria-disabled={saving} onClick={submit}>
+                <button
+                  type="button"
+                  className={`${s.button} ${s.buttonLive}`}
+                  aria-disabled={saving}
+                  onClick={() => submit()}
+                >
                   {saving ? 'Saving…' : 'Save link'}
                 </button>
               </div>
@@ -159,6 +189,18 @@ export function LinkView({ data }: { data: LinkPageData }) {
           ) : null}
         </>
       )}
+      {confirming ? (
+        <ConfirmDialog
+          title="Replace this division’s mobile league?"
+          message={`“${data.divisionName}” is linked to “${data.currentLeagueName || data.currentLeagueId}”. Replace it with “${proposedName}”? Review the team pairs before saving.`}
+          confirmLabel="Replace link"
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            setConfirming(false);
+            submit(true);
+          }}
+        />
+      ) : null}
     </section>
   );
 }

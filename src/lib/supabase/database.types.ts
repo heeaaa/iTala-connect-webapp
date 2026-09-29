@@ -767,6 +767,14 @@ export type Database = {
         Args: { p_game_id: string; p_s1: number; p_s2: number; p_source: Json }
         Returns: undefined
       }
+      mobile_result_conflicts: {
+        Args: { p_event_id: string; p_mobile_game_ids: string[] }
+        Returns: { mobile_game_id: string }[]
+      }
+      mobile_league_link_count: {
+        Args: { p_league_id: string }
+        Returns: number
+      }
       assert_event_editor: { Args: { p_event_id: string }; Returns: undefined }
       begin_schedule_addition: {
         Args: { p_event_id: string; p_unschedule: string[] }
@@ -876,7 +884,9 @@ export type Database = {
       }
       set_division_mobile_link: {
         Args: {
+          p_confirm_replace: boolean
           p_division_id: string
+          p_expected_league_id: string | null
           p_league_id: string
           p_league_name: string
           p_season: string

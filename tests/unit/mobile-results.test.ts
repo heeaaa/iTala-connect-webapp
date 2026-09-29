@@ -15,10 +15,12 @@ import { createMobileReader } from '@/server/mobile/transport';
 const fake = vi.hoisted(() => ({
   results: {} as Record<string, { data: unknown; error: unknown }>,
   finals: vi.fn(),
+  conflicts: vi.fn(),
 }));
 vi.mock('@/server/mobile/reader', () => ({ mobileReader: () => ({ finals: fake.finals }) }));
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
+    rpc: fake.conflicts,
     from: (table: string) => {
       const chain: Record<string, unknown> = {};
       for (const op of ['select', 'eq', 'in']) chain[op] = () => chain;
@@ -207,9 +209,52 @@ beforeEach(() => {
     score_sources: { data: [], error: null },
   };
   fake.finals.mockResolvedValue([]);
+  fake.conflicts.mockResolvedValue({ data: [], error: null });
 });
 
 describe('loadInbox (M-04 to M-09)', () => {
+  it('reads a league once and assigns a scheduled final only to its claimed division', async () => {
+    const row = eventRow();
+    row.divisions[1]!.division_mobile_links = {
+      league_id: 'L1',
+      league_name: 'Harbour League',
+      division_mobile_team_links: [
+        { team_id: T.hawks, mobile_team_id: 'm-hawks' },
+        { team_id: T.owls, mobile_team_id: 'm-owls' },
+      ],
+    };
+    row.games.push(game('40000000-0000-4000-8000-000000000001', T.hawks, T.owls));
+    fake.results.events = { data: row, error: null };
+    fake.finals.mockResolvedValue([final({ game_id: 'cg_40000000-0000-4000-8000-000000000001' })]);
+    const inbox = (await loadInbox(EVENT, NOW))!;
+    expect(fake.finals).toHaveBeenCalledTimes(1);
+    expect(inbox.items).toHaveLength(1);
+    expect(inbox.items[0]).toMatchObject({ divisionId: OPEN, result: { state: 'proposed' } });
+    fake.finals.mockResolvedValue([final({ game_id: 'cg_40000000-0000-4000-8000-000000000099' })]);
+    const missing = (await loadInbox(EVENT, NOW))!;
+    expect(missing.items).toHaveLength(1);
+    expect(missing.items[0]!.result).toMatchObject({ state: 'review', pick: null });
+  });
+
+  it('shows an approval in another event only as a review case, without event details', async () => {
+    fake.finals.mockResolvedValue([final({ game_id: 'cg_40000000-0000-4000-8000-000000000099' })]);
+    fake.conflicts.mockResolvedValue({
+      data: [{ mobile_game_id: 'cg_40000000-0000-4000-8000-000000000099' }],
+      error: null,
+    });
+    const inbox = (await loadInbox(EVENT, NOW))!;
+    expect(inbox.items).toHaveLength(1);
+    expect(inbox.items[0]!.result).toMatchObject({
+      state: 'review',
+      reason: 'This mobile final was approved for a different fixture',
+    });
+    expect(fake.conflicts).toHaveBeenCalledWith('mobile_result_conflicts', {
+      p_event_id: EVENT,
+      p_mobile_game_ids: ['cg_40000000-0000-4000-8000-000000000099'],
+    });
+    fake.conflicts.mockResolvedValue({ data: null, error: { message: 'unavailable' } });
+    expect((await loadInbox(EVENT, NOW))!.notice).toBe(SCORES_UNREADABLE);
+  });
   it('says so when no division is linked, and never asks the mobile app', async () => {
     fake.results.events = { data: eventRow(false), error: null };
     const inbox = await loadInbox(EVENT, NOW);
@@ -264,6 +309,31 @@ describe('loadInbox (M-04 to M-09)', () => {
     const inbox = (await loadInbox(EVENT, NOW))!;
     expect(inbox.items[0]!.result).toMatchObject({ state: 'proposed', pick: { gameId: 'gf', sameDay: true } });
     expect(inbox.games.find((g) => g.id === 'gf')).toMatchObject({ team1Id: T.hawks, team2Id: T.owls });
+  });
+
+  it('validates a scheduled playoff claim against the current resolved teams', async () => {
+    const row = eventRow();
+    const playoffId = '40000000-0000-4000-8000-0000000000ff';
+    row.games.find((g) => g.id === 'gf')!.id = playoffId;
+    fake.results.events = { data: row, error: null };
+    fake.results.game_scores = {
+      data: [
+        { game_id: 'g1', s1: 60, s2: 50 },
+        { game_id: 'g2', s1: 55, s2: 40 },
+        { game_id: 'g3', s1: 70, s2: 30 },
+      ],
+      error: null,
+    };
+    fake.finals.mockResolvedValue([final({ game_id: `cg_${playoffId}` })]);
+    expect((await loadInbox(EVENT, NOW))!.items[0]!.result).toMatchObject({
+      state: 'proposed',
+      pick: { gameId: playoffId },
+    });
+    fake.results.game_scores = { data: [{ game_id: 'g1', s1: 60, s2: 50 }], error: null };
+    expect((await loadInbox(EVENT, NOW))!.items[0]!.result).toMatchObject({
+      state: 'review',
+      reason: 'Team links changed',
+    });
   });
 
   it('shows what was published beside a result that changed after approval', async () => {

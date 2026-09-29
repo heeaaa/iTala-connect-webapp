@@ -182,14 +182,28 @@ export interface MatchResult<G extends MatchGame> {
 export interface MatchInput<G extends MatchGame> {
   games: readonly G[];
   divisionId: string;
+  /** League currently linked to this division. Required for scheduled claims. */
+  leagueId?: string;
   /** Connect team id -> mobile team id, from the division's link. */
   teamMap: Readonly<Record<string, string | null | undefined>>;
   /** Game id -> provenance of an approved result. */
   sources: Readonly<Record<string, ApprovedSource | null | undefined>>;
+  /** IDs approved in another event; no other event details are exposed. */
+  conflictingMobileGameIds?: ReadonlySet<string>;
   finals: readonly MobileFinal[];
   scoredGameIds: ReadonlySet<string>;
   nowMs: number;
   timeZone: string;
+}
+
+const FIXTURE_CLAIM = /^cg_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+export function parseFixtureClaim(
+  id: string,
+): { kind: 'legacy' } | { kind: 'invalid' } | { kind: 'valid'; gameId: string } {
+  if (!id.startsWith('cg_')) return { kind: 'legacy' };
+  const match = FIXTURE_CLAIM.exec(id);
+  return match ? { kind: 'valid', gameId: match[1]!.toLowerCase() } : { kind: 'invalid' };
 }
 
 /**
@@ -206,6 +220,7 @@ export function matchFinals<G extends MatchGame>(input: MatchInput<G>): MatchRes
   }
 
   return input.finals.map((f) => {
+    const claim = parseFixtureClaim(f.game_id);
     const out: MatchResult<G> = {
       final: f,
       homeTeamId: (f.home_team_id && reverse.get(f.home_team_id)) || null,
@@ -220,7 +235,17 @@ export function matchFinals<G extends MatchGame>(input: MatchInput<G>): MatchRes
     const prior = byMobileGame.get(f.game_id);
     if (prior) {
       out.existing = prior;
+      if (claim.kind !== 'legacy' && (claim.kind !== 'valid' || prior.gameId !== claim.gameId)) {
+        out.state = 'review';
+        out.reason = 'This mobile final was approved for a different fixture';
+        return out;
+      }
       out.state = hasDrifted(prior.source, f) ? 'drifted' : 'approved';
+      return out;
+    }
+    if (input.conflictingMobileGameIds?.has(f.game_id)) {
+      out.state = 'review';
+      out.reason = 'This mobile final was approved for a different fixture';
       return out;
     }
     const why = reviewReason(f);
@@ -232,6 +257,33 @@ export function matchFinals<G extends MatchGame>(input: MatchInput<G>): MatchRes
     if (isSettling(f, input.nowMs)) {
       out.state = 'settling';
       out.reason = `the last stat arrived less than ${Math.round(SETTLING_MS / 60000)} minutes ago`;
+      return out;
+    }
+    if (claim.kind !== 'legacy') {
+      out.state = 'review';
+      if (claim.kind === 'invalid') out.reason = 'Scheduled fixture ID is invalid';
+      else if (f.league_id !== input.leagueId) out.reason = 'Mobile league link changed';
+      else {
+        const game = input.games.find((g) => g.id === claim.gameId);
+        if (!game || game.divisionId !== input.divisionId) out.reason = 'Scheduled fixture is not in this event';
+        else if (
+          !out.homeTeamId ||
+          !out.awayTeamId ||
+          !(
+            (game.team1Id === out.homeTeamId && game.team2Id === out.awayTeamId) ||
+            (game.team1Id === out.awayTeamId && game.team2Id === out.homeTeamId)
+          )
+        )
+          out.reason = 'Team links changed';
+        else if (input.scoredGameIds.has(game.id!)) out.reason = 'Connect already has a score for this fixture';
+        else {
+          const day = dayOf(f, input.timeZone);
+          const candidate = { gameId: game.id!, game, sameDay: !!day && game.day === day };
+          out.candidates = [candidate];
+          out.pick = candidate;
+          out.state = 'proposed';
+        }
+      }
       return out;
     }
     if (!out.homeTeamId || !out.awayTeamId) {

@@ -1,7 +1,7 @@
 -- Link wizard (PRD M-03): linking a division made by hand to a mobile league, one to one.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(11);
+select plan(16);
 
 create function pg_temp.login(p_uid uuid) returns void language plpgsql as $$
 begin
@@ -29,7 +29,7 @@ select pg_temp.login('00000000-0000-0000-0000-0000000000ac');
 select lives_ok(
   $$select public.set_division_mobile_link('20000000-0000-0000-0000-0000000000ac', 'league-open', 'Harbour League', '2026',
     '[{"team_id": "30000000-0000-0000-0000-0000000000a1", "mobile_team_id": "team-hawks"},
-      {"team_id": "30000000-0000-0000-0000-0000000000a2", "mobile_team_id": "team-owls"}]'::jsonb)$$,
+      {"team_id": "30000000-0000-0000-0000-0000000000a2", "mobile_team_id": "team-owls"}]'::jsonb, null, false)$$,
   'the owner links a division and maps its teams');
 select results_eq(
   $$select league_id, league_name, season, linked_by from public.division_mobile_links
@@ -38,11 +38,13 @@ select results_eq(
   'the link names the league and who linked it');
 select is((select count(*)::int from public.division_mobile_team_links where division_id = '20000000-0000-0000-0000-0000000000ac'), 2,
   'both teams are mapped');
+select is(public.mobile_league_link_count('league-open'), 1,
+  'an admin can see the total link count without other event details');
 
 -- Linking again replaces the map: Owls now "not in the mobile app".
 select lives_ok(
   $$select public.set_division_mobile_link('20000000-0000-0000-0000-0000000000ac', 'league-open', 'Harbour League', '2026',
-    '[{"team_id": "30000000-0000-0000-0000-0000000000a1", "mobile_team_id": "team-hawks"}]'::jsonb)$$,
+    '[{"team_id": "30000000-0000-0000-0000-0000000000a1", "mobile_team_id": "team-hawks"}]'::jsonb, 'league-open', false)$$,
   'the owner links again');
 select results_eq(
   $$select team_id, mobile_team_id from public.division_mobile_team_links
@@ -53,14 +55,14 @@ select results_eq(
 select throws_ok(
   $$select public.set_division_mobile_link('20000000-0000-0000-0000-0000000000ac', 'league-open', 'Harbour League', '2026',
     '[{"team_id": "30000000-0000-0000-0000-0000000000a1", "mobile_team_id": "team-hawks"},
-      {"team_id": "30000000-0000-0000-0000-0000000000a2", "mobile_team_id": "team-hawks"}]'::jsonb)$$,
+      {"team_id": "30000000-0000-0000-0000-0000000000a2", "mobile_team_id": "team-hawks"}]'::jsonb, 'league-open', false)$$,
   '23505', null, 'two division teams cannot point at the same mobile team');
 select throws_ok(
   $$select public.set_division_mobile_link('20000000-0000-0000-0000-0000000000ac', 'league-open', 'Harbour League', '2026',
-    '[{"team_id": "30000000-0000-0000-0000-0000000000a3", "mobile_team_id": "team-kea"}]'::jsonb)$$,
+    '[{"team_id": "30000000-0000-0000-0000-0000000000a3", "mobile_team_id": "team-kea"}]'::jsonb, 'league-open', false)$$,
   '23514', null, 'a team from another division cannot be mapped');
 select throws_ok(
-  $$select public.set_division_mobile_link('20000000-0000-0000-0000-0000000000ac', ' ', 'X', null, '[]'::jsonb)$$,
+  $$select public.set_division_mobile_link('20000000-0000-0000-0000-0000000000ac', ' ', 'X', null, '[]'::jsonb, 'league-open', false)$$,
   '22023', null, 'a league is required');
 
 select is(
@@ -68,14 +70,29 @@ select is(
    where action = 'division.mobile_link' and event_id = '10000000-0000-0000-0000-0000000000ac'),
   2, 'each wizard link (new and changed) is audited as a link, not an import');
 
+select throws_ok(
+  $$select public.set_division_mobile_link('20000000-0000-0000-0000-0000000000ac', 'league-new', 'New League', null,
+    '[]'::jsonb, 'league-open', false)$$,
+  '23514', null, 'replacing a different league needs confirmation');
+select throws_ok(
+  $$select public.set_division_mobile_link('20000000-0000-0000-0000-0000000000ac', 'league-new', 'New League', null,
+    '[]'::jsonb, null, true)$$,
+  '23514', null, 'a stale page cannot replace the current league');
+select lives_ok(
+  $$select public.set_division_mobile_link('20000000-0000-0000-0000-0000000000ac', 'league-new', 'New League', null,
+    '[]'::jsonb, 'league-open', true)$$,
+  'a confirmed replacement updates the league and pairs together');
+
 select pg_temp.login('00000000-0000-0000-0000-0000000000bc');
 select throws_ok(
-  $$select public.set_division_mobile_link('20000000-0000-0000-0000-0000000000ac', 'league-x', 'X', null, '[]'::jsonb)$$,
+  $$select public.set_division_mobile_link('20000000-0000-0000-0000-0000000000ac', 'league-x', 'X', null, '[]'::jsonb, 'league-new', true)$$,
   '42501', null, 'another admin cannot link someone else''s division');
 
 reset role;
-select ok(not has_function_privilege('anon', 'public.set_division_mobile_link(uuid, text, text, text, jsonb)', 'execute'),
+select ok(not has_function_privilege('anon', 'public.set_division_mobile_link(uuid, text, text, text, jsonb, text, boolean)', 'execute'),
   'anon cannot link divisions');
+select ok(not has_function_privilege('anon', 'public.mobile_league_link_count(text)', 'execute'),
+  'anon cannot query league link counts');
 
 select * from finish();
 rollback;
