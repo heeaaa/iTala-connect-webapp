@@ -131,6 +131,7 @@ test('approves a scheduled final on its exact moved fixture despite same-day rep
   await page.goto('/admin/import/league-open');
   await page.getByLabel('Event name', { exact: true }).fill('Scheduled result');
   await page.getByRole('button', { name: 'Create event', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/events\/[0-9a-f-]{36}$/);
   const eventId = new URL(page.url()).pathname.split('/').pop()!;
   await page.getByRole('group', { name: 'Choose event dates' }).getByRole('button').first().click();
   await page.getByRole('button', { name: 'Publish', exact: true }).click();

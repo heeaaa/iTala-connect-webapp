@@ -61,8 +61,8 @@ test('deep link survives sign-in, links an editable division, publishes, and con
   await expect(page).toHaveURL(/\/admin\/import\/league-open$/);
   await expect(page.getByRole('heading', { name: 'Link to an existing event' })).toBeVisible();
   const choice = page.getByRole('combobox', { name: 'Event and division' });
-  await expect(choice).toContainText('Own league night');
-  await expect(choice).not.toContainText('Private league night');
+  await expect(choice.locator('optgroup[label="Own league night (draft)"]')).toHaveCount(1);
+  await expect(choice.locator('optgroup[label="Private league night (draft)"]')).toHaveCount(0);
   await choice.selectOption(`${own.eventId}/${own.divisionId}`);
   await page.getByRole('link', { name: 'Review team pairs' }).click();
   await expect(page).toHaveURL(
