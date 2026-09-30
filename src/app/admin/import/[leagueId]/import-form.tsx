@@ -10,11 +10,13 @@ import w from '../../admin-workspace.module.css';
 export function ImportForm({
   league,
   links,
+  otherLinkCount,
   year,
   siteUrl,
 }: {
   league: MobileLeague;
-  links: { eventId: string; eventName: string }[];
+  links: { eventId: string; eventName: string; divisionId: string }[];
+  otherLinkCount: number;
   /** The year a default web address uses (P-14). */
   year: number;
   siteUrl: string;
@@ -23,6 +25,7 @@ export function ImportForm({
   const { value, slug, status, setChosen } = useEventAddress(eventName, year);
   const [error, setError] = useState('');
   const [pending, start] = useTransition();
+  const hasLinks = links.length + otherLinkCount > 0;
   const router = useRouter();
   return (
     <form
@@ -36,7 +39,7 @@ export function ImportForm({
             eventName,
             divisionName: String(data.get('divisionName')),
             slug,
-            allowDuplicate: links.length > 0,
+            allowDuplicate: hasLinks,
           });
           if (!result.ok) setError(result.error);
           else
@@ -44,16 +47,22 @@ export function ImportForm({
         });
       }}
     >
-      {links.length > 0 && (
+      <h2>Create a new event</h2>
+      {hasLinks && (
         <div className={w.notice}>
           <p>
-            This league is already linked to {links.map((l) => l.eventName).join(', ')}. Creating another event will
-            link it twice.
+            {links.length
+              ? `This league is already linked to ${[...new Set(links.map((l) => l.eventName))].join(', ')}. `
+              : ''}
+            {otherLinkCount
+              ? `It is linked to ${otherLinkCount} other division${otherLinkCount === 1 ? '' : 's'} you cannot edit. `
+              : ''}
+            Creating another event will link it again.
           </p>
           <div className={w.actions}>
             {links.map((l, i) => (
               <Link
-                key={l.eventId}
+                key={l.divisionId}
                 href={`/admin/events/${l.eventId}`}
                 className={`${s.button} ${i === 0 ? s.buttonLive : s.buttonQuiet}`}
               >
@@ -91,8 +100,8 @@ export function ImportForm({
         {error}
       </p>
       <div className={w.actions}>
-        <button disabled={pending} className={`${s.button} ${links.length ? s.buttonQuiet : s.buttonLive}`}>
-          {pending ? 'Creating…' : links.length ? 'Create anyway' : 'Create event'}
+        <button disabled={pending} className={`${s.button} ${hasLinks ? s.buttonQuiet : s.buttonLive}`}>
+          {pending ? 'Creating…' : hasLinks ? 'Create anyway' : 'Create event'}
         </button>
         <Link href="/admin/import">Back to leagues</Link>
       </div>

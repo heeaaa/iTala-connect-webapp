@@ -13,6 +13,8 @@ export const linkInputSchema = z.object({
   eventId: z.uuid(),
   divisionId: z.uuid(),
   leagueId: z.string().min(1).max(200),
+  expectedLeagueId: z.string().max(200).nullable(),
+  confirmReplace: z.boolean(),
   pairs: z.array(z.object({ teamId: z.uuid(), mobileTeamId: z.string().max(200) })).max(200),
 });
 export type LinkInput = z.input<typeof linkInputSchema>;

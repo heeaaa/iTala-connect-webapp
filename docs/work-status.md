@@ -1,6 +1,17 @@
 # Work status
 
-Last updated: 26/09/2026 (Claude, work laptop)
+Last updated: 30/09/2026 (Codex, Connect schedule integration)
+
+## CSI Connect schedule handoff (30/09/2026)
+
+**Objective and branch:** Implement `docs/PRD_CONNECT_SCHEDULE_INTEGRATION.md` CSI-01 to CSI-11 in Connect only. `handoff/codex` was fast-forwarded to `origin/main` at `f07d904` before these edits. The mobile repository was not changed.
+
+**Decisions and changed areas:** The existing league preview offers an editable event/division route into the link wizard. Linking re-reads current data; replacing a different league needs a named confirmation and an atomic expected-link check. The inbox treats full `cg_<UUID>` IDs as exact fixture claims, shows invalid or conflicting claims once in Needs a look, and keeps legacy freeform matching and Attach. The approval RPC checks the claimed UUID, current league/team links and score state; a unique non-null `score_sources.mobile_game_id` index prevents one final being approved twice. A restricted conflict query returns mobile IDs only, without another event's details. Migrations: `20260930000100_scheduled_mobile_results.sql` then `20260930000200_confirm_mobile_link.sql`. The generated Supabase types were updated by hand pending local regeneration.
+
+**Verification on this Windows host:** The new matcher regression suite failed 4 of 5 cases before the fix and passed afterward. Focused matcher plus golden parity: 310/310 passed. Final `npm run lint`, `npm run typecheck`, `npm run test:coverage` (990/990; 96.33% lines, 93.45% branches), `npm run build` with local-only endpoints, and `npm run check:secrets` passed. `npx playwright test --list` found 102 tests across mobile and desktop, including the new CSI journeys; listing does not prove they pass. Impeccable's mechanical detector found no issues in the changed admin UI files. The build had two Big Shoulders font fallback warnings. The secret scan found no patterns but had no server-only values set in its local-only environment.
+An intermediate full-coverage run had two timing failures in untouched `tests/component/admins-view.test.tsx`; that file passed 8/8 alone and the next full run passed 990/990. An earlier sandboxed coverage run failed four importer CLI tests because child `tsx` processes could not read Windows user information; those tests passed 51/51 with the required environment permission.
+
+**Blocked or not run:** `npm run db:start` failed because the Docker Desktop Linux engine pipe was absent. Therefore pgTAP, integration, browser E2E, local `db:types`, rendered mobile/desktop inspection, and the read-only duplicate preflight against a running Connect database remain NOT RUN here. CI's Docker backend job is the next verification step for pgTAP, integration and E2E. Do not apply the hosted migration until the CSI-10 duplicate preflight in `docs/MOBILE_INTEGRATION.md` returns zero rows, any duplicates are resolved deliberately, and release approval is given. The real mobile project and deployed cross-project check remain NOT RUN pending the existing go-ahead.
 
 ## Current handoff (27/09/2026, Claude on the work laptop)
 

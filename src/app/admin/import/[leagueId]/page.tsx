@@ -3,19 +3,25 @@ import { notFound } from 'next/navigation';
 import { serverEnv } from '@/env';
 import { clientEnv } from '@/env.client';
 import { slugYear } from '@/lib/event-slug';
+import { createClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/server/auth';
 import { mobileConfigured, mobileReader } from '@/server/mobile/reader';
-import { linkedMobileEvents } from '@/server/mobile/links';
+import { linkedMobileEvents, mobileLeagueLinkCount } from '@/server/mobile/links';
 import { TitlePlate, platformStyles as s } from '@/components/platform/platform-frame';
 import { ImportForm } from './import-form';
+import { ExistingEventChoice, type EditableEvent } from './existing-event-choice';
 import w from '../../admin-workspace.module.css';
 export default async function PreviewPage({ params }: PageProps<'/admin/import/[leagueId]'>) {
   const { leagueId } = await params;
-  await requireAdmin(`/admin/import/${encodeURIComponent(leagueId)}`);
+  const admin = await requireAdmin(`/admin/import/${encodeURIComponent(leagueId)}`);
   if (!mobileConfigured) notFound();
-  let preview, links;
+  let preview, links, linkCount;
   try {
-    [preview, links] = await Promise.all([mobileReader().preview(leagueId), linkedMobileEvents(leagueId)]);
+    [preview, links, linkCount] = await Promise.all([
+      mobileReader().preview(leagueId),
+      linkedMobileEvents(leagueId),
+      mobileLeagueLinkCount(leagueId),
+    ]);
   } catch {
     return (
       <>
@@ -32,6 +38,23 @@ export default async function PreviewPage({ params }: PageProps<'/admin/import/[
       </>
     );
   }
+  const db = await createClient();
+  let eventQuery = db
+    .from('events')
+    .select('id, name, status, divisions(id, name, sort_order, created_at)')
+    .order('name');
+  if (admin.role !== 'superadmin') eventQuery = eventQuery.eq('owner_id', admin.id);
+  const { data: eventRows, error: eventsError } = await eventQuery;
+  const editableEvents: EditableEvent[] = eventsError
+    ? []
+    : (eventRows ?? []).map((event) => ({
+        id: event.id,
+        name: event.name,
+        status: event.status,
+        divisions: [...event.divisions]
+          .sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at))
+          .map((division) => ({ id: division.id, name: division.name })),
+      }));
   return (
     <>
       <TitlePlate title={preview.league.name} sub="Review your import" />
@@ -39,9 +62,17 @@ export default async function PreviewPage({ params }: PageProps<'/admin/import/[
         {preview.league.season || 'No season'} · {preview.teams.length} teams ·{' '}
         {preview.teams.reduce((n, t) => n + t.players.length, 0)} players
       </p>
+      {eventsError ? (
+        <p role="alert" className={s.error}>
+          Could not load your events. Refresh to try again.
+        </p>
+      ) : (
+        <ExistingEventChoice leagueId={leagueId} events={editableEvents} />
+      )}
       <ImportForm
         league={preview.league}
         links={links}
+        otherLinkCount={Math.max(0, linkCount - links.length)}
         year={slugYear([], new Date(), serverEnv().DEFAULT_EVENT_TIMEZONE)}
         siteUrl={clientEnv().NEXT_PUBLIC_SITE_URL}
       />

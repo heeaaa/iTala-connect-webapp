@@ -1,7 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { orient, toMs } from '@/domain/mobile-matching';
+import { orient, parseFixtureClaim, toMs } from '@/domain/mobile-matching';
 import { createClient } from '@/lib/supabase/server';
 import { authorizeAdmin, canEditEvent, type ActionResult } from '@/server/auth';
 import { mobileConfigured } from '@/server/mobile/reader';
@@ -19,6 +19,8 @@ const iso = (v: number | string | null | undefined) => {
 const sourceOf = (item: InboxItem, method: 'mobile' | 'attach') => ({
   mobile_game_id: item.final.game_id,
   league_id: item.final.league_id ?? null,
+  home_team_id: item.final.home_team_id,
+  away_team_id: item.final.away_team_id,
   home_pts: item.final.home_pts,
   away_pts: item.final.away_pts,
   event_count: item.final.event_count ?? 0,
@@ -69,6 +71,7 @@ export async function approveResult(input: ApproveInput): Promise<ActionResult<{
   if (!found.ok) return found;
   const { inbox, item } = found.data;
   const m = item.result;
+  if (mode === 'attach' && parseFixtureClaim(mobileGameId).kind !== 'legacy') return { ok: false, error: CHANGED };
 
   const allowed =
     mode === 'approve'

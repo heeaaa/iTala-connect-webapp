@@ -19,17 +19,20 @@ export async function saveMobileLink(input: LinkInput): Promise<ActionResult> {
   if (!mobileConfigured) return { ok: false, error: 'The mobile app integration is not configured.' };
   const parsed = linkInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: CHECK };
-  const { eventId, divisionId, leagueId, pairs } = parsed.data;
+  const { eventId, divisionId, leagueId, pairs, expectedLeagueId, confirmReplace } = parsed.data;
   if (!(await canEditEvent(eventId))) return { ok: false, error: 'You can only edit your own events.' };
   if (duplicateMobileTeams(pairs).length) return { ok: false, error: DUPLICATE };
 
   const db = await createClient();
   const { data: division } = await db
     .from('divisions')
-    .select('id, event_id, teams(id)')
+    .select('id, event_id, teams(id), division_mobile_links(league_id)')
     .eq('id', divisionId)
     .maybeSingle();
   if (!division || division.event_id !== eventId) return { ok: false, error: CHECK };
+  const currentLeagueId = division.division_mobile_links?.league_id ?? null;
+  if (currentLeagueId !== expectedLeagueId || (currentLeagueId && currentLeagueId !== leagueId && !confirmReplace))
+    return { ok: false, error: CHECK };
   const teamIds = new Set(division.teams.map((t) => t.id));
   if (pairs.some((p) => !teamIds.has(p.teamId))) return { ok: false, error: CHECK };
 
@@ -53,6 +56,8 @@ export async function saveMobileLink(input: LinkInput): Promise<ActionResult> {
     p_league_name: league.name,
     p_season: league.season,
     p_teams: chosen.map((p) => ({ team_id: p.teamId, mobile_team_id: p.mobileTeamId })),
+    p_expected_league_id: expectedLeagueId,
+    p_confirm_replace: confirmReplace,
   });
   if (error)
     return { ok: false, error: error.code === '23505' ? DUPLICATE : 'Could not save the link. Please try again.' };

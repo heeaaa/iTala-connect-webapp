@@ -93,7 +93,7 @@ function EventBug({ event: e }: { event: HomeCard }) {
       <span className={s.bugBody}>
         {e.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- storage URLs are sized on upload (E-18)
-          <img src={e.logoUrl} alt="" className={s.bugLogo} />
+          <img src={e.logoUrl} alt="" className={s.bugLogo} width={40} height={40} />
         ) : null}
         <span className={s.bugText}>
           <span className={s.bugName}>{e.name || 'Untitled event'}</span>

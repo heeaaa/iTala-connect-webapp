@@ -444,7 +444,7 @@ A fixed night-broadcast palette from the iTala logo: navy grounds, one teal iden
 - **On Lime** (`platform-on-lime`, `--brand-live-text`): text and the pip on solid lime.
 
 #### Neutral
-- **Network Ground** (`platform-ground`, `--brand-bg`): the page, the sticky network bar, input fills, the tile behind event logos. Equal to the ground of the iTala mark.
+- **Network Ground** (`platform-ground`, `--brand-bg`): the page, the sticky network bar and input fills. Equal to the ground of the iTala mark.
 - **Bug Plate** (`platform-plate`, `--brand-surface`): title plates, event bugs, table rows, the organiser plate, the sign-in panel, placeholders and empty states.
 - **Raised Plate** (`platform-plate-raised`, `--brand-raised`): date blocks, the title sub-strip, quiet buttons, notices, hovered event bugs.
 - **Seam** (`platform-seam`, `--brand-border`): 1 px hairlines (network bar base, section label rules, status bug outlines, notices), resting input underline, scrollbar thumb.
@@ -652,7 +652,7 @@ Components are broadcast graphics: cut plates on navy, capitalised and condensed
 The lower-third that opens every platform page: a teal key block, then the page title on a Bug Plate in condensed caps, each cut on the right-end diagonal; beneath it, indented to clear the key, a Raised Plate sub-strip carrying the tagline or subtitle in teal ("Record. Track. Elevate.", "Organisers only. Fans never need an account."). The title is the page's `h1`. The plate wipes in once on load, left to right over 420ms as a clip reveal, and the sub-strip follows 120ms later; then both hold.
 
 #### Event bug row
-The rundown row for an event on Home (a link to the event page) and the Dashboard (table semantics, bug looks): a Raised Plate date block with a 3 px teal top edge ("11/09" over "/2026", or "TBC"), the event's logo on a ground tile when it has one, the name in condensed caps with the divisions and date range beneath in Meta, then the status bug. The row is a Bug Plate cut on the right end. On hover and focus the row steps to Raised Plate and the date block lights solid teal with On Teal text.
+The rundown row for an event on Home (a link to the event page) and the Dashboard (table semantics, bug looks): a Raised Plate date block with a 3 px teal top edge ("11/09" over "/2026", or "TBC"), the event's logo directly on the Bug Plate when it has one so transparent pixels show the row colour, the name in condensed caps with the divisions and date range beneath in Meta, then the status bug. The row is a Bug Plate cut on the right end. On hover and focus the row steps to Raised Plate and the date block lights solid teal with On Teal text.
 
 #### Tables
 Admin tables keep real table semantics inside a scrollable, labelled region. Headers use the muted Label style; each row's cells are Bug Plate strips separated by 0.375rem of ground, first column at 700.

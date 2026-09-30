@@ -11,8 +11,11 @@ import { DUPLICATE } from '@/lib/mobile-link';
 const data = (o: Partial<LinkPageData> = {}): LinkPageData => ({
   eventId: 'e1',
   eventName: 'League Night',
+  eventStatus: 'draft',
   divisionId: 'd1',
   divisionName: 'Open',
+  currentLeagueId: null,
+  currentLeagueName: null,
   teams: [
     { id: 't-hawks', name: 'Harbour Hawks' },
     { id: 't-owls', name: 'Night Owls' },
@@ -28,6 +31,7 @@ const data = (o: Partial<LinkPageData> = {}): LinkPageData => ({
     { id: 'm-hawks', name: 'Harbour Hawks BC' },
     { id: 'm-owls', name: 'Night Owls' },
   ],
+  otherLinkCount: 0,
   existing: {},
   unreachable: false,
   ...o,
@@ -35,6 +39,12 @@ const data = (o: Partial<LinkPageData> = {}): LinkPageData => ({
 const pick = (team: string) => screen.getByRole('combobox', { name: `Mobile team for ${team}` });
 
 beforeEach(() => {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute('open', '');
+  };
+  HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute('open');
+  };
   vi.clearAllMocks();
   fake.save.mockResolvedValue({ ok: true, data: undefined });
 });
@@ -59,6 +69,8 @@ describe('LinkView (M-03)', () => {
       eventId: 'e1',
       divisionId: 'd1',
       leagueId: 'league-open',
+      expectedLeagueId: null,
+      confirmReplace: false,
       pairs: [
         { teamId: 't-hawks', mobileTeamId: 'm-hawks' },
         { teamId: 't-owls', mobileTeamId: 'm-owls' },
@@ -163,5 +175,21 @@ describe('LinkView (M-03)', () => {
     expect(screen.getByRole('heading', { name: 'Could not reach the mobile app' })).toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to event' })).toBeInTheDocument();
+  });
+
+  it('names both leagues and waits for confirmation before replacing a link', async () => {
+    const user = userEvent.setup();
+    render(<LinkView data={data({ currentLeagueId: 'league-old', currentLeagueName: 'Autumn' })} />);
+    await user.click(screen.getByRole('button', { name: 'Save link' }));
+    expect(fake.save).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toHaveTextContent('Autumn');
+    expect(screen.getByRole('dialog')).toHaveTextContent('Harbour League');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(fake.save).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Save link' }));
+    await user.click(screen.getByRole('button', { name: 'Replace link' }));
+    expect(fake.save).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedLeagueId: 'league-old', confirmReplace: true }),
+    );
   });
 });

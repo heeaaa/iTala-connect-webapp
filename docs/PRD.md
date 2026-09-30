@@ -289,6 +289,7 @@ These are pure functions. They are ported to TypeScript in `src/domain/` and pro
 - State order: prior provenance (approved, or drifted if points, event count or last event time changed), review, settling, unlinked, then candidates (one same-day or one overall is proposed, more is ambiguous, none is unmatched).
 - Review reasons in order: no stats, same team both sides, no finish time, level score.
 - Settling: 0 <= now - last event < 5 minutes.
+- Scheduled mobile finals with a full `cg_<UUID>` ID are matched only to that fixture in the linked division, after current team and score checks. A malformed `cg_` ID or conflicting claim needs review and cannot use Attach. Legacy IDs keep the original team/date matching. See [Connect schedule integration](PRD_CONNECT_SCHEDULE_INTEGRATION.md) for CSI-01 to CSI-11.
 
 ## 13. Data to carry across
 
@@ -296,6 +297,6 @@ Every event, division, team, player, game (including unscheduled and orphaned ga
 
 ## 14. Out of scope for the migration
 
-- Mobile app pulling the schedule from iTala Connect (stage 3 in [MOBILE_INTEGRATION.md](MOBILE_INTEGRATION.md); parked plan in [SCHEDULER_INTEGRATION_PLAN.md](SCHEDULER_INTEGRATION_PLAN.md); the schema is designed so that becomes a read-only endpoint later).
+- A direct mobile-to-Connect score write endpoint, automatic approval, and optional score push. The mobile Schedule flow and Connect-side scheduled-final checks are tracked in [Connect schedule integration](PRD_CONNECT_SCHEDULE_INTEGRATION.md).
 - Player stats and leaderboards from the mobile app.
 - Payments, registrations, notifications.
