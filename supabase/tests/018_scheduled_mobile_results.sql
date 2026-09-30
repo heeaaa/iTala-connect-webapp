@@ -1,7 +1,7 @@
 -- CSI-09/10/11: scheduled claims are checked again inside the approval transaction.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(20);
+select plan(21);
 
 create function pg_temp.login(p_uid uuid) returns void language plpgsql as $$
 begin
@@ -23,12 +23,14 @@ insert into public.divisions (id, event_id, name) values
   ('20000000-0000-0000-0000-0000000000e2', '10000000-0000-0000-0000-0000000000e2', 'Other');
 insert into public.teams (id, division_id, name) values
   ('30000000-0000-0000-0000-0000000000e1', '20000000-0000-0000-0000-0000000000e1', 'Hawks'),
-  ('30000000-0000-0000-0000-0000000000e2', '20000000-0000-0000-0000-0000000000e1', 'Owls');
+  ('30000000-0000-0000-0000-0000000000e2', '20000000-0000-0000-0000-0000000000e1', 'Owls'),
+  ('30000000-0000-0000-0000-0000000000e3', '20000000-0000-0000-0000-0000000000e1', 'Kea');
 insert into public.division_mobile_links (division_id, league_id, league_name) values
   ('20000000-0000-0000-0000-0000000000e1', 'L1', 'League');
 insert into public.division_mobile_team_links (division_id, team_id, mobile_team_id) values
   ('20000000-0000-0000-0000-0000000000e1', '30000000-0000-0000-0000-0000000000e1', 'm-hawks'),
-  ('20000000-0000-0000-0000-0000000000e1', '30000000-0000-0000-0000-0000000000e2', 'm-owls');
+  ('20000000-0000-0000-0000-0000000000e1', '30000000-0000-0000-0000-0000000000e2', 'm-owls'),
+  ('20000000-0000-0000-0000-0000000000e1', '30000000-0000-0000-0000-0000000000e3', 'm-kea');
 insert into public.games (id, event_id, division_id, team1_id, team2_id, label, position) values
   ('40000000-0000-0000-0000-0000000000e1', '10000000-0000-0000-0000-0000000000e1',
    '20000000-0000-0000-0000-0000000000e1', '30000000-0000-0000-0000-0000000000e2',
@@ -137,6 +139,11 @@ select throws_ok(
   '23514', null, 'a direct call cannot approve an unresolved seeded playoff');
 update public.game_scores set s1 = 60, s2 = 50 where game_id = '40000000-0000-0000-0000-0000000000e2';
 update public.game_scores set s1 = 60, s2 = 50 where game_id = '40000000-0000-0000-0000-0000000000e3';
+select throws_ok(
+  $$select public.approve_mobile_result('40000000-0000-0000-0000-0000000000e7', 20, 10,
+    '{"mobile_game_id":"cg_40000000-0000-0000-0000-0000000000e7","league_id":"L1",
+      "home_team_id":"m-hawks","away_team_id":"m-kea"}'::jsonb)$$,
+  '23514', null, 'a resolved playoff rejects a different mapped opponent');
 select lives_ok(
   $$select public.approve_mobile_result('40000000-0000-0000-0000-0000000000e7', 20, 10,
     '{"mobile_game_id":"cg_40000000-0000-0000-0000-0000000000e7","league_id":"L1",
