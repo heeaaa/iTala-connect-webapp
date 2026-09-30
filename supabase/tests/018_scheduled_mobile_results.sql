@@ -1,7 +1,7 @@
 -- CSI-09/10/11: scheduled claims are checked again inside the approval transaction.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(16);
+select plan(20);
 
 create function pg_temp.login(p_uid uuid) returns void language plpgsql as $$
 begin
@@ -44,6 +44,17 @@ insert into public.games (id, event_id, division_id, team1_id, team2_id, label, 
    '30000000-0000-0000-0000-0000000000e2', 'Open', 4),
   ('40000000-0000-0000-0000-0000000000e5', '10000000-0000-0000-0000-0000000000e2',
    '20000000-0000-0000-0000-0000000000e2', null, null, 'Other', 1);
+insert into public.games (id, event_id, division_id, team1_id, team2_id, label, type,
+  is_playoff, bracket_game_id, team1_source, team2_source, position) values
+  ('40000000-0000-0000-0000-0000000000e6', '10000000-0000-0000-0000-0000000000e1',
+   '20000000-0000-0000-0000-0000000000e1', null, null, 'Open', 'group',
+   false, null, null, null, 5),
+  ('40000000-0000-0000-0000-0000000000e7', '10000000-0000-0000-0000-0000000000e1',
+   '20000000-0000-0000-0000-0000000000e1', null, null, 'Open', 'semi',
+   true, 'P1', '{"type":"seed","rank":1}', '{"type":"seed","rank":2}', 6),
+  ('40000000-0000-0000-0000-0000000000e8', '10000000-0000-0000-0000-0000000000e1',
+   '20000000-0000-0000-0000-0000000000e1', null, null, 'Open', 'final',
+   true, 'P2', '{"type":"winner","bracketGameId":"P1"}', '{"type":"seed","rank":2}', 7);
 insert into public.game_scores (game_id, event_id, s1, s2) values
   ('40000000-0000-0000-0000-0000000000e2', '10000000-0000-0000-0000-0000000000e1', 0, null),
   ('40000000-0000-0000-0000-0000000000e3', '10000000-0000-0000-0000-0000000000e1', null, 0),
@@ -114,6 +125,28 @@ select throws_ok(
   $$select public.approve_mobile_result('40000000-0000-0000-0000-0000000000e5', 1, 2,
     '{"mobile_game_id":"cg_40000000-0000-0000-0000-0000000000e5","league_id":"L1"}'::jsonb)$$,
   '42501', null, 'another organiser''s fixture cannot be changed');
+select throws_ok(
+  $$select public.approve_mobile_result('40000000-0000-0000-0000-0000000000e6', 1, 2,
+    '{"mobile_game_id":"cg_40000000-0000-0000-0000-0000000000e6","league_id":"L1",
+      "home_team_id":"m-hawks","away_team_id":"m-owls"}'::jsonb)$$,
+  '23514', null, 'a direct call cannot assign a scheduled final to a fixture with no teams');
+select throws_ok(
+  $$select public.approve_mobile_result('40000000-0000-0000-0000-0000000000e7', 1, 2,
+    '{"mobile_game_id":"cg_40000000-0000-0000-0000-0000000000e7","league_id":"L1",
+      "home_team_id":"m-hawks","away_team_id":"m-owls"}'::jsonb)$$,
+  '23514', null, 'a direct call cannot approve an unresolved seeded playoff');
+update public.game_scores set s1 = 60, s2 = 50 where game_id = '40000000-0000-0000-0000-0000000000e2';
+update public.game_scores set s1 = 60, s2 = 50 where game_id = '40000000-0000-0000-0000-0000000000e3';
+select lives_ok(
+  $$select public.approve_mobile_result('40000000-0000-0000-0000-0000000000e7', 20, 10,
+    '{"mobile_game_id":"cg_40000000-0000-0000-0000-0000000000e7","league_id":"L1",
+      "home_team_id":"m-hawks","away_team_id":"m-owls"}'::jsonb)$$,
+  'a resolved seeded playoff accepts its actual mapped teams');
+select lives_ok(
+  $$select public.approve_mobile_result('40000000-0000-0000-0000-0000000000e8', 30, 20,
+    '{"mobile_game_id":"cg_40000000-0000-0000-0000-0000000000e8","league_id":"L1",
+      "home_team_id":"m-hawks","away_team_id":"m-owls"}'::jsonb)$$,
+  'a later playoff accepts the winner of a scored bracket fixture');
 select pg_temp.login('00000000-0000-0000-0000-0000000000e2');
 select throws_ok(
   $$select * from public.mobile_result_conflicts('10000000-0000-0000-0000-0000000000e1', array['foreign-final'])$$,
