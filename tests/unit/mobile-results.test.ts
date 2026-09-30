@@ -79,6 +79,9 @@ describe('Finished games from the mobile app (M-02, M-05)', () => {
     expect(detailLine(final({ event_count: 1, league_name: null }), 'America/Vancouver')).toBe(
       'finished 27/09/2026 12:05 am · 1 stat',
     );
+    expect(detailLine(final({ is_default: true, event_count: 0, home_pts: 30, away_pts: 0 }), 'Pacific/Auckland')).toBe(
+      'Harbour League · finished 27/09/2026 8:05 pm · default result',
+    );
     expect(finishedWhen(null, 'Pacific/Auckland')).toBe('no finish time');
     expect(finishedWhen('not a time', 'Pacific/Auckland')).toBe('no finish time');
     expect(driftLine({ s1: 58, s2: 51, eventCount: 48 }, final({ home_pts: 60, event_count: 50 }))).toBe(

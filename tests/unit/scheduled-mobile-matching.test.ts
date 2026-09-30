@@ -95,4 +95,17 @@ describe('scheduled fixture claims (CSI-03 to CSI-08)', () => {
       pick: { gameId: REPEAT },
     });
   });
+
+  it('sends an explicit zero-event default to approval but still reviews an ordinary zero-event final', () => {
+    const byDefault = { ...finished, home_pts: 30, away_pts: 0, event_count: 0, last_event_at: null, is_default: true };
+    expect(match({ finals: [byDefault] })).toMatchObject({
+      state: 'proposed',
+      pick: { gameId: ID },
+      final: { home_pts: 30, away_pts: 0 },
+    });
+    expect(match({ finals: [{ ...byDefault, is_default: false }] })).toMatchObject({
+      state: 'review',
+      reason: 'no stats were recorded for this game',
+    });
+  });
 });
