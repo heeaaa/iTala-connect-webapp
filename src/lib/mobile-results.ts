@@ -38,6 +38,7 @@ export const mobileFinalSchema = z.object({
   home_pts: count,
   away_pts: count,
   event_count: count,
+  is_default: z.boolean().optional(),
   finished_at: when,
   last_event_at: when,
 });
@@ -87,7 +88,11 @@ export function finishedWhen(value: number | string | null, timeZone: string): s
 /** "{league} · finished {when} · {n} stats" (M-05). */
 export const detailLine = (f: InboxFinal, timeZone: string) => {
   const stats = Number(f.event_count) || 0;
-  return [f.league_name, `finished ${finishedWhen(f.finished_at, timeZone)}`, `${stats} stat${stats === 1 ? '' : 's'}`]
+  return [
+    f.league_name,
+    `finished ${finishedWhen(f.finished_at, timeZone)}`,
+    f.is_default ? 'default result' : `${stats} stat${stats === 1 ? '' : 's'}`,
+  ]
     .filter(Boolean)
     .join(' · ');
 };

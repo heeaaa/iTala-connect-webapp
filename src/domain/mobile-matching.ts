@@ -15,6 +15,8 @@ export interface MobileFinal {
   home_pts: number | null;
   away_pts: number | null;
   event_count: number | null;
+  /** Explicit official default result from the mobile game row. Older views omit it. */
+  is_default?: boolean;
   finished_at: number | string | null;
   last_event_at: number | string | null;
 }
@@ -42,7 +44,7 @@ export function toMs(v: number | string | null | undefined): number | null {
 
 /** Why a row is not a usable result, in check order; null when it is usable. */
 export function reviewReason(f: MobileFinal): string | null {
-  if (!f.event_count) return 'no stats were recorded for this game';
+  if (!f.event_count && !f.is_default) return 'no stats were recorded for this game';
   if (f.home_team_id === f.away_team_id) return 'the same team is on both sides';
   if (toMs(f.finished_at) === null) return 'no finish time recorded';
   if (f.home_pts === f.away_pts) return 'the score is level, so the game has no result';
