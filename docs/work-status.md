@@ -1,6 +1,16 @@
 # Work status
 
-Last updated: 01/10/2026 (Codex, daily mobile link delivery)
+Last updated: 02/10/2026 (Codex, Connect Reports integration)
+
+## Current handoff (02/10/2026, Connect Reports integration)
+
+The user commissioned a transfer of iTala-web functionality into a new admin Reports tab in Connect, including all six planned templates, PDF/XLSX/CSV, private presets, and the three Game Box Score Book scopes: whole linked league/division, one league day, and one selected game. See [ITALA_WEB_INTEGRATION_PLAN.md](ITALA_WEB_INTEGRATION_PLAN.md) for the source audit, data boundaries, schema proposal, and acceptance matrix. This is **in progress** and must not be released as a completed reporting product yet.
+
+The isolated `/admin/reports` route and pure report builder now preview score-based data for events a signed-in admin can manage. The six report calculations and export encoders are implemented; live Mobile player data, preview snapshot persistence, preset storage, download actions, and Mobile capture remain outstanding. Existing Connect scores and tables are read only by Reports. The existing Mobile reader has an Auth signup side effect, so Reports does not call it. No report migration, hosted database write, or mobile change has been made. The user accepted new report-owned storage in principle if existing data is unaffected; the precise new-table approval questions are pending.
+
+**Verified locally:** `npm run lint` passed after formatting; `npm run test:coverage` passed 77 files and 1018 tests, with 95.61% statements, 91.81% branches, and 96.42% lines overall. The new report feature reached 95.94% lines and 80.05% branches. `npm run typecheck`, `npm run build`, and `npm run check:secrets` passed outside the sandbox after sandbox-specific Node `ENOMEM`/generated-file `EPERM` failures. The build retained only the existing Big Shoulders fallback-font warnings. A gated sample preview was inspected at 390 px and 1440 px with no page overflow or serious/critical axe findings; a sample PDF was rendered and visually inspected. Focused report tests passed after the latest box-score ID/team scoring refinement. The full suite/build should be rerun after the remaining implementation.
+
+**Next:** agree the exact new Connect/Mobile table contracts; implement private presets and immutable preview/export downloads; add a Mobile GET-only report bridge and prospective capture manifest; test migrations/RLS, source parity, offline replay, all formats and browser journeys. Do not treat the current synthetic Mobile fixtures as live data verification.
 
 ## Current handoff (01/10/2026, daily mobile link delivery)
 

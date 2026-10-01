@@ -1,0 +1,67 @@
+# iTala Reports in Connect: implementation and verification plan
+
+Status: implementation in progress, 2 October 2026. The plan was written before application code. No report database migration, hosted database operation, or mobile data write has occurred.
+
+## Decisions and source audit
+
+- Build Reports inside iTala Connect under `/admin/reports`, beside Events, Dashboard, Settings, and Admins. Use Connect sign-in and show all events the signed-in admin can manage. Do not embed or deploy the standalone app.
+- Deliver the six templates specified by `iTala-web/docs/iTala-Reports-PRD.md`: Game Box Score Book (R1), Cumulative League Statistics (R2), Cumulative Team Statistics (R3), Results and Standings (R4), Player Leaderboards (R5), and Player Game Log (R6). Include preview, PDF, XLSX and CSV exports, and private presets.
+- Preserve every existing Connect event, score, mobile link, schedule, settings, and admin workflow. Reports read existing Connect and Mobile data; report-owned persistence may use **new Connect tables only**. No report path updates, inserts into, or deletes from an existing source table. No hosted database operation, migration application, or mobile data write occurs without a separate explicit go-ahead.
+- Expand mobile capture prospectively to provide trustworthy tracking coverage and appearances. Present the mobile schema and write path for approval before editing or applying it. Old games remain unknown where evidence is missing.
+- Source review used the local `iTala-web` checkout at `8385a7a` (1 October 2026), whose origin matches the supplied GitHub URL. Network access to GitHub was unavailable. The app currently ships a points-only synthetic PGlite demo, not a live Supabase integration. Its pure scoring, selection, and safe CSV logic can be adapted with the MIT licence notice; its local credentials, Auth, PGlite, root styles, and loopback-only server are excluded.
+- Connect source documents reviewed: `docs/PRD.md`, `docs/MIGRATION_PLAN.md`, `docs/MOBILE_INTEGRATION.md`, `docs/MOBILE_LINK_SYNC.md`, `docs/PRD_CONNECT_SCHEDULE_INTEGRATION.md`, `docs/SCHEDULER_INTEGRATION_PLAN.md`, `docs/PHASE_3B_HANDOFF.md`, and `docs/work-status.md`. Mobile schema and sync paths were inspected in `iTala-official`.
+
+## Data contract and limits
+
+Connect fixtures, division/team identity and `game_scores` remain the authority for published results. Approved `score_sources`, one-to-one mobile league/team links, and the mobile final game ID establish provenance for player statistics. Never join by name alone or silently replace a Connect score with a mobile score. An unlinked division still supports score-based results and standings; player tables explain why they are unavailable.
+
+For the organiser's three box-score jobs, a Connect division is the selected mobile league: R1 can include every eligible game in that division, every game on one division-local day, or one explicitly selected game. R4 can also produce that day's results and standings with its scope stated. A single game with no mobile detail still shows its final Connect team scores.
+
+Per-game/side/category coverage is one of complete, not tracked, partial, or unknown. Confirmed appearance is separate from roster membership and attendance. A missing missed-shot event does not prove misses were tracked; a player with no scoring events is not automatically a scoreless participant. Attempts, percentages, turnovers and player per-game averages are shown only for supported eligible games. Historical records without proof remain unknown, with the reason visible in preview and exports. Connect's existing standings function supports group-game wins, losses, points and a known sort order; label that rule and do not claim unconfigured forfeits or official competition points.
+
+The existing `src/server/mobile/transport.ts` makes `POST /auth/v1/signup` when it needs a mobile anonymous session. That can create an Auth record, so it does **not** meet a literal zero-write reporting path. RLS on mobile `games` and `events` currently requires `auth.uid()`; a publishable key alone cannot read them. Before Reports fetch live mobile statistics, establish and verify a request path that performs SELECT/GET only and no signup or refresh write. The preferred proposal is a dedicated Mobile Edge Function with a separate Connect Reports secret: after Connect verifies the current admin and event, it requests only the approved linked mobile game IDs; the function validates the secret and IDs, then selects final games, roster identities, events, and manifests. Its service credential stays in Mobile, never in Connect or the browser. The function must reject non-GET requests, bound game/event counts, and have transport tests proving only SELECT/GET reaches the database. This code path and its deployment need review before use. Until then, Reports must not initiate the existing Auth flow; templates can use Connect score data and clearly mark mobile-only values unavailable. This is a release dependency for player reports, not a reason to invent data.
+
+## New storage proposal, not yet a migration
+
+All source reads use the signed-in Connect session and RLS; report actions recheck active admin status and `is_event_editor(event_id)`. Proposed **new Connect tables only**:
+
+| Table | Fields and purpose | Write scope |
+| --- | --- | --- |
+| `report_presets` | UUID primary key, owner ID referencing `profiles`, event ID referencing `events`, name (1–80 characters), definition version and bounded JSON definition, created/updated timestamps. Stores filters and layout, no copied source data. | Owner may create/update/delete while still able to edit the event. |
+| `report_snapshots` | UUID primary key, owner ID referencing `profiles`, event ID referencing `events`, template/version, bounded immutable report JSON, generated/source-read timestamps, expiry at seven days. The exact preview payload powers every export. | Owner may insert a bounded snapshot for an event they manage; no update. Expired entries are inaccessible; retention cleanup is a separate approved operation. |
+
+Both tables need RLS, foreign keys to owner/event identities, JSON and size limits, and no anonymous access. Each retrieval must check both ownership and **current** event-edit permission, including after a role is disabled or event ownership changes. Exports are generated from the saved snapshot, with no export-job table or object storage for the first 100-game limit. If testing proves synchronous generation insufficient, revise the design before adding storage or queues. A database migration file and its pgTAP policies will be prepared only after approval of this exact proposal; applying it to a hosted database needs another go-ahead.
+
+## Prospective mobile capture proposal, pending approval
+
+Use a **new mobile `game_report_manifests` table** keyed by existing `games.id`, rather than altering scoring tables. Proposed fields: `game_id` primary/foreign key, `league_id`, manifest version, per-side tracking intent and change history, per-side category coverage (`scoring`, each shot type, turnovers, rebounds, assists, steals, blocks, fouls), historical rostered player IDs and separately confirmed appeared player IDs with their game-time team IDs, final event ID digest/count, confirmed-at timestamp, writer ID and updated-at timestamp. Only a complete roster snapshot plus confirmed appearance list may identify did-not-play; otherwise absence stays unknown. The final event digest is checked against the selected `events` rows when reporting; a later edit invalidates complete coverage until the manifest is reconfirmed. Mobile scoring/finalisation would write this table through its offline outbox; Connect Reports would only SELECT it through the approved read-only path. A score-only opponent keeps unknown player participation. Missing rows on old clients or historical games mean unknown coverage and appearance. A detailed SQL/RLS contract, offline replay and compatibility migration will be reviewed before any mobile schema or write-path edit. No backfill will relabel old games from current league settings.
+
+The user accepted report-owned database storage in new tables if existing data is unaffected. Before writing migrations or changing hosted schema, confirm the exact Connect and Mobile table contracts above. Application code can progress in isolation in the meantime.
+
+## Implementation order after plan approval
+
+1. Add the admin-only Reports link after Dashboard and an isolated `/admin/reports` route. Put reporting domain code under `src/features/reports/` and use scoped styles in Connect's established Broadcast Package design. Direct route and every action enforce access, not just the visible tab.
+2. Implement pure selection, scoring, coverage and six template builders from recorded fixtures, using Connect event time zones and stable IDs. Report a supported score-only result when mobile data is absent. Keep excluded games and unavailable columns explicit; cap a selection at 100 games.
+3. Build the server-only Connect adapter with SELECT queries for every manageable event. Add the mobile adapter only after the read-only access dependency above is resolved. Use approved source IDs and mapped teams; bound/paginate mobile reads and disclose cross-database as-of limits.
+4. Once the new Connect tables are approved, add RLS-backed private presets and immutable previews. The report builder selects event, division, team, player, dates/games, template, eligible columns and qualifications. Preview shows coverage, exclusions and as-of time.
+5. Generate PDF, XLSX and packaged CSV from the same snapshot payload. Include IDs, numeric spreadsheet cells, safe text, coverage and qualifications; inspect PDF pagination and wide tables.
+6. With separate mobile schema/write approval, add capture to the mobile app, offline sync and finalisation confirmation. Verify new and old client behaviour before allowing Reports to mark a category complete. Keep score and Connect approval flows unchanged.
+7. Release behind a Reports enable switch after all relevant gates pass. Disable the switch to roll back the feature without changing source data.
+
+## Verification plan and acceptance gates
+
+| Area | Representative checks | Evidence required |
+| --- | --- | --- |
+| Permissions and navigation | Public/admin/superadmin tab order and active state; direct route/action/export denial; disabled admin, foreign event, revoked ownership. | Component and local RLS/integration tests, browser at 390 and 1440 px. |
+| No source writes | Assert report data path issues SELECT/GET only to existing Connect/Mobile data; no mobile Auth signup or refresh; report writes target only approved new Connect tables. | Transport tests plus audited request/SQL logs against local fixtures. |
+| Selection | Single day, range, nonconsecutive dates, latest/last five, explicit IDs, event time zone near midnight, duplicate IDs, unfinished/unscored games, no results and 100-game limit. | Deterministic unit tests and adapter integration tests. |
+| Calculations | All R1-R6; points by shot type, player/team/unallocated reconciliation, stints, ties, game logs, score-only opponents, standings scope/cutoff; mixed coverage, zero attempts, scoreless confirmed appearance and unknown participation. | Independent expected fixtures, mobile calculation parity, at least 80% line and branch coverage for new domain logic. |
+| Presets and snapshots | Private ownership, schema/version validation, expiry, stale/revoked access; source correction after preview leaves that preview and all exports fixed while a fresh preview changes. | pgTAP RLS, integration tests and parsed exports. |
+| Formats | PDF/XLSX/CSV totals, IDs and coverage reconcile with preview; numeric cells remain numeric; spreadsheet formula text is inert; wide PDF tables and repeated headers remain readable. | Parse generated files and visually inspect rendered PDF for all six templates at typical and upper-bound sizes. |
+| UI and resilience | Keyboard flow, screen-reader status and errors, loading/empty/partial/source-down/expired states, no page-wide overflow at 360 px, safe retries and bounded failures. | Playwright journeys, axe, screenshots at 390 and 1440 px. |
+| Mobile capture, if approved | New/old games and clients, settings change, both sides, attendance vs appearance, offline finalisation/replay, duplicate delivery, missing manifest, old-history unknown. | Mobile reducer/sync/SQL tests and available device review. |
+| Existing Connect | Events and public event themes, dashboard, Settings/Admins, schedule editing/publishing, mobile links/results, auth, CSP. | Affected existing suites, lint, TypeScript, coverage, local DB tests, integration, build, secrets check and E2E. |
+
+Do not count mocked adapters as live integration, a build as UI verification, or unavailable gates as passing. Local Supabase fixtures are isolated from hosted data. Record exact commands, failures, screenshots and source revisions in `docs/work-status.md` when implementation occurs.
+
+Baseline on 2 October 2026: `npm run lint` passed; `npx tsc --noEmit` passed; `npx vitest run --project component tests/component/platform-frame.test.tsx` passed 7/7. `npm run typecheck` stopped in `next typegen` with `EPERM` opening generated `.next/types/routes.d.ts`; direct TypeScript passed. Resolve or record that environment issue when running completion gates.

@@ -50,7 +50,7 @@ describe('PlatformFrame network bar (PRD N-01)', () => {
       within(main)
         .getAllByRole('link')
         .map((a) => a.textContent),
-    ).toEqual(['Events', 'Dashboard']);
+    ).toEqual(['Events', 'Dashboard', 'Reports']);
     expect(within(main).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByTestId('signed-in-as')).toHaveTextContent('Aroha (Admin)');
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
@@ -64,7 +64,7 @@ describe('PlatformFrame network bar (PRD N-01)', () => {
       within(main)
         .getAllByRole('link')
         .map((a) => a.textContent),
-    ).toEqual(['Events', 'Dashboard', 'Settings', 'Admins']);
+    ).toEqual(['Events', 'Dashboard', 'Reports', 'Settings', 'Admins']);
     expect(within(main).getByRole('link', { name: 'Admins' })).toHaveAttribute('aria-current', 'page');
     expect(within(main).getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current');
     expect(screen.getByTestId('signed-in-as')).toHaveTextContent('Sam (Superadmin)');
@@ -76,6 +76,8 @@ describe('platform pieces', () => {
     expect(sectionOf('/')).toBe('events');
     expect(sectionOf('/admin')).toBe('dashboard');
     expect(sectionOf('/admin/events/1')).toBe('dashboard');
+    expect(sectionOf('/admin/reports')).toBe('reports');
+    expect(sectionOf('/admin/reports/preview')).toBe('reports');
     expect(sectionOf('/admin/settings')).toBe('settings');
     expect(sectionOf('/admin/admins')).toBe('admins');
     expect(sectionOf('/login')).toBeNull();
