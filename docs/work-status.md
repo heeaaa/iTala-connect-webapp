@@ -1,6 +1,44 @@
 # Work status
 
-Last updated: 01/10/2026 (Codex, durable mobile Connect status)
+Last updated: 01/10/2026 (Codex, Netlify compiler-cache deployment fix)
+
+## Current handoff (01/10/2026, Netlify deployment recovery)
+
+Branch `codex/netlify-secret-cache-fix` starts from merged `origin/main` at
+`4d4a704`. The production deployment compiled and bundled successfully, then
+Netlify's full secret scan found `CONNECT_LINK_SYNC_SECRET` in a restored
+`.netlify/.next/cache/turbopack/*.sst` file. The user confirmed All scopes is the
+only selectable setting. Scope selection is a paid-plan option; this fix works
+with All scopes and retains both secret scanners.
+
+**Changed:** disable production Turbopack disk persistence, add npm prebuild
+cleanup of only the two known compiler-cache paths, extend `check:secrets` to
+those paths, and supply a harmless CI build secret. Cleanup refuses symlink
+ancestors and preserves image caches/other output. Worker/runtime configuration
+is unchanged. Deployment recovery is documented in [MOBILE_LINK_SYNC.md](MOBILE_LINK_SYNC.md).
+
+**Bug proof on the actual Next 16.3.6 build:** an isolated tracked-source copy
+with shared dependencies and a random test-only secret reproduced the original
+failure: build succeeded, byte scan found the test value in
+`.next/cache/turbopack/v16.3.6-a758ffcf/00000003.sst`, exit 1. No local `.env` files
+or real credentials were copied/read. The same diagnostic on the fixed source,
+after seeding both restored-cache locations, passed: production build succeeded,
+the entire `.next`/`.netlify` byte scan found zero test-secret values, and the
+extended `check:secrets` passed with the test variable set, exit 0. Diagnostic
+and logs are ignored local artifacts under `node_modules/.deployment-regression`
+and `dist/deployment-regression`; not production deployments.
+
+**Executed:** focused scanner/cleanup tests 11/11 passed (including binary cache
+data, junction refusal and retained neighbouring files); `npm run lint` and
+`npm run typecheck` passed. `npm run test:coverage`: 73 files, 1004 tests passed,
+96.49% line and 93.61% branch coverage. The production build retained the two
+existing Big Shoulders fallback-font warnings. Independent read-only review
+found no blocking issue and reran the focused tests successfully.
+
+**Remaining:** push/open the follow-up PR, observe CI and the Netlify preview,
+then merge/deploy and use Clear cache and deploy site for the first production
+retry. Confirm the hosted full scan and `sync-mobile-links` delivery logs. No
+production retry, merge or backend change was performed during local verification.
 
 ## Current handoff (01/10/2026, durable mobile link status)
 

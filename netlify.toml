@@ -10,6 +10,7 @@
 
 [build]
   # The secret scan runs on every build (CLAUDE.md): it fails the deploy if a server-only value,
-  # or anything shaped like a Supabase secret key, reaches the browser bundle or served pages.
+  # or anything shaped like a Supabase secret key, reaches browser output or compiler caches.
+  # npm's prebuild removes restored Turbopack caches; Next disables new production disk caches.
   # The publish directory is left to the adapter, which sets it for Next.js without configuration.
   command = "npm run build && npm run check:secrets"
