@@ -1,5 +1,9 @@
 # PRD: Connect side of mobile scheduled games
 
+**1 October update:** [MOBILE_LINK_SYNC.md](MOBILE_LINK_SYNC.md) describes the
+commissioned durable link-status delivery to the mobile backend. It extends the
+read-only boundary below for link metadata, keeping final-score approval unchanged.
+
 Status: Draft implementation brief, 29/09/2026. The scheduled-fixture and manual-approval decisions are confirmed; the Connect-admin linking path is the recommended choice.
 
 This document specifies the Connect work required by [iTala mobile PR #50](https://github.com/heeaaa/iTala-official/pull/50) and its [cross-repository review](https://github.com/heeaaa/iTala-official/pull/50#issuecomment-5885782979). It is the implementation brief for a Claude session working in this repository. Read `CLAUDE.md`, `docs/PRD.md` section 10, `docs/MOBILE_INTEGRATION.md`, and the current code before editing. When commissioned for implementation, this brief supersedes the older instruction that stage 3 is parked.

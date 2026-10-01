@@ -50,6 +50,7 @@ export const serverEnvSchema = clientEnvSchema
     SUPABASE_STORAGE_BUCKET: optionalBlank(z.string().trim().min(1)).transform((v) => v ?? 'images'),
     MOBILE_SUPABASE_URL: optionalBlank(httpUrl),
     MOBILE_SUPABASE_PUBLISHABLE_KEY: optionalBlank(key),
+    CONNECT_LINK_SYNC_SECRET: optionalBlank(z.string().min(32)),
     DEFAULT_EVENT_TIMEZONE: optionalBlank(
       z.string().trim().refine(isValidTimeZone, 'is not a valid IANA time zone'),
     ).transform((v) => v ?? 'Pacific/Auckland'),

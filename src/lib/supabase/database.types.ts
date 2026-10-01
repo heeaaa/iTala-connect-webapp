@@ -519,6 +519,12 @@ export type Database = {
           },
         ]
       }
+      mobile_link_sync_queue: {
+        Row: { league_id: string; revision: number; pending: boolean }
+        Insert: { league_id: string; revision?: number; pending?: boolean }
+        Update: { league_id?: string; revision?: number; pending?: boolean }
+        Relationships: []
+      }
       platform_settings: {
         Row: {
           default_rules_html: string
@@ -744,6 +750,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ack_mobile_link_snapshot: {
+        Args: { p_league_id: string; p_revision: number }
+        Returns: undefined
+      }
+      connect_mobile_link_snapshot: {
+        Args: { p_league_id: string }
+        Returns: Json
+      }
+      pending_mobile_link_snapshots: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
+      queue_mobile_link_sync: {
+        Args: { p_league_id: string }
+        Returns: undefined
+      }
       add_playoff: {
         Args: { p_event_id: string; p_games: Json; p_unschedule: string[] }
         Returns: number
