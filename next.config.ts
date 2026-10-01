@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   experimental: {
+    // Next 16.3's Turbopack disk cache can retain runtime environment values.
+    // Netlify restores/scans that cache, so runtime secrets must not be saved there.
+    // Development caching stays enabled; prebuild also removes older saved caches.
+    turbopackFileSystemCacheForBuild: false,
     // Event logo and sponsor uploads (E-18) go through a Server Action. The
     // browser shrinks them to 1600 px first; 5 MB matches the images bucket.
     serverActions: { bodySizeLimit: '5mb' },

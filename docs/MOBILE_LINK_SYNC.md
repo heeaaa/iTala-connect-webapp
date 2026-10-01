@@ -30,7 +30,10 @@ counts without secrets or league payloads.
    schedule/default-game migrations. Apply the Connect migration above after
    existing migrations. No database reset is needed.
 2. Set a new random `CONNECT_LINK_SYNC_SECRET` of at least 32 characters in
-   Netlify Functions and mobile Edge Function secrets.
+   Netlify's environment and mobile Edge Function secrets. On plans that allow
+   scope selection, select **Functions only**, excluding Builds and Runtime.
+   Netlify Free uses all scopes; the build handles this without persisting the
+   compiler cache or disabling secret scanning.
 3. Deploy mobile `connect-link-state` with gateway JWT verification disabled
    only for that function; it checks `x-connect-link-secret`. Deploy
    `connect-schedule` with normal JWT verification enabled.
@@ -43,6 +46,28 @@ counts without secrets or league payloads.
 
 See [Netlify scheduling](https://docs.netlify.com/build/functions/scheduled-functions/)
 and [Supabase function configuration](https://supabase.com/docs/guides/functions/function-configuration).
+
+### Netlify deployment stopped by a compiler-cache secret finding
+
+Next 16.3 enables Turbopack's persistent production cache by default. Netlify
+can restore that cache and its full secret scanner checks it after packaging.
+A runtime secret in `.netlify/.next/cache/turbopack/*.sst` therefore stops the
+deployment even when compilation and the browser-output scan passed.
+
+Production builds now disable Turbopack disk caching. `npm run build` first
+removes only `.next/cache/turbopack` and `.netlify/.next/cache/turbopack`, including
+restored cache files. Image caches and other output are retained. `check:secrets`
+also scans these compiler-cache locations; CI builds with a harmless test secret.
+The scheduled worker still receives the actual secret through Netlify at runtime.
+
+Deploy this fix, then use Netlify's **Clear cache and deploy site** for the first
+retry. Keep `CONNECT_LINK_SYNC_SECRET` marked secret and retain Netlify scanning;
+do not add omit-key/path exceptions. The pasted cache-only finding does not
+establish that the secret reached a browser. Verify the hosted scan and worker
+logs after the retry; a local build cannot prove the Netlify deployment passed.
+
+References: [Next production compiler cache](https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopackFileSystemCache),
+[Netlify environment scopes](https://docs.netlify.com/build/environment-variables/overview/#scopes).
 
 ## Verification limits
 

@@ -68,5 +68,6 @@ The site (https://itala-connect.netlify.app) is built by Netlify's free tier fro
 
 - **Migrations first.** Push new migrations to the hosted Supabase project (`npx supabase db push`) before merging the code that needs them.
 - **Environment values** live in Netlify (Project configuration > Environment variables), never in the repository: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SITE_URL`, `SUPABASE_SECRET_KEY` (marked as secret), `SUPABASE_STORAGE_BUCKET` and `DEFAULT_EVENT_TIMEZONE`. Leave `MOBILE_*` unset until the real mobile check, and never set `ENABLE_PROTOTYPES` or `FIREBASE_*`.
+- **Compiler caches and secrets.** `npm run build` removes restored Turbopack compiler caches and disables new production disk caches. This supports Netlify Free's all-scope environment settings while keeping secret scanning enabled. See [mobile link deployment recovery](docs/MOBILE_LINK_SYNC.md#netlify-deployment-stopped-by-a-compiler-cache-secret-finding).
 - **Supabase Auth** (URL Configuration): the Site URL is the site's address and the Redirect URLs include `https://itala-connect.netlify.app/**`, or sign-in and set-up links go to the wrong place. Public sign-ups and anonymous sign-ins stay off.
 - Moving `connect.itala.fyi` here is the cutover (docs/MIGRATION_PLAN.md 12.2); update `NEXT_PUBLIC_SITE_URL` and the Supabase URLs then.

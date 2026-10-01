@@ -2,13 +2,16 @@
  * npm run check:secrets (X-01)
  *
  * Scans what the browser can receive from a build: .next/static, plus the
- * prerendered HTML and RSC payloads under .next/server/app. It looks for:
+ * prerendered HTML and RSC payloads under .next/server/app, plus the compiler
+ * caches that Netlify also scans. It looks for:
  *  - the value of every server-only variable present in the environment,
  *  - Supabase secret key and service-role JWT patterns, whatever the env.
  * Fails with the variable name and file, never the value.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+
+import { TURBOPACK_BUILD_CACHES } from './clean-build-cache';
 
 export const SERVER_ONLY_VARS = [
   'SUPABASE_SECRET_KEY',
@@ -84,33 +87,43 @@ export function scan(
   return findings;
 }
 
-function main() {
-  const root = join(process.cwd(), '.next');
+export function scanBuildOutput(projectRoot: string, env: Record<string, string | undefined>): Finding[] {
+  const root = join(projectRoot, '.next');
   const staticDir = join(root, 'static');
   const serverApp = join(root, 'server', 'app');
+  return [
+    ...scan(staticDir, env).map((f) => ({ ...f, file: join('.next', 'static', f.file) })),
+    ...(existsSync(serverApp)
+      ? scan(serverApp, env, (file) => SERVED_SERVER_OUTPUT.test(file)).map((f) => ({
+          ...f,
+          file: join('.next', 'server', 'app', f.file),
+        }))
+      : []),
+    ...TURBOPACK_BUILD_CACHES.flatMap((cache) => {
+      const dir = join(projectRoot, cache);
+      return existsSync(dir) ? scan(dir, env).map((f) => ({ ...f, file: join(cache, f.file) })) : [];
+    }),
+  ];
+}
+
+function main() {
+  const projectRoot = process.cwd();
+  const staticDir = join(projectRoot, '.next', 'static');
   try {
     statSync(staticDir);
   } catch {
     console.error('check:secrets: .next/static not found. Run `npm run build` first.');
     process.exit(2);
   }
-  const findings = [
-    ...scan(staticDir, process.env).map((f) => ({ ...f, file: join('static', f.file) })),
-    ...(existsSync(serverApp)
-      ? scan(serverApp, process.env, (file) => SERVED_SERVER_OUTPUT.test(file)).map((f) => ({
-          ...f,
-          file: join('server', 'app', f.file),
-        }))
-      : []),
-  ];
+  const findings = scanBuildOutput(projectRoot, process.env);
   const checked = SERVER_ONLY_VARS.filter((n) => (process.env[n]?.trim().length ?? 0) >= 12);
   if (findings.length > 0) {
-    console.error('check:secrets FAILED. Server-only material found in browser-facing build output:');
-    for (const f of findings) console.error(`  - ${f.what} in .next/${f.file}`);
+    console.error('check:secrets FAILED. Server-only material found in browser output or compiler cache:');
+    for (const f of findings) console.error(`  - ${f.what} in ${f.file}`);
     process.exit(1);
   }
   console.log(
-    `check:secrets passed: no secret patterns in .next/static or served .next/server/app output; server-only values checked: ${
+    `check:secrets passed: no secret patterns in browser output or compiler cache; server-only values checked: ${
       checked.length ? checked.join(', ') : 'none set in this environment'
     }.`,
   );
