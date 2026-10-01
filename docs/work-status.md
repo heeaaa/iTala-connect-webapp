@@ -1,6 +1,29 @@
 # Work status
 
-Last updated: 01/10/2026 (Codex, Netlify compiler-cache deployment fix)
+Last updated: 01/10/2026 (Codex, daily mobile link delivery)
+
+## Current handoff (01/10/2026, daily mobile link delivery)
+
+The user chose daily delivery after reviewing measured runtimes and projected
+compute credits. Branch `codex/daily-connect-link-sync` starts from merged
+`origin/main` at `ecee768`. Change the Netlify worker schedule from every five
+minutes to `0 11 * * *` (11:00 UTC, midnight NZDT / 11 PM NZST). This reduces
+automatic invocations from 8640 to 30 in a 30-day period. Owner Schedule/Settings
+checks still save current status through the existing mobile Supabase bridge.
+
+The worker retains its ten-league batch limit and durable retries. Untouched
+leagues wait for the next daily run, and larger backlogs take additional days.
+No migration or mobile function redeployment is required. The cadence changes
+in production only after this branch is merged and published by Netlify.
+
+**Verified locally:** `npm run lint`, `npm run typecheck`, and the production
+build passed. The build retained the two existing Big Shoulders fallback-font
+warnings. The focused link-delivery suite passed 8/8 tests. The actual `.mts`
+function bundled with esbuild; importing the generated ESM confirmed
+`config.schedule === '0 11 * * *'`. Node's Pacific/Auckland timezone conversion
+confirmed the documented NZDT/NZST times. No new dependencies or tests were
+introduced for this configuration change. CI and the Netlify preview will run
+on the PR; the live schedule is unchanged until its production deployment.
 
 ## Current handoff (01/10/2026, Netlify deployment recovery)
 
