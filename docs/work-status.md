@@ -1,6 +1,35 @@
 # Work status
 
-Last updated: 30/09/2026 (Codex, Connect schedule integration)
+Last updated: 01/10/2026 (Codex, durable mobile Connect status)
+
+## Current handoff (01/10/2026, durable mobile link status)
+
+Implemented on `codex/synced-connect-links` from `feat/default-games` at `e611099`,
+paired with mobile `codex/schedule-iphone-fixes`. See [MOBILE_LINK_SYNC.md](MOBILE_LINK_SYNC.md)
+for behavior and coordinated rollout. The user commissioned both repositories.
+The source database now queues link/publication/unpublication/relink/deletion
+changes transactionally, including imports and cascades. A scheduled Netlify
+worker delivers versioned metadata to a dedicated secret-authenticated mobile
+receiver. Ordinary mobile game screens no longer discover Connect links.
+Existing league/result reads and manual final-score approval retain their behavior.
+
+**Executed locally:** `npm run lint` and `npm run typecheck` passed. Final
+`npm run test:coverage`: 72 files, 999 tests passed; 96.35% lines and 93.52%
+branches overall, with 100% lines/branches/statements/functions for the new
+delivery worker. `npm run build` passed (two existing Big Shoulders fallback
+warnings). `npm run check:secrets` passed; no server-only values were set in
+that build environment, so this is a pattern scan rather than a live-secret check.
+The `.mts` scheduled function also bundles and passes Node syntax checking.
+Mobile's two-database PGlite 0.5.8 test executed the shipped source/mobile
+migrations plus the real worker/receiver and passed publish/unpublish, retries,
+relink, deletion, stale revision/ack, permissions and the mobile game guard.
+
+**Not deployed or executed:** hosted migrations/functions, Netlify scheduling,
+native iPhone/iPad verification and Docker pgTAP/integration/browser E2E.
+Docker Desktop's Linux engine pipe is absent on this host. The new pgTAP
+permission test is ready for the existing CI backend job. Database types were
+maintained by hand pending local regeneration. Follow the paired deployment
+guide before testing the new durable status on hosted backends.
 
 ## CSI Connect schedule handoff (30/09/2026)
 

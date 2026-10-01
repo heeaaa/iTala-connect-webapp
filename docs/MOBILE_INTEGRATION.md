@@ -1,5 +1,10 @@
 # iTala mobile + iTala Connect integration roadmap
 
+**1 October update:** Published-link status now has a transactional queue and
+dedicated mobile receiver. See [MOBILE_LINK_SYNC.md](MOBILE_LINK_SYNC.md) for the
+paired rollout, verification and remaining hosted/device checks. This extends
+the earlier read-only integration boundary for link metadata only.
+
 Status: Stage 1 code complete and finish-reviewed, 26/09/2026 (its newest E2E needs a Docker run). Owner: Aeron. Read [PHASE_3B_HANDOFF.md](PHASE_3B_HANDOFF.md) for the current implementation, verified tests and remaining work. Real mobile connection has NOT RUN.
 
 **Direction.** iTala Connect is the source of truth for **fixtures** (events, divisions, teams on the schedule, who plays whom, when and where). The iTala mobile app is the source of truth for **stats and final scores** of the games it records. The two are joined at **mobile league = Connect division**, with an explicit team-to-team map. Everything below builds on that one link.
