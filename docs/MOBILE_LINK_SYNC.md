@@ -13,11 +13,16 @@ division rename/move, imports and cascading deletion. Existing links are
 backfilled. Snapshots contain only published event references and linked division
 names. Draft links produce an empty published-event list.
 
-`netlify/functions/sync-mobile-links.mts` runs every five minutes and sends up
-to ten league snapshots through `src/server/mobile/link-sync-worker.ts`.
+`netlify/functions/sync-mobile-links.mts` runs once daily at 11:00 UTC
+(`0 11 * * *`, midnight NZDT / 11 PM NZST) and sends up to ten league snapshots
+through `src/server/mobile/link-sync-worker.ts`.
 Failures stay pending. Exact-revision acknowledgements cannot clear newer
 changes. Mobile ignores stale revisions. Backlogs/outages increase delivery
 delay; manual owner discovery in mobile Schedule/Settings provides recovery.
+Without an owner refresh, a change or failed delivery waits for the next daily
+run. More than ten pending leagues take additional runs. Explicit owner
+Schedule Refresh or Settings' Check for a schedule updates the mobile backend
+immediately through the existing Supabase bridge.
 
 The worker uses Connect's server key and a dedicated shared secret, without a
 mobile database service key or user credentials. Each request has a six-second

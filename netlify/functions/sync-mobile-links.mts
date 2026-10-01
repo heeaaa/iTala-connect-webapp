@@ -11,4 +11,5 @@ export default async function syncMobileLinkJob() {
   return new Response(JSON.stringify(result), { status: result.configured ? 200 : 503 });
 }
 
-export const config = { schedule: '*/5 * * * *' };
+// Netlify uses UTC: 11:00 is midnight NZDT / 23:00 NZST. One automatic run per day.
+export const config = { schedule: '0 11 * * *' };
