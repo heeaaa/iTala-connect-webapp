@@ -14,12 +14,7 @@ import { authOrigin } from '@/server/auth-origin';
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const next = safeNextPath(params.get('next'));
-  const site = authOrigin(
-    serverEnv().NEXT_PUBLIC_SITE_URL,
-    request.nextUrl.origin,
-    process.env.CONTEXT,
-    process.env.DEPLOY_PRIME_URL,
-  );
+  const site = authOrigin(serverEnv().NEXT_PUBLIC_SITE_URL, request.nextUrl.origin);
   const back = (error: string) =>
     NextResponse.redirect(new URL(`/login?error=${error}&next=${encodeURIComponent(next)}`, site));
   const code = params.get('code');

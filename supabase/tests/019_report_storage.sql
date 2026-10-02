@@ -1,7 +1,7 @@
 -- Report rows belong to their creator and remain tied to current event permission.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(16);
+select plan(21);
 
 create function pg_temp.login(p_uid uuid) returns void language plpgsql as $$
 begin
@@ -41,6 +41,20 @@ select lives_ok($$insert into public.report_snapshots (id, event_id, template, d
 select throws_ok($$update public.report_presets set event_id = '10000000-0000-0000-0000-000000000193'
   where id = '20000000-0000-0000-0000-000000000191'$$,
   '42501', null, 'a preset cannot be moved to another manageable event');
+select throws_ok($$update public.report_presets set id = '20000000-0000-0000-0000-000000000192'
+  where id = '20000000-0000-0000-0000-000000000191'$$,
+  '42501', null, 'a preset cannot change identity');
+select throws_ok($$insert into public.report_presets (event_id, name, definition) values
+  ('10000000-0000-0000-0000-000000000191', 'Missing identity', '{"template":"results"}')$$,
+  '23514', null, 'a preset definition must include its event identity');
+select throws_ok($$insert into public.report_presets (event_id, name, definition) values
+  ('10000000-0000-0000-0000-000000000191', 'Missing template',
+   '{"eventId":"10000000-0000-0000-0000-000000000191"}')$$,
+  '23514', null, 'a preset definition must include its template');
+select throws_ok($$insert into public.report_presets (event_id, name, definition) values
+  ('10000000-0000-0000-0000-000000000191', 'My report' || repeat(' ', 80),
+   '{"eventId":"10000000-0000-0000-0000-000000000191","template":"results"}')$$,
+  '23514', null, 'a preset name cannot store unbounded whitespace');
 select throws_ok($$update public.report_snapshots set template = 'team'
   where id = '30000000-0000-0000-0000-000000000191'$$,
   '42501', null, 'an authenticated user cannot change an immutable snapshot');
@@ -48,6 +62,10 @@ select throws_ok($$insert into public.report_snapshots (event_id, template, docu
   ('10000000-0000-0000-0000-000000000191', 'results',
    '{"version":1,"eventId":"10000000-0000-0000-0000-000000000192","template":"results"}')$$,
   '23514', null, 'document event identity must match the owning event');
+select throws_ok($$insert into public.report_snapshots (event_id, template, document) values
+  ('10000000-0000-0000-0000-000000000191', 'results',
+   '{"eventId":"10000000-0000-0000-0000-000000000191","template":"results"}')$$,
+  '23514', null, 'a snapshot document must include its version');
 
 select pg_temp.login('00000000-0000-0000-0000-000000000192');
 select is((select count(*)::int from public.report_snapshots where id = '30000000-0000-0000-0000-000000000191'),

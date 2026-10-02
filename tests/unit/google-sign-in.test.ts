@@ -72,6 +72,16 @@ describe('login notices', () => {
 });
 
 describe('/auth/google', () => {
+  it('uses the requesting Connect host for the PKCE callback despite a different configured site URL', async () => {
+    await start(new NextRequest('https://connect.itala.fyi/auth/google?next=%2Fadmin'));
+    expect(fake.oauth.mock.calls[0]![0].options.redirectTo).toBe(
+      'https://connect.itala.fyi/auth/callback?next=%2Fadmin',
+    );
+    await start(new NextRequest('https://deploy-preview-12--itala-connect.netlify.app/auth/google?next=%2Fadmin'));
+    expect(fake.oauth.mock.calls[1]![0].options.redirectTo).toBe(
+      'https://deploy-preview-12--itala-connect.netlify.app/auth/callback?next=%2Fadmin',
+    );
+  });
   it('starts the Google flow with a callback on the configured site, keeping a safe next path', async () => {
     const response = await start(request('/auth/google?next=/admin/events/abc'));
     expect(location(response)).toBe('https://project.supabase.co/auth/v1/authorize?provider=google');
@@ -102,6 +112,10 @@ describe('/auth/google', () => {
 });
 
 describe('/auth/callback', () => {
+  it('returns successful sign-in to the same Connect host', async () => {
+    const response = await callback(new NextRequest('https://connect.itala.fyi/auth/callback?code=abc'));
+    expect(location(response)).toBe('https://connect.itala.fyi/admin');
+  });
   it('signs an invited admin in and returns to the requested page', async () => {
     const response = await callback(request('/auth/callback?code=abc&next=/admin/events/1'));
     expect(fake.exchange).toHaveBeenCalledWith('abc');

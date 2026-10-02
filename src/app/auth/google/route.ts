@@ -13,12 +13,7 @@ import { googleSignInEnabled } from '@/server/auth-providers';
  */
 export async function GET(request: NextRequest) {
   const next = safeNextPath(request.nextUrl.searchParams.get('next'));
-  const site = authOrigin(
-    serverEnv().NEXT_PUBLIC_SITE_URL,
-    request.nextUrl.origin,
-    process.env.CONTEXT,
-    process.env.DEPLOY_PRIME_URL,
-  );
+  const site = authOrigin(serverEnv().NEXT_PUBLIC_SITE_URL, request.nextUrl.origin);
   const back = (error: string) =>
     NextResponse.redirect(new URL(`/login?error=${error}&next=${encodeURIComponent(next)}`, site));
   if (!(await googleSignInEnabled())) return back('google');
