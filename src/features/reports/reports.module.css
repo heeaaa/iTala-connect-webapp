@@ -10,6 +10,72 @@
   background: var(--brand-raised);
   border-left: 0.35rem solid var(--brand-accent);
 }
+.snapshotForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-top: 1.25rem;
+}
+.snapshotForm p {
+  margin: 0;
+  color: var(--brand-muted);
+  font-size: 0.875rem;
+}
+.savedMeta {
+  color: var(--brand-muted);
+}
+.downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.presetForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.presetForm label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--brand-text);
+  font-weight: 700;
+}
+.presetForm input {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--brand-border);
+  background: var(--brand-bg);
+  color: var(--brand-text);
+  font: inherit;
+}
+.presets {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--brand-border);
+}
+.presets h2 {
+  margin-top: 0;
+}
+.presets ul {
+  padding-left: 1.2rem;
+}
+.presets li {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0.5rem 0;
+}
+.presets li button {
+  border: 0;
+  background: none;
+  color: #e07171;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
 .form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));

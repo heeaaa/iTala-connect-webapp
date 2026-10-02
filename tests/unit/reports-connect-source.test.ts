@@ -28,14 +28,15 @@ vi.mock('@/lib/supabase/server', () => ({
                     ],
                   },
                 ],
-                games: fake.eventGames,
               },
             ]
-          : table === 'game_scores'
-            ? [{ game_id: 'g', s1: 4, s2: 2 }]
-            : table === 'score_sources'
-              ? [{ game_id: 'g', mobile_game_id: 'mobile-g' }]
-              : [];
+          : table === 'games'
+            ? fake.eventGames
+            : table === 'game_scores'
+              ? [{ game_id: 'g', s1: 4, s2: 2 }]
+              : table === 'score_sources'
+                ? [{ game_id: 'g', mobile_game_id: 'mobile-g' }]
+                : [];
       const query = {
         select(selection: string) {
           fake.calls.push(`select:${table}:${selection}`);
@@ -52,6 +53,10 @@ vi.mock('@/lib/supabase/server', () => ({
         in(column: string, values: string[]) {
           fake.calls.push(`in:${table}:${column}:${values.join(',')}`);
           return query;
+        },
+        range(start: number, end: number) {
+          fake.calls.push(`range:${table}:${start}-${end}`);
+          return Promise.resolve({ data: rows.slice(start, end + 1), error: null });
         },
         maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
         then(resolve: (result: { data: typeof rows; error: null }) => unknown) {
@@ -97,6 +102,7 @@ describe('Connect report source', () => {
       mobileEvents: [],
     });
     expect(fake.calls).toContain('in:score_sources:game_id:g');
+    expect(fake.calls).toContain('in:game_scores:game_id:g');
     expect(fake.calls.every((call) => !/insert|update|delete|upsert|signup|refresh/.test(call))).toBe(true);
   });
 
@@ -118,5 +124,16 @@ describe('Connect report source', () => {
     expect(reads).toHaveLength(2);
     expect(reads[0]!.split(',')).toHaveLength(100);
     expect(reads[1]).toBe('in:score_sources:game_id:game-100');
+  });
+
+  it('paginates games instead of silently truncating a whole league', async () => {
+    fake.eventGames = Array.from({ length: 1001 }, (_, index) => ({ ...fake.eventGames[0], id: `game-${index}` }));
+    const source = await loadConnectReportSource('e');
+    expect(source.games).toHaveLength(1001);
+    expect(fake.calls.filter((call) => call.startsWith('range:games:'))).toEqual([
+      'range:games:0-499',
+      'range:games:500-999',
+      'range:games:1000-1499',
+    ]);
   });
 });

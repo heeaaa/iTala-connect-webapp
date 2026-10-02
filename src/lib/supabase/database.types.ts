@@ -635,6 +635,102 @@ export type Database = {
         }
         Relationships: []
       }
+      report_presets: {
+        Row: {
+          created_at: string
+          definition: Json
+          definition_version: number
+          event_id: string
+          id: string
+          name: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          definition: Json
+          definition_version?: number
+          event_id: string
+          id?: string
+          name: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          definition?: Json
+          definition_version?: number
+          event_id?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_presets_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_presets_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_snapshots: {
+        Row: {
+          created_at: string
+          document: Json
+          document_version: number
+          event_id: string
+          expires_at: string
+          id: string
+          owner_id: string
+          template: string
+        }
+        Insert: {
+          created_at?: string
+          document: Json
+          document_version?: number
+          event_id: string
+          expires_at?: string
+          id?: string
+          owner_id?: string
+          template: string
+        }
+        Update: {
+          created_at?: string
+          document?: Json
+          document_version?: number
+          event_id?: string
+          expires_at?: string
+          id?: string
+          owner_id?: string
+          template?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_snapshots_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_snapshots_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       score_sources: {
         Row: {
           approved_at: string | null

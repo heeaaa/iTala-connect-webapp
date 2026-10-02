@@ -856,8 +856,11 @@ export function buildReport(source: ReportSource, d: ReportDefinition, generated
       break;
   }
   if (!included.length) notes.push('No eligible games match this selection.');
+  if (source.warnings?.length) notes.push(...source.warnings);
   if (included.some((g) => !g.mobileGameId || !g.mobileFinal))
     notes.push('Some games have no approved final mobile source; player tables are incomplete.');
+  if (included.some((g) => g.mobileFinal && g.manifests.length === 0))
+    notes.push('Mobile events are recorded, but tracking coverage and appearances are unconfirmed.');
   if (included.length && d.template !== 'results') {
     const sides = included
       .flatMap((game) => [game.homeTeamId!, game.awayTeamId!].map((teamId) => ({ game, teamId })))

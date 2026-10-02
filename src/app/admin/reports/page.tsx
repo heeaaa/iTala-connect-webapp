@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { TitlePlate, platformStyles } from '@/components/platform/platform-frame';
 import { buildReport, ReportInputError } from '@/features/reports/build';
 import { listReportEvents, loadConnectReportSource } from '@/features/reports/connect-source';
+import { listReportPresets } from '@/features/reports/connect-storage';
+import { enrichReportSourceWithMobile } from '@/features/reports/mobile-source';
 import {
   REPORT_TEMPLATES,
   type ReportDefinition,
@@ -11,9 +13,13 @@ import {
   type ReportSource,
 } from '@/features/reports/model';
 import { ReportPreview } from '@/features/reports/preview';
+import { reportDefinitionSchema } from '@/features/reports/schema';
+import { createReportSnapshot } from '@/server/actions/report-snapshots';
+import { deleteReportPreset, saveReportPreset } from '@/server/actions/report-presets';
 import { canEditEvent, requireAdmin } from '@/server/auth';
 
 import styles from '@/features/reports/reports.module.css';
+import Link from 'next/link';
 
 export const metadata: Metadata = { title: 'Reports' };
 
@@ -61,12 +67,26 @@ export default async function ReportsPage({
   const canRead = eventSelected && (await canEditEvent(eventId));
   let source: ReportSource | null = null;
   let report: ReportDocument | null = null;
+  let selectedDefinition: ReportDefinition | null = null;
+  let presets: { id: string; name: string; url: string }[] | null = [];
   let error: string | null = null;
+  if (one(query.snapshotError)) {
+    error =
+      one(query.snapshotError) === 'storage'
+        ? 'Report storage is not available yet. Your preview was not saved.'
+        : 'Could not save that report. Please check your selection and try again.';
+  }
   if (eventId && !canRead) error = 'That event is unavailable for your account.';
+  if (one(query.presetError)) error = 'Could not save those filters. Please try again.';
   if (canRead) {
+    presets = await listReportPresets(eventId);
     try {
       source = await loadConnectReportSource(eventId);
-      if (one(query.preview) === '1') report = buildReport(source, definition(query, source), new Date().toISOString());
+      source = await enrichReportSourceWithMobile(source, definition(query, source));
+      if (one(query.preview) === '1') {
+        selectedDefinition = reportDefinitionSchema.parse(definition(query, source));
+        report = buildReport(source, selectedDefinition, new Date().toISOString());
+      }
     } catch (cause) {
       error = cause instanceof ReportInputError ? cause.message : 'Could not prepare the report. Please try again.';
     }
@@ -132,7 +152,7 @@ export default async function ReportsPage({
                 <select name="game" defaultValue={one(query.game)}>
                   <option value="">All matching games</option>
                   {source.games
-                    .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
+                    .toSorted((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
                     .map((game) => (
                       <option value={game.id} key={game.id}>
                         {source.divisions.find((division) => division.id === game.divisionId)?.name ?? 'Division TBC'} ·{' '}
@@ -214,18 +234,68 @@ export default async function ReportsPage({
             value="1"
             className={`${platformStyles.button} ${platformStyles.buttonLive}`}
           >
-            Build preview
+            Build draft preview
           </button>
         </form>
       ) : (
         <p className={styles.empty}>No events are available to manage.</p>
       )}
+      {canRead ? (
+        <section className={styles.presets} aria-labelledby="saved-filters-title">
+          <h2 id="saved-filters-title">Saved filters</h2>
+          {presets === null ? (
+            <p>Saved filters are unavailable right now.</p>
+          ) : presets.length ? (
+            <ul>
+              {presets.map((preset) => (
+                <li key={preset.id}>
+                  <Link href={preset.url}>{preset.name}</Link>
+                  <form action={deleteReportPreset}>
+                    <input type="hidden" name="id" value={preset.id} />
+                    <input type="hidden" name="event" value={eventId} />
+                    <button type="submit">Delete</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No saved filters for this event.</p>
+          )}
+        </section>
+      ) : null}
       {error ? (
         <p role="alert" className={styles.error}>
           {error}
         </p>
       ) : null}
-      {report ? <ReportPreview report={report} /> : null}
+      {report ? (
+        <>
+          <ReportPreview report={report} />
+          {selectedDefinition ? (
+            <>
+              <form action={createReportSnapshot} className={styles.snapshotForm}>
+                <input type="hidden" name="definition" value={JSON.stringify(selectedDefinition)} />
+                <button type="submit" className={`${platformStyles.button} ${platformStyles.buttonLive}`}>
+                  Create fixed report and downloads
+                </button>
+                <p>
+                  Scores are read again when saved. Review the fixed report before sharing; it expires after seven days.
+                </p>
+              </form>
+              <form action={saveReportPreset} className={styles.presetForm}>
+                <input type="hidden" name="definition" value={JSON.stringify(selectedDefinition)} />
+                <label>
+                  Filter name
+                  <input name="name" maxLength={80} required placeholder="e.g. Saturday box scores" />
+                </label>
+                <button type="submit" className={platformStyles.button}>
+                  Save filters
+                </button>
+              </form>
+            </>
+          ) : null}
+        </>
+      ) : null}
     </>
   );
 }

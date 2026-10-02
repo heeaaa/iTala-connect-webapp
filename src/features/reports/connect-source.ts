@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase/database.types';
 import type { Admin } from '@/server/auth';
 import type { ReportGame, ReportSource } from './model';
 
@@ -22,15 +23,36 @@ export async function loadConnectReportSource(
   const db = await createClient();
   const { data: event, error: eventError } = await db
     .from('events')
-    .select(
-      'id, name, timezone, divisions(id, name, teams(id, name)), games(id, division_id, day, start_time, type, is_playoff, team1_id, team2_id)',
-    )
+    .select('id, name, timezone, divisions(id, name, teams(id, name))')
     .eq('id', eventId)
     .maybeSingle();
   if (eventError || !event) throw new Error('Event unavailable');
-  const gameIds = event.games.map((game) => game.id);
+  type GameRow = Pick<
+    Database['public']['Tables']['games']['Row'],
+    'id' | 'division_id' | 'day' | 'start_time' | 'type' | 'is_playoff' | 'team1_id' | 'team2_id'
+  >;
+  const gameRows: GameRow[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data: page, error } = await db
+      .from('games')
+      .select('id, division_id, day, start_time, type, is_playoff, team1_id, team2_id')
+      .eq('event_id', eventId)
+      .order('id')
+      .range(offset, offset + 499);
+    if (error || !page) throw new Error('Could not read report games');
+    gameRows.push(...page);
+    if (page.length < 500) break;
+  }
+  const gameIds = gameRows.map((game) => game.id);
   const sourceReads = [];
+  const scoreReads = [];
   for (let offset = 0; offset < gameIds.length; offset += 100) {
+    scoreReads.push(
+      db
+        .from('game_scores')
+        .select('game_id, s1, s2')
+        .in('game_id', gameIds.slice(offset, offset + 100)),
+    );
     sourceReads.push(
       db
         .from('score_sources')
@@ -38,16 +60,14 @@ export async function loadConnectReportSource(
         .in('game_id', gameIds.slice(offset, offset + 100)),
     );
   }
-  const [{ data: scores, error: scoresError }, ...sourcePages] = await Promise.all([
-    db.from('game_scores').select('game_id, s1, s2').eq('event_id', eventId),
-    ...sourceReads,
-  ]);
-  if (scoresError || !scores || sourcePages.some((page) => page.error || !page.data))
+  const [scorePages, sourcePages] = await Promise.all([Promise.all(scoreReads), Promise.all(sourceReads)]);
+  if (scorePages.some((page) => page.error || !page.data) || sourcePages.some((page) => page.error || !page.data))
     throw new Error('Could not read report scores or provenance');
+  const scores = scorePages.flatMap((page) => page.data ?? []);
   const sources = sourcePages.flatMap((page) => page.data ?? []);
   const scoreByGame = new Map(scores.map((s) => [s.game_id, s]));
   const mobileByGame = new Map(sources.map((s) => [s.game_id, s.mobile_game_id]));
-  const games: ReportGame[] = event.games.map((g) => {
+  const games: ReportGame[] = gameRows.map((g) => {
     const score = scoreByGame.get(g.id);
     return {
       id: g.id,

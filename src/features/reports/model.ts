@@ -73,6 +73,7 @@ export interface ReportSource {
   players: ReportPlayer[];
   games: ReportGame[];
   readAt: string;
+  warnings?: string[];
 }
 
 export interface ReportTable {

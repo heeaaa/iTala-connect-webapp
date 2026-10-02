@@ -2,12 +2,14 @@ import type { ReportDocument } from './model';
 import styles from './reports.module.css';
 
 /** The same document shape drives preview and the three export formats. */
-export function ReportPreview({ report }: { report: ReportDocument }) {
+export function ReportPreview({ report, saved = false }: { report: ReportDocument; saved?: boolean }) {
   return (
     <section className={styles.preview} aria-labelledby="preview-title">
       <div className={styles.previewHeading}>
         <div>
-          <p className={styles.eyebrow}>Preview · {report.generatedAt.slice(0, 16).replace('T', ' ')} UTC</p>
+          <p className={styles.eyebrow}>
+            {saved ? 'Saved preview' : 'Draft preview'} · {report.generatedAt.slice(0, 16).replace('T', ' ')} UTC
+          </p>
           <h2 id="preview-title">{report.title}</h2>
           <p>
             {report.eventName} · {report.includedCount} of {report.selectedCount} selected games
