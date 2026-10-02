@@ -29,6 +29,17 @@
   padding-inline: var(--gutter);
 }
 
+.footer {
+  margin-top: auto;
+  padding-block: 1.5rem;
+  font-size: 0.875rem;
+}
+
+.footer a {
+  color: var(--brand-text);
+  text-underline-offset: 0.2em;
+}
+
 /* Network bar ------------------------------------------------------------- */
 
 .bar {

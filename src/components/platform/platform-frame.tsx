@@ -60,6 +60,9 @@ export function PlatformFrame({ current, viewer, fontClassName, signOut, childre
         </div>
       </header>
       {children}
+      <footer className={`${styles.footer} ${styles.wrap}`}>
+        <a href="https://www.itala.fyi/privacy/">Privacy Policy</a>
+      </footer>
     </div>
   );
 }
