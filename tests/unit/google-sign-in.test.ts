@@ -25,6 +25,7 @@ import { GOOGLE_SIGN_IN_FAILED, loginNoticeMessage, NO_ACCESS_MESSAGES } from '@
 import { googleSignInEnabled } from '@/server/auth-providers';
 import { GET as start } from '@/app/auth/google/route';
 import { GET as callback } from '@/app/auth/callback/route';
+import { OAUTH_NEXT_COOKIE } from '@/server/oauth-next';
 
 const settings = (body: unknown, ok = true) => vi.fn().mockResolvedValue({ ok, json: async () => body } as Response);
 const request = (path: string) => new NextRequest(new URL(path, 'https://connect.example.nz'));
@@ -72,22 +73,38 @@ describe('login notices', () => {
 });
 
 describe('/auth/google', () => {
-  it('starts the Google flow with a callback on the configured site, keeping a safe next path', async () => {
+  it('uses an exact allowlisted callback on the requesting host, without a query string', async () => {
+    const production = await start(new NextRequest('https://connect.itala.fyi/auth/google?next=%2Fadmin%2Freports'));
+    expect(fake.oauth.mock.calls[0]![0].options.redirectTo).toBe('https://connect.itala.fyi/auth/callback');
+    expect(production.cookies.get(OAUTH_NEXT_COOKIE)?.value).toBe('/admin/reports');
+    expect(production.cookies.get(OAUTH_NEXT_COOKIE)?.httpOnly).toBe(true);
+    expect(production.cookies.get(OAUTH_NEXT_COOKIE)?.sameSite).toBe('lax');
+    expect(production.cookies.get(OAUTH_NEXT_COOKIE)?.secure).toBe(true);
+
+    const preview = await start(
+      new NextRequest('https://deploy-preview-12--itala-connect.netlify.app/auth/google?next=%2Fadmin'),
+    );
+    expect(fake.oauth.mock.calls[1]![0].options.redirectTo).toBe(
+      'https://deploy-preview-12--itala-connect.netlify.app/auth/callback',
+    );
+    expect(preview.cookies.get(OAUTH_NEXT_COOKIE)?.value).toBe('/admin');
+  });
+  it('starts the Google flow with a callback on the configured site and a safe return-path cookie', async () => {
     const response = await start(request('/auth/google?next=/admin/events/abc'));
     expect(location(response)).toBe('https://project.supabase.co/auth/v1/authorize?provider=google');
     expect(fake.oauth).toHaveBeenCalledWith({
       provider: 'google',
       options: {
-        redirectTo: 'https://connect.example.nz/auth/callback?next=%2Fadmin%2Fevents%2Fabc',
+        redirectTo: 'https://connect.example.nz/auth/callback',
         skipBrowserRedirect: true,
       },
     });
+    expect(response.cookies.get(OAUTH_NEXT_COOKIE)?.value).toBe('/admin/events/abc');
   });
   it('never forwards an off-site next path', async () => {
-    await start(request('/auth/google?next=//evil.example/admin'));
-    expect(fake.oauth.mock.calls[0]![0].options.redirectTo).toBe(
-      'https://connect.example.nz/auth/callback?next=%2Fadmin',
-    );
+    const response = await start(request('/auth/google?next=//evil.example/admin'));
+    expect(fake.oauth.mock.calls[0]![0].options.redirectTo).toBe('https://connect.example.nz/auth/callback');
+    expect(response.cookies.get(OAUTH_NEXT_COOKIE)?.value).toBe('/admin');
   });
   it('goes back to sign in when Google is off or the flow cannot start', async () => {
     vi.stubGlobal('fetch', settings({ external: { google: false } }));
@@ -102,6 +119,19 @@ describe('/auth/google', () => {
 });
 
 describe('/auth/callback', () => {
+  it('reads and clears the saved return path after exchanging a preview login code', async () => {
+    const incoming = new NextRequest('https://deploy-preview-12--itala-connect.netlify.app/auth/callback?code=abc');
+    incoming.cookies.set(OAUTH_NEXT_COOKIE, '/admin/reports');
+    const response = await callback(incoming);
+    expect(fake.exchange).toHaveBeenCalledWith('abc');
+    expect(location(response)).toBe('https://deploy-preview-12--itala-connect.netlify.app/admin/reports');
+    expect(response.cookies.get(OAUTH_NEXT_COOKIE)?.value).toBe('');
+    expect(Number(response.cookies.get(OAUTH_NEXT_COOKIE)?.expires)).toBe(0);
+  });
+  it('returns successful sign-in to the same Connect host', async () => {
+    const response = await callback(new NextRequest('https://connect.itala.fyi/auth/callback?code=abc'));
+    expect(location(response)).toBe('https://connect.itala.fyi/admin');
+  });
   it('signs an invited admin in and returns to the requested page', async () => {
     const response = await callback(request('/auth/callback?code=abc&next=/admin/events/1'));
     expect(fake.exchange).toHaveBeenCalledWith('abc');
@@ -116,6 +146,14 @@ describe('/auth/callback', () => {
     expect(fake.exchange).not.toHaveBeenCalled();
     fake.exchange.mockResolvedValue({ data: { user: null }, error: { message: 'invalid grant' } });
     expect(location(await callback(request('/auth/callback?code=stale')))).toContain('/login?error=google');
+  });
+  it('clears the saved return path when the provider returns an error', async () => {
+    const incoming = request('/auth/callback?error=access_denied');
+    incoming.cookies.set(OAUTH_NEXT_COOKIE, '/admin/reports');
+    const response = await callback(incoming);
+    expect(location(response)).toBe('https://connect.example.nz/login?error=google&next=%2Fadmin%2Freports');
+    expect(Number(response.cookies.get(OAUTH_NEXT_COOKIE)?.expires)).toBe(0);
+    expect(fake.exchange).not.toHaveBeenCalled();
   });
   it('signs out an account without admin rights and says why', async () => {
     fake.profile.mockResolvedValue({ data: { id: user.id, display_name: 'Sam', role: null, disabled_at: null } });
