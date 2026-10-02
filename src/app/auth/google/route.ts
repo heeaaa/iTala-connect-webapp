@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { serverEnv } from '@/env';
 import { createClient } from '@/lib/supabase/server';
 import { safeNextPath } from '@/server/access';
+import { authOrigin } from '@/server/auth-origin';
 import { googleSignInEnabled } from '@/server/auth-providers';
 
 /**
@@ -12,7 +13,12 @@ import { googleSignInEnabled } from '@/server/auth-providers';
  */
 export async function GET(request: NextRequest) {
   const next = safeNextPath(request.nextUrl.searchParams.get('next'));
-  const site = serverEnv().NEXT_PUBLIC_SITE_URL;
+  const site = authOrigin(
+    serverEnv().NEXT_PUBLIC_SITE_URL,
+    request.nextUrl.origin,
+    process.env.CONTEXT,
+    process.env.DEPLOY_PRIME_URL,
+  );
   const back = (error: string) =>
     NextResponse.redirect(new URL(`/login?error=${error}&next=${encodeURIComponent(next)}`, site));
   if (!(await googleSignInEnabled())) return back('google');

@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { serverEnv } from '@/env';
 import { createClient } from '@/lib/supabase/server';
 import { resolveAccess, safeNextPath, type ProfileRow } from '@/server/access';
+import { authOrigin } from '@/server/auth-origin';
 
 /**
  * Finishes Google sign-in (PRD A-11). Sign-ups stay off, so Supabase only
@@ -13,7 +14,12 @@ import { resolveAccess, safeNextPath, type ProfileRow } from '@/server/access';
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const next = safeNextPath(params.get('next'));
-  const site = serverEnv().NEXT_PUBLIC_SITE_URL;
+  const site = authOrigin(
+    serverEnv().NEXT_PUBLIC_SITE_URL,
+    request.nextUrl.origin,
+    process.env.CONTEXT,
+    process.env.DEPLOY_PRIME_URL,
+  );
   const back = (error: string) =>
     NextResponse.redirect(new URL(`/login?error=${error}&next=${encodeURIComponent(next)}`, site));
   const code = params.get('code');

@@ -3,6 +3,13 @@
   color: var(--brand-muted);
   margin-bottom: 1.5rem;
 }
+.loading {
+  max-width: 40rem;
+  padding: 1.25rem;
+  color: var(--brand-text);
+  background: var(--brand-raised);
+  border-left: 0.35rem solid var(--brand-accent);
+}
 .form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
