@@ -4,6 +4,7 @@ import { serverEnv } from '@/env';
 import { createClient } from '@/lib/supabase/server';
 import { resolveAccess, safeNextPath, type ProfileRow } from '@/server/access';
 import { authOrigin } from '@/server/auth-origin';
+import { OAUTH_NEXT_COOKIE } from '@/server/oauth-next';
 
 /**
  * Finishes Google sign-in (PRD A-11). Sign-ups stay off, so Supabase only
@@ -13,10 +14,14 @@ import { authOrigin } from '@/server/auth-origin';
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
-  const next = safeNextPath(params.get('next'));
+  const next = safeNextPath(request.cookies.get(OAUTH_NEXT_COOKIE)?.value ?? params.get('next'));
   const site = authOrigin(serverEnv().NEXT_PUBLIC_SITE_URL, request.nextUrl.origin);
-  const back = (error: string) =>
-    NextResponse.redirect(new URL(`/login?error=${error}&next=${encodeURIComponent(next)}`, site));
+  const redirect = (path: string) => {
+    const response = NextResponse.redirect(new URL(path, site));
+    response.cookies.delete(OAUTH_NEXT_COOKIE);
+    return response;
+  };
+  const back = (error: string) => redirect(`/login?error=${error}&next=${encodeURIComponent(next)}`);
   const code = params.get('code');
   // Provider or Auth errors (for example "Signups not allowed") arrive as query text: never shown as-is.
   if (!code || params.get('error')) return back('google');
@@ -35,5 +40,5 @@ export async function GET(request: NextRequest) {
     await supabase.auth.signOut();
     return back(access.kind === 'no-access' ? access.reason : 'google');
   }
-  return NextResponse.redirect(new URL(next, site));
+  return redirect(next);
 }
