@@ -34,6 +34,10 @@ describe('PlatformFrame network bar (PRD N-01)', () => {
     ).toEqual(['Events']);
     expect(within(main).getByRole('link', { name: 'Events' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute(
+      'href',
+      'https://www.itala.fyi/privacy/',
+    );
     expect(screen.queryByTestId('signed-in-as')).not.toBeInTheDocument();
   });
 
