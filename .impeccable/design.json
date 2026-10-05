@@ -350,7 +350,7 @@
       },
       "small": {
         "displayName": "Small",
-        "purpose": "Legends, grid hours, footer."
+        "purpose": "Legends, grid start times, footer."
       },
       "platform-plate-title": {
         "displayName": "Plate Title",
@@ -410,7 +410,7 @@
       {
         "name": "rule",
         "value": "1px",
-        "purpose": "Quiet separation: stations, grid hours, footer, final and awaiting cells."
+        "purpose": "Quiet separation: stations, grid start times, footer, final and awaiting cells."
       },
       {
         "name": "emphasis",

@@ -40,6 +40,18 @@ describe('prototype sample league', () => {
     expect(finals.every((g) => g.team1Id === null && g.score1 === null)).toBe(true);
   });
 
+  it.each([
+    [60, ['18:00', '19:00', '20:00', '21:00']],
+    [65, ['18:00', '19:05', '20:10', '21:15']],
+    [45, ['18:00', '18:45', '19:30', '20:15']],
+  ] as const)('starts every court on a %i-minute gap', (cadence, times) => {
+    const event = sampleLeague({ courts: 2, clock: at('19:25'), cadence });
+    for (const court of [1, 2]) {
+      const starts = event.games.filter((g) => g.day === SAMPLE_GAME_DAY && g.court === court).map((g) => g.time);
+      expect(starts.sort()).toEqual([...times]);
+    }
+  });
+
   it('scores every game on past nights', () => {
     const event = sampleLeague({ courts: 2, clock: at('23:00') });
     const past = event.games.filter((g) => g.day! < SAMPLE_GAME_DAY);

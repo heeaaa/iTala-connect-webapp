@@ -166,6 +166,11 @@ function PrototypeControls({ canSimulate, onSimulate }: { canSimulate: boolean; 
           [null, '2 courts'],
           ['4', '4 courts'],
         ])}
+        {group('Game gap', 'cadence', [
+          [null, '60 minutes'],
+          ['65', '65 minutes'],
+          ['45', '45 minutes'],
+        ])}
         {group('Colours', 'theme', [
           [null, 'Default event colours'],
           ['light', 'Another organiser'],

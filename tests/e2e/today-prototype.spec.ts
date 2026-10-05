@@ -22,6 +22,32 @@ async function noSidewaysScroll(page: Page) {
   expect(width).toBeLessThanOrEqual(page.viewportSize()!.width);
 }
 
+/**
+ * Every game card in the day grid: its start time (from the card's own
+ * screen-reader text), the time-column label printing that time, and the
+ * card's box. The label's rule should sit level with the card's top edge.
+ */
+async function gridGeometry(page: Page) {
+  return page.getByRole('region', { name: 'Games by time and court' }).evaluate((grid) => {
+    const labels = [...grid.querySelectorAll('[aria-hidden="true"] > time')].map((t) => ({
+      text: t.textContent,
+      top: t.parentElement!.getBoundingClientRect().top,
+    }));
+    return [...grid.querySelectorAll('article')].map((card) => {
+      const box = card.getBoundingClientRect();
+      const time = card.querySelector('time')!.textContent;
+      const label = labels.find((l) => l.text === time);
+      return {
+        time,
+        left: Math.round(box.left),
+        top: box.top,
+        bottom: box.bottom,
+        gap: label ? box.top - label.top : null,
+      };
+    });
+  });
+}
+
 test.describe('Today screen prototype (sample data)', () => {
   test('score fields stay inside game cards with long team names on a phone', async ({ page }, info) => {
     test.skip(info.project.name !== 'mobile');
@@ -126,6 +152,39 @@ test.describe('Today screen prototype (sample data)', () => {
     await expect(page.getByRole('textbox', { name: /score, 6:00 pm/ }).first()).toBeVisible();
     await noSidewaysScroll(page);
     await expectNoSeriousA11yViolations(page);
+  });
+
+  test('each time in the grid is a real start time, level with its games when they run 65 minutes apart', async ({
+    page,
+  }) => {
+    // Reported 05/10/2026: an hourly ruler from the first game read 7:00, 8:00 and 9:00 pm beside 7:05, 8:10 and 9:15 pm games.
+    await page.goto('/prototype/today?cadence=65');
+    const cards = await gridGeometry(page);
+    expect([...new Set(cards.map((c) => c.time))].sort()).toEqual(['6:00 pm', '7:05 pm', '8:10 pm', '9:15 pm']);
+    for (const card of cards) {
+      // The card's own 0.375rem top margin is the only space between the label's rule and the card.
+      expect(card.gap, `${card.time} label`).not.toBeNull();
+      expect(card.gap!).toBeGreaterThanOrEqual(0);
+      expect(card.gap!).toBeLessThanOrEqual(8);
+    }
+    const column = page.getByRole('region', { name: 'Games by time and court' }).locator('[aria-hidden="true"] > time');
+    await expect(column).toHaveText(['6:00 pm', '7:05 pm', '8:10 pm', '9:15 pm']);
+    await noSidewaysScroll(page);
+    await expectNoSeriousA11yViolations(page);
+  });
+
+  test('games 45 minutes apart never overlap on a court, and each keeps its own label', async ({ page }) => {
+    await page.goto('/prototype/today?cadence=45&day=2026-10-02');
+    const cards = await gridGeometry(page);
+    expect(cards).toHaveLength(8);
+    for (const a of cards) {
+      expect(a.gap, `${a.time} label`).not.toBeNull();
+      expect(Math.abs(a.gap!)).toBeLessThanOrEqual(8);
+      for (const b of cards) {
+        if (a !== b && a.left === b.left && a.top < b.top) expect(a.bottom).toBeLessThanOrEqual(b.top);
+      }
+    }
+    await noSidewaysScroll(page);
   });
 
   test('before games and when scores may be stale', async ({ page }) => {

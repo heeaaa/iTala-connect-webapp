@@ -1,6 +1,32 @@
 # Work status
 
-Last updated: 03/10/2026 (Codex, Connect Reports integration)
+Last updated: 05/10/2026 (Claude, schedule start times)
+
+## Current handoff (05/10/2026, schedule start times)
+
+**Objective:** users reported that the public Schedule grid showed the wrong game times. The live Brotherhood Basketball 2026 page (read-only GET, Sun 11/10/2026, one court) has games at 1:10, 2:15, 3:20, 4:25 and 5:30 pm, 65 minutes apart, but the time column read 1:10, 2:10, 3:10, 4:10, 5:10 and 6:10 pm. It was an hourly ruler counted from the first game while the cards sat at their real times, so every card drifted 5 minutes further from its label. All nine regular-season days share the pattern. The old app labelled every row with its exact start time (P-05), so this was a parity regression.
+
+**Decision (user, 05/10/2026):** after a mock-up of Current, Option A (the column shows real start times) and Option B (times on the cards over a clock-hour scale), the user chose Option A plus the overlap fix, and a pushed branch with a draft PR. Mock-up: private artifact https://claude.ai/artifact/H4br24sajNi489bftcAy2u.
+
+**Changed (branch `fix/schedule-start-times` from `main` at `0d98543`):**
+- `src/domain/game-day.ts`: `startMarks` (one time-column mark per distinct start on the day; starts in one 5-minute step share a mark), `markInProgress` (the band) and `cellEnd` (a cell stops at the next game on its court when that is under 60 minutes away).
+- `src/components/event/today/day-grid.tsx` and `today.module.css`: the gutter labels only real start times, level with their cards, and is visual only (each cell now names its start time and court for screen readers, and cells are in time-then-court reading order). The band marks the start time whose games are on court, until the slot ends or the next start, so a changeover or break shows no band (refined after review; the approved plan said "to the next start", which would have kept 11:00 am banded through a lunch break). Row counts round up, so odd minutes such as 2:13 pm keep a valid grid. `gridHour` and `hourBand` are renamed `gridTime` and `timeBand`.
+- Independent review (read-only subagent, node simulations of the row maths): no material defects. Acted on: reading order, exact grid-row assertions, the band over breaks. Left as cosmetic: with a start off the 5-minute grid (1:13 and 2:15 pm) the now line can sit up to 4 minutes inside the next row before the band moves, and the last card can end one 5-minute row short of the grid bottom.
+- `/prototype/today?cadence=65` or `45`, with a Game gap control, for the new E2E checks.
+- DESIGN.md (day grid, now line, palette roles), `.impeccable/design.json`, the Today surface brief and PRD P-05.
+
+**Verified on this laptop (Windows, Node 24.13.0):**
+- Bug proof: the new regression tests in `tests/component/today-schedule.test.tsx` failed 3/3 on `0d98543` (labels "1:10, 2:10, ..., 6:10 pm"; label rows 2, 14, 26, 38, 50, 62 against card rows 2, 15, 28, 41, 54; cards without a time) and pass after the fix (7/7 in the block).
+- After the review follow-ups (reading order, band rule): the four affected test files passed 86/86, then `npm run lint`, `npm run typecheck`, a production build without the harness, `npm run check:secrets` (also scanned against this laptop's `.env` and `.env.local` server-only values, names only) and `today-prototype.spec.ts` on that build (16 passed, 2 skipped by design) all passed.
+- Before the follow-ups, unit and component suite with coverage, one file at a time (`--no-file-parallelism`): 1060 passed, 1 failed, with every threshold met (95.29% statements, 90.68% branches, 96.27% lines; `game-day.ts` and `day-grid.tsx` 100%). The one failure, `clean-build-cache.test.ts` junction refusal, fails identically on a clean `origin/main` worktree here, inside and outside the sandbox (baseline; CI on Linux is the check). With the default parallel workers, 6 to 10 admin-screen tests (admins-view, event-editor, default-rules, results-view, confirm-form) also timed out, a different set each run; they import no changed code and passed alone and in the sequential run.
+- `npm ci` was needed first: `exceljs`, `pdf-lib`, `@pdf-lib/fontkit` and `fflate` from the Reports merge were missing locally. The lockfile is unchanged.
+- Production build with `ENABLE_PROTOTYPES=1` and local-only public values passed (the two known Big Shoulders font warnings). `today-prototype.spec.ts` through `test-results/playwright.prototype.config.ts`: 16 passed, 2 skipped by design (phone-only tests on desktop), including the two new geometry tests and axe at 390 and 1440 px.
+- Harness captures (`.impeccable/review/schedule-times/`, ignored): before 1/5, 1/8 and 2/8 labels true with 6 overlapping cards; after 5/5, 8/8 and 8/8 with every card 6 px under its own label and no overlaps.
+- The local-only harness `src/app/prototype/zz-guard` no longer type-checks against `LinkPageData` (`link/page.tsx`), which blocks local builds; it was parked during the builds and put back unchanged.
+
+**Not run here:** Docker-only suites (pgTAP, integration, the Supabase-seeded E2E journeys); the draft PR's CI runs them. A scratch sweep at 320 to 1440 px with four courts, the light theme, owner Tab order and band timing (`test-results/zz-times/sweep.mjs`, ignored) did not run: Claude Code stopped the local server because the laptop was critically low on memory (about 1.2 GB free of 15.5 GB).
+
+**Follow-up, not in this change:** On court still means the 60-minute slot (`gameStatus`), so with games under 60 minutes apart two games on one court can both read On court for the overlap; the court panel shows the earlier one.
 
 ## Current handoff (03/10/2026, Connect Reports integration)
 

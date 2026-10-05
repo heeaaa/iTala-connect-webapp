@@ -3,13 +3,16 @@
 import { type CSSProperties } from 'react';
 
 import {
+  cellEnd,
   type Clock,
+  compareScheduled,
   type DayWindow,
   gameStatus,
   hasBothScores,
   involvesTeam,
+  markInProgress,
   nowFraction,
-  SLOT_MINUTES,
+  startMarks,
   toMinutes,
 } from '@/domain/game-day';
 import { minutesToTime } from '@/lib/event-time';
@@ -55,10 +58,15 @@ export function DayGrid(props: DayGridProps) {
     pendingGames,
     onToggleLock,
   } = props;
-  const rows = (w.end - w.start) / STEP;
+  // Rounded up: a start on an odd minute must not leave a fractional row count.
+  const rows = Math.ceil((w.end - w.start) / STEP);
   const row = (minutes: number) => Math.floor((minutes - w.start) / STEP) + 1;
-  const hours: number[] = [];
-  for (let m = w.start; m < w.end; m += 60) hours.push(m);
+
+  // The time column labels each real start time; a label runs to the next
+  // start, or past the last row. The band runs while that start's games are on court.
+  const marks = startMarks(games, day, w, STEP);
+  const endRow = (minutes: number) => (minutes >= w.end ? rows + 1 : row(minutes));
+  const inProgress = markInProgress(marks, clock, day);
 
   // The now line sits in the 5-minute row that holds "now", offset within it,
   // so it stays true when rows grow to fit wrapped names.
@@ -66,7 +74,6 @@ export function DayGrid(props: DayGridProps) {
   const offset = clock.minutes - w.start;
   const nowRow = Math.min(Math.floor(offset / STEP), rows - 1);
   const within = (offset - nowRow * STEP) / STEP;
-  const bandStart = now === null ? null : w.start + Math.floor(offset / 60) * 60;
 
   return (
     <div className={styles.gridScroll} tabIndex={0} role="region" aria-label="Games by time and court">
@@ -82,26 +89,33 @@ export function DayGrid(props: DayGridProps) {
           </div>
         ))}
 
-        {hours.map((m) => (
+        {/* Visual only: every game cell names its own start time for screen readers. */}
+        {marks.map((mark) => (
           <div
-            key={m}
-            className={styles.gridHour}
-            data-current={m === bandStart || undefined}
-            style={{ gridRow: `${row(m) + 1} / span ${60 / STEP}` }}
+            key={mark.start}
+            className={styles.gridTime}
+            data-current={mark === inProgress?.mark || undefined}
+            aria-hidden="true"
+            style={{ gridRow: `${row(mark.start) + 1} / ${endRow(mark.end) + 1}` }}
           >
-            {formatTime(minutesToTime(m))}
+            {mark.times.map((t) => (
+              <time key={t} dateTime={t}>
+                {formatTime(t)}
+              </time>
+            ))}
           </div>
         ))}
 
-        {bandStart !== null && bandStart < w.end ? (
+        {inProgress ? (
           <div
-            className={styles.hourBand}
+            className={styles.timeBand}
             aria-hidden="true"
-            style={{ gridRow: `${row(bandStart) + 1} / span ${Math.min(60, w.end - bandStart) / STEP}` }}
+            style={{ gridRow: `${row(inProgress.mark.start) + 1} / ${endRow(inProgress.until) + 1}` }}
           />
         ) : null}
 
-        {games.map((g) => {
+        {/* Reading order, time then court, so screen readers and Tab follow the grid. */}
+        {[...games].sort(compareScheduled).map((g) => {
           const status = gameStatus(g, clock);
           const start = toMinutes(g.time!);
           const match = teamId ? involvesTeam(g, teamId) : null;
@@ -109,13 +123,14 @@ export function DayGrid(props: DayGridProps) {
             <GameCell
               key={g.id}
               game={g}
+              court={courtName(g.court!)}
               status={status}
               match={match}
               teamId={teamId}
               teamName={teamName}
               style={{
                 gridColumn: g.court! + 1,
-                gridRow: `${row(start) + 1} / span ${SLOT_MINUTES / STEP}`,
+                gridRow: `${row(start) + 1} / span ${Math.max(1, row(cellEnd(g, games)) - row(start))}`,
                 ...divisionVars(divisionColor(g)),
               }}
               onScoreChange={onScoreChange}
@@ -148,6 +163,7 @@ const STATUS_WORDS = {
 
 function GameCell(props: {
   game: TodayGame;
+  court: string;
   status: ReturnType<typeof gameStatus>;
   match: boolean | null;
   teamId: string | null;
@@ -158,8 +174,19 @@ function GameCell(props: {
   pendingGames?: ReadonlySet<string>;
   onToggleLock?: DayGridProps['onToggleLock'];
 }) {
-  const { game, status, match, teamId, teamName, style, onScoreChange, unlockedGames, pendingGames, onToggleLock } =
-    props;
+  const {
+    game,
+    court,
+    status,
+    match,
+    teamId,
+    teamName,
+    style,
+    onScoreChange,
+    unlockedGames,
+    pendingGames,
+    onToggleLock,
+  } = props;
   const bothKnown = game.team1Id !== null && game.team2Id !== null;
   const scoreLocked =
     Boolean(onToggleLock) &&
@@ -214,6 +241,9 @@ function GameCell(props: {
       data-match={match === null ? undefined : String(match)}
       data-playoff={game.type !== 'group' || undefined}
     >
+      <p className="sr-only">
+        <time dateTime={game.time!}>{formatTime(game.time!)}</time>, {court}
+      </p>
       <header className={styles.cellHead}>
         <span className={styles.swatch} aria-hidden="true" />
         <span className={styles.cellLabel}>{game.label}</span>

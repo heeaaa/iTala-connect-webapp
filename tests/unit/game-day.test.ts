@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  cellEnd,
   compareScheduled,
   courtStations,
   dayWindow,
   gameStatus,
   hasBothScores,
   involvesTeam,
+  markInProgress,
   nextGameForTeam,
   nowFraction,
   pickFocusDay,
+  startMarks,
   toMinutes,
   type Clock,
   type DayGame,
@@ -203,5 +206,134 @@ describe('dayWindow and nowFraction', () => {
     expect(nowFraction(at('17:59'), TONIGHT, w)).toBeNull();
     expect(nowFraction(at('22:01'), TONIGHT, w)).toBeNull();
     expect(nowFraction(at('19:00', '2026-09-18'), TONIGHT, w)).toBeNull();
+  });
+});
+
+describe('startMarks: the time column shows real start times (reported 05/10/2026)', () => {
+  // One court, games 65 minutes apart: an hourly ruler from 1:10 pm read 2:10, 3:10, 4:10 and 5:10.
+  const sunday = ['13:10', '14:15', '15:20', '16:25', '17:30'].map((time, i) => game(`s${i}`, { time }));
+  const sundayWindow = dayWindow(sunday, TONIGHT)!;
+
+  it('gives one mark per start time, each running to the next start or the window end', () => {
+    expect(sundayWindow).toEqual({ start: 790, end: 1110 });
+    expect(startMarks(sunday, TONIGHT, sundayWindow)).toEqual([
+      { start: 790, end: 855, times: ['13:10'] },
+      { start: 855, end: 920, times: ['14:15'] },
+      { start: 920, end: 985, times: ['15:20'] },
+      { start: 985, end: 1050, times: ['16:25'] },
+      { start: 1050, end: 1110, times: ['17:30'] },
+    ]);
+  });
+
+  it('labels a time shared by several courts once, and every staggered start', () => {
+    const games = [
+      game('c1-19', { time: '19:00' }),
+      game('c2-1830', { court: 2, time: '18:30' }),
+      game('c1-18', { time: '18:00' }),
+      game('c2-18', { court: 2, time: '18:00' }),
+    ];
+    const marks = startMarks(games, TONIGHT, dayWindow(games, TONIGHT)!);
+    expect(marks.map((m) => m.times)).toEqual([['18:00'], ['18:30'], ['19:00']]);
+    expect(marks.map((m) => [m.start, m.end])).toEqual([
+      [1080, 1110],
+      [1110, 1140],
+      [1140, 1200],
+    ]);
+  });
+
+  it('puts starts that share one grid step in one mark, so labels never sit on top of each other', () => {
+    const games = [game('a', { time: '18:00' }), game('b', { time: '18:07', court: 2 }), game('c', { time: '18:09' })];
+    const w = dayWindow(games, TONIGHT)!;
+    expect(startMarks(games, TONIGHT, w)).toEqual([
+      { start: 1080, end: 1087, times: ['18:00'] },
+      { start: 1087, end: 1149, times: ['18:07', '18:09'] },
+    ]);
+    // A coarser step groups more.
+    expect(startMarks(games, TONIGHT, w, 10)).toEqual([{ start: 1080, end: 1149, times: ['18:00', '18:07', '18:09'] }]);
+  });
+
+  it('ignores other days and unscheduled games, and is empty on a day without games', () => {
+    const games = [
+      game('a', { time: '18:00' }),
+      game('other-day', { day: '2026-09-18', time: '17:00' }),
+      game('no-time', { time: null }),
+    ];
+    expect(startMarks(games, TONIGHT, { start: 1080, end: 1140 })).toEqual([
+      { start: 1080, end: 1140, times: ['18:00'] },
+    ]);
+    expect(startMarks(games, '2026-10-02', { start: 0, end: 60 })).toEqual([]);
+  });
+});
+
+describe('markInProgress', () => {
+  const games = ['13:10', '14:15', '17:30'].map((time, i) => game(`m${i}`, { time }));
+  const marks = startMarks(games, TONIGHT, dayWindow(games, TONIGHT)!);
+
+  it('is the start whose games are on court, until its slot ends', () => {
+    expect(markInProgress(marks, at('13:10'), TONIGHT)).toEqual({ mark: marks[0], until: toMinutes('14:10') });
+    expect(markInProgress(marks, at('14:09'), TONIGHT)?.mark.start).toBe(790);
+    expect(markInProgress(marks, at('14:15'), TONIGHT)).toEqual({ mark: marks[1], until: toMinutes('15:15') });
+    expect(markInProgress(marks, at('17:30'), TONIGHT)).toEqual({ mark: marks[2], until: toMinutes('18:30') });
+    expect(markInProgress(marks, at('18:29'), TONIGHT)?.mark.start).toBe(1050);
+  });
+
+  it('is null in the changeover between games and over a break, so no old start stays banded', () => {
+    expect(markInProgress(marks, at('14:10'), TONIGHT)).toBeNull();
+    expect(markInProgress(marks, at('14:14'), TONIGHT)).toBeNull();
+    expect(markInProgress(marks, at('16:00'), TONIGHT)).toBeNull();
+  });
+
+  it('hands over at the next start when games are under 60 minutes apart', () => {
+    const tight = ['18:00', '18:45'].map((time, i) => game(`t${i}`, { time }));
+    const tightMarks = startMarks(tight, TONIGHT, dayWindow(tight, TONIGHT)!);
+    expect(markInProgress(tightMarks, at('18:44'), TONIGHT)).toEqual({
+      mark: tightMarks[0],
+      until: toMinutes('18:45'),
+    });
+    expect(markInProgress(tightMarks, at('18:45'), TONIGHT)?.mark.start).toBe(toMinutes('18:45'));
+  });
+
+  it('honours a custom slot length', () => {
+    expect(markInProgress(marks, at('13:45'), TONIGHT, 30)).toBeNull();
+    expect(markInProgress(marks, at('13:39'), TONIGHT, 30)?.until).toBe(toMinutes('13:40'));
+  });
+
+  it('is null before the first start, from the end of the last slot, and on another day', () => {
+    expect(markInProgress(marks, at('13:09'), TONIGHT)).toBeNull();
+    expect(markInProgress(marks, at('18:30'), TONIGHT)).toBeNull();
+    expect(markInProgress(marks, at('14:00', '2026-09-18'), TONIGHT)).toBeNull();
+    expect(markInProgress([], at('14:00'), TONIGHT)).toBeNull();
+  });
+});
+
+describe('cellEnd: a game cell never runs into the next game on its court', () => {
+  it('stops at the next start on the court when that comes before the slot ends', () => {
+    const games = [game('a', { time: '18:00' }), game('b', { time: '18:45' }), game('c', { time: '19:30' })];
+    expect(cellEnd(games[0]!, games)).toBe(toMinutes('18:45'));
+    expect(cellEnd(games[1]!, games)).toBe(toMinutes('19:30'));
+    expect(cellEnd(games[2]!, games)).toBe(toMinutes('20:30'));
+  });
+
+  it('keeps the full slot when the next game starts 60 minutes or more later', () => {
+    const games = [game('a', { time: '13:10' }), game('b', { time: '14:10' }), game('c', { time: '15:15' })];
+    expect(cellEnd(games[0]!, games)).toBe(toMinutes('14:10'));
+    expect(cellEnd(games[1]!, games)).toBe(toMinutes('15:10'));
+  });
+
+  it('ignores other courts, other days, unscheduled games and earlier games', () => {
+    const games = [
+      game('a', { time: '18:00' }),
+      game('court-2', { court: 2, time: '18:15' }),
+      game('other-day', { day: '2026-09-18', time: '18:15' }),
+      game('no-time', { time: null }),
+      game('earlier', { time: '17:30' }),
+      game('same-time', { time: '18:00' }),
+    ];
+    expect(cellEnd(games[0]!, games)).toBe(toMinutes('19:00'));
+  });
+
+  it('honours a custom slot length', () => {
+    const games = [game('a', { time: '18:00' }), game('b', { time: '18:50' })];
+    expect(cellEnd(games[0]!, games, 40)).toBe(toMinutes('18:40'));
   });
 });

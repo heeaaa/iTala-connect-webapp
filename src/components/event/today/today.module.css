@@ -682,7 +682,7 @@
 }
 
 .gridCorner,
-.gridHour {
+.gridTime {
   position: sticky;
   left: 0;
   z-index: 2;
@@ -707,8 +707,14 @@
   border-bottom: var(--line) solid var(--paint);
 }
 
-.gridHour {
+/*
+ * A real start time, level with the top of the games that start then; its
+ * rule runs to the next start. Two starts in one 5-minute step stack.
+ */
+.gridTime {
   grid-column: 1;
+  display: grid;
+  align-content: start;
   padding-top: 0.375rem;
   border-top: 1px solid var(--rule);
   color: var(--ev-muted);
@@ -718,14 +724,14 @@
   white-space: nowrap;
 }
 
-/* The hour in progress: banded across the gutter and every court. */
-.hourBand {
+/* The start time in progress: banded across the gutter and every court. */
+.timeBand {
   grid-column: 1 / -1;
   z-index: 0;
   background: color-mix(in srgb, var(--paint) 13%, var(--ev-bg));
 }
 
-.gridHour[data-current] {
+.gridTime[data-current] {
   background: transparent;
   color: var(--ev-heading);
 }
