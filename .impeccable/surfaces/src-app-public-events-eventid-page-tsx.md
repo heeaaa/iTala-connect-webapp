@@ -17,7 +17,7 @@ Spectators, players and families at a league night (typically 1-2 courts, up to 
 
 ## Constraints
 
-Colour only from the five `--ev-*` organiser tokens plus division colours. State never by colour alone. No game clock, period or quarter (mobile app owns stats). On court = scheduled slot in progress in the event time zone; Final = slot passed and both scores in; otherwise "Awaiting score".
+Colour only from the five `--ev-*` organiser tokens plus division colours. State never by colour alone. No game clock, period or quarter (mobile app owns stats). On court = from the start until the 60-minute slot ends or the next game on its court starts, whichever is first, in the event time zone; Final = that time passed and both scores in; otherwise "Awaiting score".
 
 ## Open decisions
 

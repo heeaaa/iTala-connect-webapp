@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -309,6 +309,47 @@ describe('Today screen: the time column shows real start times (reported 05/10/2
     rows.slice(1).forEach(([first], i) => expect(rows[i]![0] + rows[i]![1]).toBeLessThanOrEqual(first));
     // The last game keeps its full 60-minute slot: 12 five-minute rows.
     expect(rows.at(-1)![1]).toBe(12);
+  });
+
+  // Reported 06/10/2026: the 6:00 pm game still read On court until 7:00 pm, beside the
+  // 6:45 pm game on the same court, and the court panel featured the earlier one.
+  it('has one game on court per court when games are 45 minutes apart', async () => {
+    const user = userEvent.setup();
+    const grid = renderSunday(['18:00', '18:45', '19:30', '20:15'], at('18:50', SUNDAY));
+    const cards = within(grid).getAllByRole('article');
+    const lead = (card: HTMLElement) => card.textContent?.match(/^\d{1,2}:\d{2} [ap]m/)?.[0];
+    expect(cards.filter((c) => c.dataset.status === 'on-court').map(lead)).toEqual(['6:45 pm']);
+    expect(cards[0]!.dataset.status).toBe('awaiting-score');
+    expect(within(cards[0]!).getByText('Awaiting score')).toBeInTheDocument();
+    expect(within(grid).getAllByText('On court')).toHaveLength(1);
+
+    const main = court('Main Gym');
+    expect(within(main).getByText('On court')).toBeInTheDocument();
+    expect(within(main).getByText('started 6:45 pm')).toBeInTheDocument();
+    expect(within(main).getByText('Awaiting score').closest('div')).toHaveTextContent('6:00 pm');
+    expect(within(main).getByText('Up next').closest('div')).toHaveTextContent('7:30 pm');
+
+    // The 6:00 pm team plays again at 8:15 pm; its first game is over.
+    const first = sundayLeague().teams[0]!;
+    await user.click(screen.getByRole('button', { name: first.name }));
+    const answer = screen.getByRole('heading', { name: `Your team: ${first.name}` }).parentElement!;
+    expect(answer).toHaveTextContent(/Next: 8:15 pm Main Gym, vs /);
+    expect(answer).not.toHaveTextContent('On court now');
+  });
+
+  it('still keeps each game on court for its full 60 minutes when games are 65 minutes apart', () => {
+    const grid = renderSunday(TIMES, at('14:12', SUNDAY));
+    const cards = within(grid).getAllByRole('article');
+    expect(cards.map((c) => c.dataset.status)).toEqual([
+      'awaiting-score',
+      'upcoming',
+      'upcoming',
+      'upcoming',
+      'upcoming',
+    ]);
+    cleanup();
+    const later = renderSunday(TIMES, at('14:09', SUNDAY));
+    expect(within(later).getAllByRole('article')[0]!.dataset.status).toBe('on-court');
   });
 
   it('keeps a whole number of rows when a game starts on an odd minute', () => {

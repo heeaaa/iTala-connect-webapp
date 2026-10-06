@@ -597,7 +597,7 @@ Components are painted outlines on the floor: confident, legible from arm's leng
 - **Day strip:** dates in muted small type with a 2 px transparent underline; the chosen day is heading ink with a 2 px paint underline. "Tonight" sits above today's date in paint-coloured Big Shoulders as part of the date label. On phones, the horizontal scrollbar thumb uses muted ink, distinct from the accent paint of the chosen day.
 
 #### Inputs / Fields
-- **Score input** (event owners only): 3.75rem wide (3rem on phones), 2.75rem tall, 1 px muted outline, 2px corners, floor fill, right-aligned Big Shoulders 700 numerals while editable. A locked final displays the disabled score without an input outline or fill; an unlocked or missing score retains the editable field.
+- **Score input** (event owners only): 3.75rem wide (3rem on phones), 2.75rem tall, 1 px muted outline, 2px corners, floor fill, right-aligned Big Shoulders 700 numerals while editable. Once both scores are in, whatever the time, the score is locked: it displays without an input outline or fill, and the padlock in the card corner opens it again. The lock waits while focus is in that game's boxes, so it never lands on a box being typed in. An unlocked or missing score retains the editable field. From 40rem the owner's card header always keeps the padlock's 2.75rem (hidden until both scores are in), so the padlock appearing never moves the score boxes.
 - **Invalid:** outline switches to body ink and dashed, so the error does not rely on colour.
 - **Focus:** the shared focus outline (3 px solid paint, 3 px offset).
 

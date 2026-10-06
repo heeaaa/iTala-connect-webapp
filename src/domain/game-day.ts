@@ -3,9 +3,10 @@
  *
  * New in iTala Connect (no old-code equivalent), so there is no golden
  * file: the rules are the ones confirmed in the Today surface brief.
- *  - On court: the game's scheduled slot is in progress.
- *  - Final: the slot has passed and both scores are in (0 is a score).
- *  - Awaiting score: the slot has passed without both scores.
+ *  - On court: from the game's start until its 60-minute slot ends, or until
+ *    the next game on its court starts if that is sooner.
+ *  - Final: that time has passed and both scores are in (0 is a score).
+ *  - Awaiting score: that time has passed without both scores.
  * All times are the event's local wall-clock times; the caller converts
  * "now" into the event time zone first (src/lib/event-time.ts).
  */
@@ -45,14 +46,37 @@ export function hasBothScores(game: Pick<DayGame, 'score1' | 'score2'>): boolean
   return game.score1 !== null && game.score2 !== null;
 }
 
-export function gameStatus(game: DayGame, clock: Clock, slotMinutes = SLOT_MINUTES): GameStatus {
+/**
+ * Where a game's time on its court ends: the end of its slot, or sooner when
+ * the next game on its court starts first. The day grid ends the game's cell
+ * here so cells never overlap, and the game stops being on court here
+ * (reported 06/10/2026: games 45 minutes apart both read On court).
+ */
+export function slotEnd(game: DayGame, games: readonly DayGame[], slotMinutes = SLOT_MINUTES): number {
+  const start = toMinutes(game.time!);
+  let end = start + slotMinutes;
+  if (game.court === null) return end;
+  for (const g of games) {
+    if (g.day !== game.day || g.court !== game.court || g.time === null) continue;
+    const next = toMinutes(g.time);
+    if (next > start && next < end) end = next;
+  }
+  return end;
+}
+
+/** `games` are the event's other games (any days), so the next game on the court ends this one's time on court. */
+export function gameStatus(
+  game: DayGame,
+  clock: Clock,
+  games: readonly DayGame[],
+  slotMinutes = SLOT_MINUTES,
+): GameStatus {
   if (game.day === null || game.time === null) return 'unscheduled';
   const finished = hasBothScores(game) ? 'final' : 'awaiting-score';
   if (game.day < clock.date) return finished;
   if (game.day > clock.date) return 'upcoming';
-  const start = toMinutes(game.time);
-  if (clock.minutes < start) return 'upcoming';
-  if (clock.minutes < start + slotMinutes) return 'on-court';
+  if (clock.minutes < toMinutes(game.time)) return 'upcoming';
+  if (clock.minutes < slotEnd(game, games, slotMinutes)) return 'on-court';
   return finished;
 }
 
@@ -101,7 +125,7 @@ export function courtStations<G extends DayGame>(
   for (let court = 1; court <= courts; court++) {
     const onThisCourt = games.filter((g) => g.day === day && g.court === court && g.time !== null);
     onThisCourt.sort(compareScheduled);
-    const status = (g: G) => gameStatus(g, clock, slotMinutes);
+    const status = (g: G) => gameStatus(g, clock, onThisCourt, slotMinutes);
     const finished = onThisCourt.filter((g) => {
       const s = status(g);
       return s === 'final' || s === 'awaiting-score';
@@ -132,7 +156,7 @@ export function nextGameForTeam<G extends DayGame>(
   const candidates = games
     .filter((g) => involvesTeam(g, teamId))
     .filter((g) => {
-      const s = gameStatus(g, clock, slotMinutes);
+      const s = gameStatus(g, clock, games, slotMinutes);
       return s === 'on-court' || s === 'upcoming';
     });
   candidates.sort(compareScheduled);
@@ -215,19 +239,4 @@ export function markInProgress(
     if (mark.start <= clock.minutes && clock.minutes < until) return { mark, until };
   }
   return null;
-}
-
-/**
- * Where a game's cell ends on the day grid: the end of its slot, or sooner
- * when the next game on its court starts first, so cells never overlap.
- */
-export function cellEnd(game: DayGame, games: readonly DayGame[], slotMinutes = SLOT_MINUTES): number {
-  const start = toMinutes(game.time!);
-  let end = start + slotMinutes;
-  for (const g of games) {
-    if (g.day !== game.day || g.court !== game.court || g.time === null) continue;
-    const next = toMinutes(g.time);
-    if (next > start && next < end) end = next;
-  }
-  return end;
 }

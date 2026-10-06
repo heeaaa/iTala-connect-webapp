@@ -161,7 +161,10 @@ describe('LiveEvent (PRD P-07, P-08)', () => {
   it('owner score entry saves both sides once typing stops', async () => {
     saveScore.mockResolvedValue({ ok: true, data: undefined });
     render(<LiveEvent model={model()} tab="schedule" selectedDay={null} canEdit renderedAt={RENDERED} />);
+    // Both scores are in, so the boxes are locked until the owner opens the lock.
+    fireEvent.click(screen.getByRole('button', { name: /Unlock score for Hawks versus Bolts/ }));
     const input = screen.getByRole('textbox', { name: /Hawks score, 10:00 am/ });
+    expect(input).not.toBeDisabled();
     fireEvent.change(input, { target: { value: '2' } });
     fireEvent.change(input, { target: { value: '25' } });
     expect(saveScore).not.toHaveBeenCalled();
@@ -184,6 +187,108 @@ describe('LiveEvent (PRD P-07, P-08)', () => {
     await act(async () => vi.advanceTimersByTime(800));
     expect(saveScore).toHaveBeenCalledWith({ gameId: GAME, score1: 25, score2: 18 });
     expect(input).toBeDisabled();
+  });
+
+  // User decision 06/10/2026: the boxes lock as soon as both scores are in, whatever the time,
+  // and never while a score is missing; the lock still opens them.
+  it('locks a game as soon as both scores are in, even while it is on court', () => {
+    render(<LiveEvent model={model()} tab="schedule" selectedDay={null} canEdit renderedAt={RENDERED} />);
+    expect(within(court()).getByText('On court')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /Hawks score, 10:00 am/ })).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: /Bolts score, 10:00 am/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /Unlock score for Hawks versus Bolts/ }));
+    expect(screen.getByRole('textbox', { name: /Hawks score, 10:00 am/ })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Lock score for Hawks versus Bolts/ })).toBeInTheDocument();
+  });
+
+  it('never locks a game on court while a score is missing, then locks once both save', async () => {
+    let finish!: (result: { ok: true; data: undefined }) => void;
+    saveScore.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const awaiting = model();
+    awaiting.scores[GAME] = { score1: 20, score2: null };
+    render(<LiveEvent model={awaiting} tab="schedule" selectedDay={null} canEdit renderedAt={RENDERED} />);
+    expect(within(court()).getByText('On court')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /lock score for/i })).not.toBeInTheDocument();
+    const input = screen.getByRole('textbox', { name: /Bolts score/ });
+    expect(input).not.toBeDisabled();
+    fireEvent.change(input, { target: { value: '18' } });
+    await act(async () => vi.advanceTimersByTime(800));
+    expect(input).not.toBeDisabled();
+    await act(async () => finish({ ok: true, data: undefined }));
+    expect(input).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Unlock score for Hawks versus Bolts/ })).toBeInTheDocument();
+  });
+
+  // Review findings 06/10/2026: the lock must never land on a box the owner is still typing in,
+  // and a failed save must put back the stored score, not the previous keystroke.
+  it('holds the lock while the owner is still in the boxes, then locks when they leave', async () => {
+    saveScore.mockResolvedValue({ ok: true, data: undefined });
+    const awaiting = model();
+    awaiting.scores[GAME] = { score1: 20, score2: null };
+    render(<LiveEvent model={awaiting} tab="schedule" selectedDay={null} canEdit renderedAt={RENDERED} />);
+    const input = screen.getByRole('textbox', { name: /Bolts score/ });
+    act(() => input.focus());
+    fireEvent.change(input, { target: { value: '4' } });
+    await act(async () => vi.advanceTimersByTime(800));
+    expect(saveScore).toHaveBeenLastCalledWith({ gameId: GAME, score1: 20, score2: 4 });
+    // Saved, but a slow second digit must not land on a locked box.
+    expect(input).not.toBeDisabled();
+    expect(input).toHaveFocus();
+    fireEvent.change(input, { target: { value: '41' } });
+    await act(async () => vi.advanceTimersByTime(800));
+    expect(saveScore).toHaveBeenLastCalledWith({ gameId: GAME, score1: 20, score2: 41 });
+    // Moving to the other side's box is still entering this game's score.
+    act(() => screen.getByRole('textbox', { name: /Hawks score/ }).focus());
+    expect(input).not.toBeDisabled();
+    act(() => (document.activeElement as HTMLElement).blur());
+    expect(input).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Unlock score for Hawks versus Bolts/ })).toBeInTheDocument();
+  });
+
+  it('locks at once when the owner taps the padlock while still in a box', () => {
+    render(<LiveEvent model={model()} tab="schedule" selectedDay={null} canEdit renderedAt={RENDERED} />);
+    fireEvent.click(screen.getByRole('button', { name: /Unlock score for Hawks versus Bolts/ }));
+    const input = screen.getByRole('textbox', { name: /Hawks score/ });
+    act(() => input.focus());
+    fireEvent.click(screen.getByRole('button', { name: /^Lock score for Hawks versus Bolts/ }));
+    expect(input).toBeDisabled();
+  });
+
+  it('a failed save puts back the stored score, not the last keystroke, and keeps the boxes open', async () => {
+    saveScore.mockResolvedValue({ ok: false, error: 'Could not save the score. Check your connection and try again.' });
+    const awaiting = model();
+    awaiting.scores[GAME] = { score1: 20, score2: null };
+    render(<LiveEvent model={awaiting} tab="schedule" selectedDay={null} canEdit renderedAt={RENDERED} />);
+    const input = screen.getByRole('textbox', { name: /Bolts score/ });
+    fireEvent.change(input, { target: { value: '1' } });
+    fireEvent.change(input, { target: { value: '18' } });
+    await act(async () => vi.advanceTimersByTime(800));
+    expect(saveScore).toHaveBeenCalledWith({ gameId: GAME, score1: 20, score2: 18 });
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not save the score.');
+    // Bolts had no stored score: the court shows none, not the "1" typed on the way to 18.
+    expect(within(court()).getByText('20')).toBeInTheDocument();
+    expect(within(court()).queryByText('1')).not.toBeInTheDocument();
+    expect(within(court()).queryByText('18')).not.toBeInTheDocument();
+    expect(input).not.toBeDisabled();
+  });
+
+  it('keeps the boxes open after a failed save even when another device filled the score', async () => {
+    saveScore.mockResolvedValue({ ok: false, error: 'Could not save the score. Check your connection and try again.' });
+    const awaiting = model();
+    awaiting.scores[GAME] = { score1: 20, score2: null };
+    render(<LiveEvent model={awaiting} tab="schedule" selectedDay={null} canEdit renderedAt={RENDERED} />);
+    const input = screen.getByRole('textbox', { name: /Bolts score/ });
+    fireEvent.change(input, { target: { value: '18' } });
+    act(() => realtime.handlers.get('game_scores')!({ eventType: 'UPDATE', new: { game_id: GAME, s1: 20, s2: 17 } }));
+    await act(async () => vi.advanceTimersByTime(800));
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not save the score.');
+    expect(within(court()).getByText('17')).toBeInTheDocument();
+    expect(input).not.toBeDisabled();
   });
 
   it('keeps a newer score edit open while an earlier save finishes', async () => {
@@ -241,6 +346,8 @@ describe('LiveEvent (PRD P-07, P-08)', () => {
   it('a failed save says so and puts the score back', async () => {
     saveScore.mockResolvedValue({ ok: false, error: 'Could not save the score. Check your connection and try again.' });
     render(<LiveEvent model={model()} tab="schedule" selectedDay={null} canEdit renderedAt={RENDERED} />);
+    fireEvent.click(screen.getByRole('button', { name: /Unlock score for Hawks versus Bolts/ }));
+    expect(screen.getByRole('textbox', { name: /Bolts score/ })).not.toBeDisabled();
     fireEvent.change(screen.getByRole('textbox', { name: /Bolts score/ }), { target: { value: '30' } });
     await act(async () => vi.advanceTimersByTime(800));
     expect(screen.getByRole('alert')).toHaveTextContent('Could not save the score.');

@@ -1,4 +1,4 @@
-import { type Clock, toMinutes } from '@/domain/game-day';
+import { type Clock, slotEnd, toMinutes } from '@/domain/game-day';
 import { DEFAULT_EVENT_THEME, type EventTheme } from '@/components/event/theme';
 import { type TodayDivision, type TodayEvent, type TodayGame, type TodayTeam } from '@/components/event/today/model';
 import { minutesToTime } from '@/lib/event-time';
@@ -145,7 +145,7 @@ export function sampleLeague({ courts, clock, theme = DEFAULT_EVENT_THEME, caden
     theme,
     divisions: divisions.map(({ id, name, color }) => ({ id, name, color })),
     teams,
-    games: games.map((g) => withScores(g, clock)),
+    games: games.map((g) => withScores(g, clock, games)),
   };
 }
 
@@ -168,7 +168,7 @@ function game(
  * except Court 2's first game, which shows "Awaiting score"; the game on
  * court has a running score; later games have none. Playoffs stay TBD.
  */
-function withScores(g: TodayGame, clock: Clock): TodayGame {
+function withScores(g: TodayGame, clock: Clock, games: readonly TodayGame[]): TodayGame {
   if (g.team1Id === null || g.day === null || g.time === null) return g;
   const [s1, s2] = fullScore(g.id);
   if (g.day < clock.date) return { ...g, score1: s1, score2: s2 };
@@ -176,10 +176,12 @@ function withScores(g: TodayGame, clock: Clock): TodayGame {
   const start = toMinutes(g.time);
   const elapsed = clock.minutes - start;
   if (elapsed < 0) return g;
-  if (elapsed >= 60) {
+  // A game is over when its slot ends or the next game on its court starts.
+  const length = slotEnd(g, games) - start;
+  if (elapsed >= length) {
     return g.court === 2 && g.time === FIRST_SLOT ? g : { ...g, score1: s1, score2: s2 };
   }
-  const share = elapsed / 60;
+  const share = elapsed / length;
   return { ...g, score1: Math.round(s1 * share), score2: Math.round(s2 * share) };
 }
 

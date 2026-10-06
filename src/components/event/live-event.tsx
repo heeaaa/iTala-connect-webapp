@@ -47,6 +47,9 @@ export function LiveEvent({ model, tab, selectedDay, canEdit, renderedAt }: Live
   const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const saveQueues = useRef(new Map<string, Promise<void>>());
   const editVersions = useRef(new Map<string, number>());
+  // The last score the server confirmed (a save or Realtime) per game, so a failed
+  // save puts back what is stored rather than the previous keystroke.
+  const confirmed = useRef(new Map<string, Score>());
 
   const gameIds = useMemo(() => new Set(model.games.map((g) => g.id)), [model.games]);
   const scores = useMemo(() => ({ ...model.scores, ...overrides }), [model.scores, overrides]);
@@ -72,6 +75,7 @@ export function LiveEvent({ model, tab, selectedDay, canEdit, renderedAt }: Live
             payload.eventType === 'DELETE'
               ? { score1: null, score2: null }
               : { score1: row.s1 ?? null, score2: row.s2 ?? null };
+          confirmed.current.set(row.game_id, next);
           setOverrides((o) => ({ ...o, [row.game_id!]: next }));
           setChangedAt((c) => ({ ...c, [row.game_id!]: Date.now() }));
         },
@@ -111,6 +115,7 @@ export function LiveEvent({ model, tab, selectedDay, canEdit, renderedAt }: Live
             ok: false as const,
             error: 'Could not save the score. Check your connection and try again.',
           }));
+          if (result.ok) confirmed.current.set(gameId, next);
           if (editVersions.current.get(gameId) !== editVersion) return;
           setPendingGames((ids) => {
             const nextIds = new Set(ids);
@@ -119,7 +124,10 @@ export function LiveEvent({ model, tab, selectedDay, canEdit, renderedAt }: Live
           });
           if (!result.ok) {
             setSaveError(result.error);
-            setOverrides((o) => ({ ...o, [gameId]: before }));
+            const stored = confirmed.current.get(gameId) ?? model.scores[gameId] ?? { score1: null, score2: null };
+            setOverrides((o) => ({ ...o, [gameId]: stored }));
+            // Keep the boxes open to try again, even if the stored score is complete.
+            setUnlockedGames((ids) => new Set(ids).add(gameId));
           } else {
             setUnlockedGames((ids) => {
               const nextIds = new Set(ids);

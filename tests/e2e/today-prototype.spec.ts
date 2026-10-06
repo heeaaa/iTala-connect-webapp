@@ -187,6 +187,33 @@ test.describe('Today screen prototype (sample data)', () => {
     await noSidewaysScroll(page);
   });
 
+  test('games 45 minutes apart leave one game on court per court, the one that started last', async ({ page }) => {
+    // Reported 06/10/2026: the 6:00 pm games still read On court beside the 6:45 pm games until 7:00 pm.
+    await page.goto('/prototype/today?cadence=45&at=18:50');
+    const grid = page.getByRole('region', { name: 'Games by time and court' });
+    const statuses = await grid
+      .locator('article')
+      .evaluateAll((cards) =>
+        cards.map((card) => `${card.querySelector('.sr-only')!.textContent} ${card.getAttribute('data-status')}`),
+      );
+    expect(statuses).toEqual([
+      '6:00 pm, Court 1 final',
+      '6:00 pm, Court 2 awaiting-score',
+      '6:45 pm, Court 1 on-court',
+      '6:45 pm, Court 2 on-court',
+      '7:30 pm, Court 1 upcoming',
+      '7:30 pm, Court 2 upcoming',
+      '8:15 pm, Court 1 upcoming',
+      '8:15 pm, Court 2 upcoming',
+    ]);
+    const court1 = page.getByRole('region', { name: 'Court 1' });
+    await expect(court1.getByText('started 6:45 pm')).toBeVisible();
+    await expect(court1.getByText('Final').locator('..')).toContainText('6:00 pm');
+    await expect(court1.getByText('Up next').locator('..')).toContainText('7:30 pm');
+    await noSidewaysScroll(page);
+    await expectNoSeriousA11yViolations(page);
+  });
+
   test('before games and when scores may be stale', async ({ page }) => {
     await page.goto('/prototype/today?at=17:30&feed=reconnecting');
     await expect(page.getByRole('status')).toHaveText('Reconnecting. Scores may be out of date.');

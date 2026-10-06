@@ -26,7 +26,7 @@ describe('prototype sample league', () => {
 
   it('shows every game-day state at 7:25 pm', () => {
     const event = sampleLeague({ courts: 2, clock: at('19:25') });
-    const statuses = new Set(event.games.map((g) => gameStatus(g, at('19:25'))));
+    const statuses = new Set(event.games.map((g) => gameStatus(g, at('19:25'), event.games)));
     expect(statuses).toEqual(new Set(['final', 'awaiting-score', 'on-court', 'upcoming']));
     const live = event.games.find((g) => g.day === SAMPLE_GAME_DAY && g.time === '19:00' && g.court === 1)!;
     expect(live.score1).not.toBeNull();

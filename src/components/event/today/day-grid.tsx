@@ -1,9 +1,8 @@
 'use client';
 
-import { type CSSProperties } from 'react';
+import { type CSSProperties, useState } from 'react';
 
 import {
-  cellEnd,
   type Clock,
   compareScheduled,
   type DayWindow,
@@ -12,6 +11,7 @@ import {
   involvesTeam,
   markInProgress,
   nowFraction,
+  slotEnd,
   startMarks,
   toMinutes,
 } from '@/domain/game-day';
@@ -116,7 +116,7 @@ export function DayGrid(props: DayGridProps) {
 
         {/* Reading order, time then court, so screen readers and Tab follow the grid. */}
         {[...games].sort(compareScheduled).map((g) => {
-          const status = gameStatus(g, clock);
+          const status = gameStatus(g, clock, games);
           const start = toMinutes(g.time!);
           const match = teamId ? involvesTeam(g, teamId) : null;
           return (
@@ -130,7 +130,7 @@ export function DayGrid(props: DayGridProps) {
               teamName={teamName}
               style={{
                 gridColumn: g.court! + 1,
-                gridRow: `${row(start) + 1} / span ${Math.max(1, row(cellEnd(g, games)) - row(start))}`,
+                gridRow: `${row(start) + 1} / span ${Math.max(1, row(slotEnd(g, games)) - row(start))}`,
                 ...divisionVars(divisionColor(g)),
               }}
               onScoreChange={onScoreChange}
@@ -188,12 +188,14 @@ function GameCell(props: {
     onToggleLock,
   } = props;
   const bothKnown = game.team1Id !== null && game.team2Id !== null;
-  const scoreLocked =
-    Boolean(onToggleLock) &&
-    status === 'final' &&
-    hasBothScores(game) &&
-    !unlockedGames?.has(game.id) &&
-    !pendingGames?.has(game.id);
+  // While the owner is in this game's score boxes the lock waits, so a save
+  // between keystrokes never disables the box being typed in.
+  const [entering, setEntering] = useState(false);
+  // Both scores in locks the boxes, whatever the time (user, 06/10/2026), so a
+  // saved result is not changed by accident; a missing score never locks.
+  const canLock = bothKnown && Boolean(onScoreChange) && Boolean(onToggleLock);
+  const lockable = canLock && hasBothScores(game);
+  const scoreLocked = lockable && !entering && !unlockedGames?.has(game.id) && !pendingGames?.has(game.id);
   const winner = status === 'final' && hasBothScores(game) && game.score1 !== game.score2;
   const words = STATUS_WORDS[status];
 
@@ -218,6 +220,7 @@ function GameCell(props: {
             aria-readonly={scoreLocked}
             aria-label={`${teamName(id)} score, ${formatTime(game.time!)} ${game.label}`}
             defaultValue={score ?? ''}
+            onFocus={() => setEntering(true)}
             onChange={(e) => {
               const raw = e.currentTarget.value.trim();
               if (raw === '') onScoreChange(game.id, side, null);
@@ -240,6 +243,9 @@ function GameCell(props: {
       data-status={status}
       data-match={match === null ? undefined : String(match)}
       data-playoff={game.type !== 'group' || undefined}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setEntering(false);
+      }}
     >
       <p className="sr-only">
         <time dateTime={game.time!}>{formatTime(game.time!)}</time>, {court}
@@ -247,10 +253,15 @@ function GameCell(props: {
       <header className={styles.cellHead}>
         <span className={styles.swatch} aria-hidden="true" />
         <span className={styles.cellLabel}>{game.label}</span>
-        {bothKnown && onScoreChange && status === 'final' && onToggleLock ? (
+        {canLock && onToggleLock ? (
+          // Always in place for owners, hidden until both scores are in, so its
+          // room in the header never moves the score boxes as it appears.
           <button
             type="button"
             className={styles.lockButton}
+            data-idle={!lockable || undefined}
+            disabled={!lockable}
+            aria-hidden={!lockable || undefined}
             aria-label={
               (scoreLocked ? 'Unlock' : 'Lock') +
               ' score for ' +
@@ -259,7 +270,10 @@ function GameCell(props: {
               teamName(game.team2Id)
             }
             title={scoreLocked ? 'Unlock score' : 'Lock score'}
-            onClick={() => onToggleLock(game.id, scoreLocked)}
+            onClick={() => {
+              setEntering(false);
+              onToggleLock(game.id, scoreLocked);
+            }}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               {scoreLocked ? (

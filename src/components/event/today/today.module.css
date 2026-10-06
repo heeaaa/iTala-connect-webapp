@@ -829,6 +829,10 @@
   cursor: pointer;
 }
 
+.lockButton[data-idle] {
+  visibility: hidden;
+}
+
 .lockButton:hover,
 .lockButton:focus-visible {
   color: var(--ev-heading);

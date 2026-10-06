@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  cellEnd,
   compareScheduled,
   courtStations,
   dayWindow,
@@ -12,6 +11,7 @@ import {
   nextGameForTeam,
   nowFraction,
   pickFocusDay,
+  slotEnd,
   startMarks,
   toMinutes,
   type Clock,
@@ -51,30 +51,80 @@ describe('toMinutes and hasBothScores', () => {
 
 describe('gameStatus', () => {
   it('is unscheduled without a day or a time', () => {
-    expect(gameStatus(game('g', { day: null }), at('18:00'))).toBe('unscheduled');
-    expect(gameStatus(game('g', { time: null }), at('18:00'))).toBe('unscheduled');
+    expect(gameStatus(game('g', { day: null }), at('18:00'), [])).toBe('unscheduled');
+    expect(gameStatus(game('g', { time: null }), at('18:00'), [])).toBe('unscheduled');
   });
 
   it('is on court from the slot start up to (not including) its end', () => {
-    expect(gameStatus(game('g'), at('17:59'))).toBe('upcoming');
-    expect(gameStatus(game('g'), at('18:00'))).toBe('on-court');
-    expect(gameStatus(game('g'), at('18:59'))).toBe('on-court');
-    expect(gameStatus(game('g'), at('19:00'))).toBe('awaiting-score');
+    expect(gameStatus(game('g'), at('17:59'), [])).toBe('upcoming');
+    expect(gameStatus(game('g'), at('18:00'), [])).toBe('on-court');
+    expect(gameStatus(game('g'), at('18:59'), [])).toBe('on-court');
+    expect(gameStatus(game('g'), at('19:00'), [])).toBe('awaiting-score');
   });
 
   it('is final once the slot has passed with both scores, including 0', () => {
-    expect(gameStatus(game('g', { score1: 0, score2: 3 }), at('19:00'))).toBe('final');
-    expect(gameStatus(game('g', { score1: 40, score2: null }), at('19:00'))).toBe('awaiting-score');
+    expect(gameStatus(game('g', { score1: 0, score2: 3 }), at('19:00'), [])).toBe('final');
+    expect(gameStatus(game('g', { score1: 40, score2: null }), at('19:00'), [])).toBe('awaiting-score');
   });
 
   it('uses the day before the time', () => {
-    expect(gameStatus(game('g', { day: '2026-09-18', score1: 1, score2: 2 }), at('08:00'))).toBe('final');
-    expect(gameStatus(game('g', { day: '2026-09-18' }), at('08:00'))).toBe('awaiting-score');
-    expect(gameStatus(game('g', { day: '2026-10-02' }), at('23:00'))).toBe('upcoming');
+    expect(gameStatus(game('g', { day: '2026-09-18', score1: 1, score2: 2 }), at('08:00'), [])).toBe('final');
+    expect(gameStatus(game('g', { day: '2026-09-18' }), at('08:00'), [])).toBe('awaiting-score');
+    expect(gameStatus(game('g', { day: '2026-10-02' }), at('23:00'), [])).toBe('upcoming');
   });
 
   it('honours a custom slot length', () => {
-    expect(gameStatus(game('g'), at('18:45'), 40)).toBe('awaiting-score');
+    expect(gameStatus(game('g'), at('18:45'), [], 40)).toBe('awaiting-score');
+    const games = [game('a', { time: '18:00' }), game('b', { time: '18:50' })];
+    expect(gameStatus(games[0]!, at('18:39'), games, 40)).toBe('on-court');
+    expect(gameStatus(games[0]!, at('18:40'), games, 40)).toBe('awaiting-score');
+  });
+
+  // Reported 06/10/2026: with games 45 minutes apart, both read On court from 6:45 to 7:00 pm.
+  it('stops being on court when the next game on its court starts', () => {
+    const games = [game('a', { time: '18:00' }), game('b', { time: '18:45' }), game('c', { time: '19:30' })];
+    const [a, b, c] = games as [DayGame, DayGame, DayGame];
+    expect(gameStatus(a, at('18:44'), games)).toBe('on-court');
+    expect(gameStatus(b, at('18:44'), games)).toBe('upcoming');
+    expect(gameStatus(a, at('18:45'), games)).toBe('awaiting-score');
+    expect(gameStatus(b, at('18:45'), games)).toBe('on-court');
+    expect(gameStatus({ ...a, score1: 50, score2: 41 }, at('18:45'), games)).toBe('final');
+    // The last game of the night keeps its full 60 minutes.
+    expect(gameStatus(c, at('20:29'), games)).toBe('on-court');
+    expect(gameStatus(c, at('20:30'), games)).toBe('awaiting-score');
+  });
+
+  it('keeps the full 60 minutes when the next game on its court is 60 or more minutes later', () => {
+    const games = [game('a', { time: '13:10' }), game('b', { time: '14:10' }), game('c', { time: '15:15' })];
+    const [a, b, c] = games as [DayGame, DayGame, DayGame];
+    expect(gameStatus(a, at('14:09'), games)).toBe('on-court');
+    expect(gameStatus(a, at('14:10'), games)).toBe('awaiting-score');
+    expect(gameStatus(b, at('14:10'), games)).toBe('on-court');
+    expect(gameStatus(b, at('15:09'), games)).toBe('on-court');
+    // The 5-minute changeover before 3:15 pm has no game on court.
+    expect(gameStatus(b, at('15:12'), games)).toBe('awaiting-score');
+    expect(gameStatus(c, at('15:12'), games)).toBe('upcoming');
+  });
+
+  it('is not cut short by other courts, other days, a game at the same time or games without a court', () => {
+    const games = [
+      game('a', { time: '18:00' }),
+      game('court-2', { court: 2, time: '18:15' }),
+      game('other-day', { day: '2026-09-18', time: '18:15' }),
+      game('same-time', { time: '18:00' }),
+      game('no-court', { court: null, time: '18:00' }),
+      game('no-court-later', { court: null, time: '18:15' }),
+    ];
+    for (const id of ['a', 'same-time', 'no-court']) {
+      expect(
+        gameStatus(
+          games.find((g) => g.id === id)!,
+          at('18:30'),
+          games,
+        ),
+        id,
+      ).toBe('on-court');
+    }
   });
 });
 
@@ -157,6 +207,24 @@ describe('courtStations', () => {
     expect(stations).toHaveLength(3);
     expect(stations[2]).toEqual({ court: 3, final: null, onCourt: null, upNext: null, then: null });
   });
+
+  // Reported 06/10/2026: with games 45 minutes apart, the 6:00 pm game still read On court
+  // until 7:00 pm, so the court featured it over the 6:45 pm game already being played.
+  it('moves on court to the next game as soon as it starts, when games are under 60 minutes apart', () => {
+    const tight = [
+      game('c1-1800', { time: '18:00' }),
+      game('c1-1845', { time: '18:45' }),
+      game('c1-1930', { time: '19:30' }),
+      game('c2-1800', { court: 2, time: '18:00' }),
+    ];
+    const [c1, c2] = courtStations(tight, TONIGHT, 2, at('18:50'));
+    expect(c1!.final?.id).toBe('c1-1800');
+    expect(c1!.onCourt?.id).toBe('c1-1845');
+    expect(c1!.upNext?.id).toBe('c1-1930');
+    // Court 2 has nothing after 6:00 pm, so its game keeps the full 60 minutes.
+    expect(c2!.onCourt?.id).toBe('c2-1800');
+    expect(c2!.final).toBeNull();
+  });
 });
 
 describe('involvesTeam and nextGameForTeam', () => {
@@ -183,6 +251,16 @@ describe('involvesTeam and nextGameForTeam', () => {
 
   it('is null when the team has no games left', () => {
     expect(nextGameForTeam(games, 'r', at('23:00', '2026-10-02'))).toBeNull();
+  });
+
+  it('moves on once the next game on the court has started, when games are under 60 minutes apart', () => {
+    const tight = [
+      game('r-first', { time: '18:00', team1Id: 'r', team2Id: 'h' }),
+      game('others', { time: '18:45', team1Id: 'x', team2Id: 'y' }),
+      game('r-second', { time: '20:15', team1Id: 'x', team2Id: 'r' }),
+    ];
+    expect(nextGameForTeam(tight, 'r', at('18:44'))?.id).toBe('r-first');
+    expect(nextGameForTeam(tight, 'r', at('18:50'))?.id).toBe('r-second');
   });
 });
 
@@ -306,18 +384,18 @@ describe('markInProgress', () => {
   });
 });
 
-describe('cellEnd: a game cell never runs into the next game on its court', () => {
+describe("slotEnd: a game's time on court never runs into the next game on its court", () => {
   it('stops at the next start on the court when that comes before the slot ends', () => {
     const games = [game('a', { time: '18:00' }), game('b', { time: '18:45' }), game('c', { time: '19:30' })];
-    expect(cellEnd(games[0]!, games)).toBe(toMinutes('18:45'));
-    expect(cellEnd(games[1]!, games)).toBe(toMinutes('19:30'));
-    expect(cellEnd(games[2]!, games)).toBe(toMinutes('20:30'));
+    expect(slotEnd(games[0]!, games)).toBe(toMinutes('18:45'));
+    expect(slotEnd(games[1]!, games)).toBe(toMinutes('19:30'));
+    expect(slotEnd(games[2]!, games)).toBe(toMinutes('20:30'));
   });
 
   it('keeps the full slot when the next game starts 60 minutes or more later', () => {
     const games = [game('a', { time: '13:10' }), game('b', { time: '14:10' }), game('c', { time: '15:15' })];
-    expect(cellEnd(games[0]!, games)).toBe(toMinutes('14:10'));
-    expect(cellEnd(games[1]!, games)).toBe(toMinutes('15:10'));
+    expect(slotEnd(games[0]!, games)).toBe(toMinutes('14:10'));
+    expect(slotEnd(games[1]!, games)).toBe(toMinutes('15:10'));
   });
 
   it('ignores other courts, other days, unscheduled games and earlier games', () => {
@@ -329,11 +407,16 @@ describe('cellEnd: a game cell never runs into the next game on its court', () =
       game('earlier', { time: '17:30' }),
       game('same-time', { time: '18:00' }),
     ];
-    expect(cellEnd(games[0]!, games)).toBe(toMinutes('19:00'));
+    expect(slotEnd(games[0]!, games)).toBe(toMinutes('19:00'));
+  });
+
+  it('keeps the full slot for a game without a court, whatever else has no court', () => {
+    const games = [game('a', { court: null, time: '18:00' }), game('b', { court: null, time: '18:15' })];
+    expect(slotEnd(games[0]!, games)).toBe(toMinutes('19:00'));
   });
 
   it('honours a custom slot length', () => {
     const games = [game('a', { time: '18:00' }), game('b', { time: '18:50' })];
-    expect(cellEnd(games[0]!, games, 40)).toBe(toMinutes('18:40'));
+    expect(slotEnd(games[0]!, games, 40)).toBe(toMinutes('18:40'));
   });
 });

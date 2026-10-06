@@ -128,7 +128,7 @@ function NextGameLine(props: {
   const opponent = teamName(game.team1Id === teamId ? game.team2Id : game.team1Id);
   const where = courtName(event, game.court!);
   const time = formatTime(game.time!);
-  if (gameStatus(game, clock) === 'on-court') {
+  if (gameStatus(game, clock, event.games) === 'on-court') {
     return (
       <p className={styles.answerLine}>
         <strong>On court now</strong> {where}, vs {opponent}
