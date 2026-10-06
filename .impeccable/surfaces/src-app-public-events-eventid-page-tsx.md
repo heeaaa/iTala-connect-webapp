@@ -17,7 +17,7 @@ Spectators, players and families at a league night (typically 1-2 courts, up to 
 
 ## Constraints
 
-Colour only from the five `--ev-*` organiser tokens plus division colours. State never by colour alone. No game clock, period or quarter (mobile app owns stats). On court = scheduled slot in progress in the event time zone; Final = slot passed and both scores in; otherwise "Awaiting score".
+Colour only from the five `--ev-*` organiser tokens plus division colours. State never by colour alone. No game clock, period or quarter (mobile app owns stats). On court = from the start until the 60-minute slot ends or the next game on its court starts, whichever is first, in the event time zone; Final = that time passed and both scores in; otherwise "Awaiting score".
 
 ## Open decisions
 
@@ -40,6 +40,6 @@ FIRST VIEWPORT: Phone, 390 px:
 
 Desktop: the courts side by side, with the grid in full view below. The primary action is the team chip.
 
-FORM: Painted Lines, candidate 7 of 7 on the ordered list, seed key b7ecb8d8. Signature interaction: a single accent "now" line crossing tonight's court x time grid at the current time, with the hour in progress banded. It is the only moving mark apart from a brief paint-in when a score changes. Raises kept: now / next is the grid's current row folded out; one moving mark; time-proportional rows; physical paint; fixed stations Final, On court, Up next.
+FORM: Painted Lines, candidate 7 of 7 on the ordered list, seed key b7ecb8d8. Signature interaction: a single accent "now" line crossing tonight's court x time grid at the current time, with the start time in progress banded (05/10/2026: the time column labels real start times, not clock hours). It is the only moving mark apart from a brief paint-in when a score changes. Raises kept: now / next is the grid's current row folded out; one moving mark; time-proportional rows; physical paint; fixed stations Final, On court, Up next.
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance

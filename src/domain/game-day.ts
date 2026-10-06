@@ -3,9 +3,10 @@
  *
  * New in iTala Connect (no old-code equivalent), so there is no golden
  * file: the rules are the ones confirmed in the Today surface brief.
- *  - On court: the game's scheduled slot is in progress.
- *  - Final: the slot has passed and both scores are in (0 is a score).
- *  - Awaiting score: the slot has passed without both scores.
+ *  - On court: from the game's start until its 60-minute slot ends, or until
+ *    the next game on its court starts if that is sooner.
+ *  - Final: that time has passed and both scores are in (0 is a score).
+ *  - Awaiting score: that time has passed without both scores.
  * All times are the event's local wall-clock times; the caller converts
  * "now" into the event time zone first (src/lib/event-time.ts).
  */
@@ -45,14 +46,37 @@ export function hasBothScores(game: Pick<DayGame, 'score1' | 'score2'>): boolean
   return game.score1 !== null && game.score2 !== null;
 }
 
-export function gameStatus(game: DayGame, clock: Clock, slotMinutes = SLOT_MINUTES): GameStatus {
+/**
+ * Where a game's time on its court ends: the end of its slot, or sooner when
+ * the next game on its court starts first. The day grid ends the game's cell
+ * here so cells never overlap, and the game stops being on court here
+ * (reported 06/10/2026: games 45 minutes apart both read On court).
+ */
+export function slotEnd(game: DayGame, games: readonly DayGame[], slotMinutes = SLOT_MINUTES): number {
+  const start = toMinutes(game.time!);
+  let end = start + slotMinutes;
+  if (game.court === null) return end;
+  for (const g of games) {
+    if (g.day !== game.day || g.court !== game.court || g.time === null) continue;
+    const next = toMinutes(g.time);
+    if (next > start && next < end) end = next;
+  }
+  return end;
+}
+
+/** `games` are the event's other games (any days), so the next game on the court ends this one's time on court. */
+export function gameStatus(
+  game: DayGame,
+  clock: Clock,
+  games: readonly DayGame[],
+  slotMinutes = SLOT_MINUTES,
+): GameStatus {
   if (game.day === null || game.time === null) return 'unscheduled';
   const finished = hasBothScores(game) ? 'final' : 'awaiting-score';
   if (game.day < clock.date) return finished;
   if (game.day > clock.date) return 'upcoming';
-  const start = toMinutes(game.time);
-  if (clock.minutes < start) return 'upcoming';
-  if (clock.minutes < start + slotMinutes) return 'on-court';
+  if (clock.minutes < toMinutes(game.time)) return 'upcoming';
+  if (clock.minutes < slotEnd(game, games, slotMinutes)) return 'on-court';
   return finished;
 }
 
@@ -101,7 +125,7 @@ export function courtStations<G extends DayGame>(
   for (let court = 1; court <= courts; court++) {
     const onThisCourt = games.filter((g) => g.day === day && g.court === court && g.time !== null);
     onThisCourt.sort(compareScheduled);
-    const status = (g: G) => gameStatus(g, clock, slotMinutes);
+    const status = (g: G) => gameStatus(g, clock, onThisCourt, slotMinutes);
     const finished = onThisCourt.filter((g) => {
       const s = status(g);
       return s === 'final' || s === 'awaiting-score';
@@ -132,7 +156,7 @@ export function nextGameForTeam<G extends DayGame>(
   const candidates = games
     .filter((g) => involvesTeam(g, teamId))
     .filter((g) => {
-      const s = gameStatus(g, clock, slotMinutes);
+      const s = gameStatus(g, clock, games, slotMinutes);
       return s === 'on-court' || s === 'upcoming';
     });
   candidates.sort(compareScheduled);
@@ -158,4 +182,61 @@ export function nowFraction(clock: Clock, day: string, window: DayWindow): numbe
   if (clock.date !== day) return null;
   if (clock.minutes < window.start || clock.minutes > window.end) return null;
   return (clock.minutes - window.start) / (window.end - window.start);
+}
+
+/** One label in the day grid's time column. */
+export interface StartMark {
+  /** Minutes after midnight of the earliest start in the mark. */
+  start: number;
+  /** Minutes after midnight where the next mark starts, or the window end. */
+  end: number;
+  /** HH:MM starts shown together, earliest first (two only when they share one grid step). */
+  times: string[];
+}
+
+/**
+ * The time column (reported 05/10/2026): one mark per distinct start time
+ * on the day, so every label is a real start time level with its games. An
+ * hourly ruler counted from the first game drifted 5 minutes a game when
+ * games ran 65 minutes apart. Starts in the same grid step share a mark.
+ */
+export function startMarks(games: readonly DayGame[], day: string, window: DayWindow, step = 5): StartMark[] {
+  const starts = new Map<number, string>();
+  for (const g of games) {
+    if (g.day !== day || g.time === null) continue;
+    const minutes = toMinutes(g.time);
+    if (!starts.has(minutes)) starts.set(minutes, g.time);
+  }
+  const marks: StartMark[] = [];
+  let stepOfLast = Number.NaN;
+  for (const minutes of [...starts.keys()].sort((a, b) => a - b)) {
+    const stepOf = Math.floor((minutes - window.start) / step);
+    const last = marks.at(-1);
+    if (last && stepOf === stepOfLast) last.times.push(starts.get(minutes)!);
+    else {
+      if (last) last.end = minutes;
+      marks.push({ start: minutes, end: window.end, times: [starts.get(minutes)!] });
+    }
+    stepOfLast = stepOf;
+  }
+  return marks;
+}
+
+/**
+ * The start time whose games are on court now, banded on the grid until its
+ * slot ends or the next start begins, whichever is first. Null between games,
+ * over a break, before the first start, after the last slot and on another day.
+ */
+export function markInProgress(
+  marks: readonly StartMark[],
+  clock: Clock,
+  day: string,
+  slotMinutes = SLOT_MINUTES,
+): { mark: StartMark; until: number } | null {
+  if (clock.date !== day) return null;
+  for (const mark of marks) {
+    const until = Math.min(mark.end, mark.start + slotMinutes);
+    if (mark.start <= clock.minutes && clock.minutes < until) return { mark, until };
+  }
+  return null;
 }

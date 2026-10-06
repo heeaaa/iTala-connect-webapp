@@ -1,6 +1,7 @@
-import { type Clock, toMinutes } from '@/domain/game-day';
+import { type Clock, slotEnd, toMinutes } from '@/domain/game-day';
 import { DEFAULT_EVENT_THEME, type EventTheme } from '@/components/event/theme';
 import { type TodayDivision, type TodayEvent, type TodayGame, type TodayTeam } from '@/components/event/today/model';
+import { minutesToTime } from '@/lib/event-time';
 
 /**
  * SAMPLE DATA for the Today screen prototype (/prototype/today). Not a real
@@ -10,7 +11,12 @@ import { type TodayDivision, type TodayEvent, type TodayGame, type TodayTeam } f
 
 export const SAMPLE_DAYS = ['2026-09-11', '2026-09-18', '2026-09-25', '2026-10-02', '2026-10-09'];
 export const SAMPLE_GAME_DAY = '2026-09-25';
-const SLOTS = ['18:00', '19:00', '20:00', '21:00'];
+const FIRST_SLOT = '18:00';
+
+/** Four starts a night from 6:00 pm, the given minutes apart. */
+function slotTimes(cadence: number): string[] {
+  return [0, 1, 2, 3].map((i) => minutesToTime(toMinutes(FIRST_SLOT) + i * cadence));
+}
 
 /** A second organiser palette, to show the page follows any event colours. */
 export const LIGHT_ORGANISER_THEME: EventTheme = {
@@ -76,9 +82,16 @@ export interface SampleOptions {
   courts: 2 | 4;
   clock: Clock;
   theme?: EventTheme;
+  /**
+   * Minutes between a court's games: 60 as the scheduler places them, or an
+   * organiser's own times, such as 65 (a 5-minute changeover) or 45. With 45
+   * a team rests only 90 minutes, so it is a layout sample only.
+   */
+  cadence?: 45 | 60 | 65;
 }
 
-export function sampleLeague({ courts, clock, theme = DEFAULT_EVENT_THEME }: SampleOptions): TodayEvent {
+export function sampleLeague({ courts, clock, theme = DEFAULT_EVENT_THEME, cadence = 60 }: SampleOptions): TodayEvent {
+  const slots = slotTimes(cadence);
   const divisions = DIVISIONS.slice(0, courts);
   const teams: TodayTeam[] = divisions.flatMap((d) =>
     d.teams.map((name, i) => ({ id: `${d.id}-${i}`, name, divisionId: d.id })),
@@ -94,9 +107,9 @@ export function sampleLeague({ courts, clock, theme = DEFAULT_EVENT_THEME }: Sam
       const offset = divIndex % 2;
       if (playoffs) {
         games.push(
-          game(`${day}-${d.id}-s1`, day, SLOTS[offset]!, firstCourt, null, null, d, `${d.name} - Semi 1`, 'semi'),
-          game(`${day}-${d.id}-s2`, day, SLOTS[offset]!, firstCourt + 1, null, null, d, `${d.name} - Semi 2`, 'semi'),
-          game(`${day}-${d.id}-f`, day, SLOTS[offset + 2]!, firstCourt, null, null, d, `${d.name} - Finals`, 'final'),
+          game(`${day}-${d.id}-s1`, day, slots[offset]!, firstCourt, null, null, d, `${d.name} - Semi 1`, 'semi'),
+          game(`${day}-${d.id}-s2`, day, slots[offset]!, firstCourt + 1, null, null, d, `${d.name} - Semi 2`, 'semi'),
+          game(`${day}-${d.id}-f`, day, slots[offset + 2]!, firstCourt, null, null, d, `${d.name} - Finals`, 'final'),
         );
         return;
       }
@@ -104,7 +117,7 @@ export function sampleLeague({ courts, clock, theme = DEFAULT_EVENT_THEME }: Sam
       [0, 1].forEach((r) => {
         const round = ROUNDS[(dayIndex * 2 + r) % ROUNDS.length]!;
         round.forEach(([a, b], i) => {
-          const slot = SLOTS[r * 2 + offset]!;
+          const slot = slots[r * 2 + offset]!;
           games.push(
             game(
               `${day}-${d.id}-${r}-${i}`,
@@ -132,7 +145,7 @@ export function sampleLeague({ courts, clock, theme = DEFAULT_EVENT_THEME }: Sam
     theme,
     divisions: divisions.map(({ id, name, color }) => ({ id, name, color })),
     teams,
-    games: games.map((g) => withScores(g, clock)),
+    games: games.map((g) => withScores(g, clock, games)),
   };
 }
 
@@ -155,7 +168,7 @@ function game(
  * except Court 2's first game, which shows "Awaiting score"; the game on
  * court has a running score; later games have none. Playoffs stay TBD.
  */
-function withScores(g: TodayGame, clock: Clock): TodayGame {
+function withScores(g: TodayGame, clock: Clock, games: readonly TodayGame[]): TodayGame {
   if (g.team1Id === null || g.day === null || g.time === null) return g;
   const [s1, s2] = fullScore(g.id);
   if (g.day < clock.date) return { ...g, score1: s1, score2: s2 };
@@ -163,10 +176,12 @@ function withScores(g: TodayGame, clock: Clock): TodayGame {
   const start = toMinutes(g.time);
   const elapsed = clock.minutes - start;
   if (elapsed < 0) return g;
-  if (elapsed >= 60) {
-    return g.court === 2 && g.time === SLOTS[0] ? g : { ...g, score1: s1, score2: s2 };
+  // A game is over when its slot ends or the next game on its court starts.
+  const length = slotEnd(g, games) - start;
+  if (elapsed >= length) {
+    return g.court === 2 && g.time === FIRST_SLOT ? g : { ...g, score1: s1, score2: s2 };
   }
-  const share = elapsed / 60;
+  const share = elapsed / length;
   return { ...g, score1: Math.round(s1 * share), score2: Math.round(s2 * share) };
 }
 

@@ -59,7 +59,7 @@ export function PrototypeToday(props: PrototypeTodayProps) {
     }));
   };
 
-  const onCourt = games.filter((g) => gameStatus(g, clock) === 'on-court' && g.team1Id && g.team2Id);
+  const onCourt = games.filter((g) => gameStatus(g, clock, games) === 'on-court' && g.team1Id && g.team2Id);
   // A fixed cycle rather than randomness, so demos and screenshots repeat.
   const [baskets, setBaskets] = useState(0);
   const simulateBasket = () => {
@@ -165,6 +165,11 @@ function PrototypeControls({ canSimulate, onSimulate }: { canSimulate: boolean; 
         {group('Courts', 'courts', [
           [null, '2 courts'],
           ['4', '4 courts'],
+        ])}
+        {group('Game gap', 'cadence', [
+          [null, '60 minutes'],
+          ['65', '65 minutes'],
+          ['45', '45 minutes'],
         ])}
         {group('Colours', 'theme', [
           [null, 'Default event colours'],

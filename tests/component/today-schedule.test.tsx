@@ -1,8 +1,9 @@
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { EventShell } from '@/components/event/event-shell';
+import { type TodayEvent } from '@/components/event/today/model';
 import { TodaySchedule } from '@/components/event/today/today-schedule';
 import { toMinutes } from '@/domain/game-day';
 import { SAMPLE_GAME_DAY, sampleLeague } from '@/prototype/league-night';
@@ -176,6 +177,205 @@ describe('Today screen: your team (PRD P-04, remembered on this device)', () => 
     expect(screen.getByRole('heading', { name: 'Your team: Kits Ravens' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Clear' }));
     expect(screen.queryByRole('heading', { name: /Your team/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('Today screen: the time column shows real start times (reported 05/10/2026)', () => {
+  // One court with games 65 minutes apart. The old hourly ruler, counted
+  // from the first game, read 2:10, 3:10, 4:10, 5:10 and 6:10 pm beside them.
+  const SUNDAY = '2026-10-11';
+  const TIMES = ['13:10', '14:15', '15:20', '16:25', '17:30'];
+  const LABELS = ['1:10 pm', '2:15 pm', '3:20 pm', '4:25 pm', '5:30 pm'];
+
+  /** Each slot is a start time on Main Gym, or [time, court]. */
+  type Slot = string | [string, number];
+
+  function sundayLeague(slots: Slot[] = TIMES, clock = at('12:00', '2026-10-05')): TodayEvent {
+    const base = sampleLeague({ courts: 2, clock });
+    const teams = base.teams.filter((t) => t.divisionId === 'open');
+    return {
+      ...base,
+      days: ['2026-10-04', SUNDAY],
+      courtNames: ['Main Gym', 'Side Gym'],
+      games: slots.map((slot, i) => ({
+        id: `sunday-${i}`,
+        day: SUNDAY,
+        time: typeof slot === 'string' ? slot : slot[0],
+        court: typeof slot === 'string' ? 1 : slot[1],
+        team1Id: teams[i % 4]!.id,
+        team2Id: teams[(i + 1) % 4]!.id,
+        score1: null,
+        score2: null,
+        divisionId: 'open',
+        label: "Men's Open - Group A",
+        type: 'group',
+      })),
+    };
+  }
+
+  function renderSunday(slots: Slot[] = TIMES, clock = at('12:00', '2026-10-05')) {
+    render(<TodaySchedule event={sundayLeague(slots, clock)} clock={clock} selectedDay={null} feed="live" />);
+    return screen.getByRole('region', { name: 'Games by time and court' });
+  }
+
+  /** Each time-column label's grid rows, top to bottom. */
+  function labelRanges(grid: HTMLElement) {
+    return [...grid.querySelectorAll<HTMLElement>('[aria-hidden="true"]')]
+      .filter((el) => el.firstElementChild?.tagName === 'TIME')
+      .map((el) => el.style.gridRow);
+  }
+
+  /** [first row, rows spanned] of a game cell. */
+  function cellRows(card: HTMLElement): [number, number] {
+    const [first, span] = card.style.gridRow.split('/');
+    return [Number(first), Number(span!.replace('span', ''))];
+  }
+
+  /** Times printed in the grid's time column, top to bottom (not the cards' own text, not the now tag). */
+  function columnTimes(grid: HTMLElement) {
+    return within(grid)
+      .getAllByText(/^\d{1,2}:\d{2} [ap]m$/)
+      .filter((el) => !el.closest('article') && !el.closest('[class*="nowLine"]'))
+      .map((el) => el.textContent);
+  }
+
+  it('labels each game with its own start time, and nothing else', () => {
+    const grid = renderSunday();
+    expect(columnTimes(grid)).toEqual(LABELS);
+  });
+
+  it('puts every label on the grid row where its games start, running to the next start', () => {
+    const grid = renderSunday();
+    const rowStart = (el: Element) => Number((el as HTMLElement).style.gridRow.split('/')[0]);
+    const labelRows = within(grid)
+      .getAllByText(/^\d{1,2}:\d{2} [ap]m$/)
+      .filter((el) => !el.closest('article'))
+      .map((el) => rowStart(el.closest('[style*="grid-row"]')!));
+    const cardRows = within(grid)
+      .getAllByRole('article')
+      .map((card) => rowStart(card));
+    expect(labelRows).toEqual(cardRows);
+    // Line 1 is the court header; 5-minute rows from 1:10 pm, the last ending after 6:30 pm.
+    expect(labelRanges(grid)).toEqual(['2 / 15', '15 / 28', '28 / 41', '41 / 54', '54 / 66']);
+  });
+
+  it('lists the cards in reading order, time then court, whatever order the games were stored in', () => {
+    const grid = renderSunday([
+      ['15:20', 1],
+      ['13:10', 2],
+      ['14:15', 1],
+      ['13:10', 1],
+    ]);
+    const lead = (card: HTMLElement) => card.textContent?.match(/^\d{1,2}:\d{2} [ap]m, \w+ Gym/)?.[0];
+    expect(within(grid).getAllByRole('article').map(lead)).toEqual([
+      '1:10 pm, Main Gym',
+      '1:10 pm, Side Gym',
+      '2:15 pm, Main Gym',
+      '3:20 pm, Main Gym',
+    ]);
+  });
+
+  it('says when and where each game is for screen readers', () => {
+    const grid = renderSunday();
+    const cards = within(grid).getAllByRole('article');
+    const lead = (card: HTMLElement) => card.textContent?.match(/^\d{1,2}:\d{2} [ap]m, Main Gym/)?.[0] ?? null;
+    expect(cards.map(lead)).toEqual(LABELS.map((t) => `${t}, Main Gym`));
+  });
+
+  it('bands the start time whose games are on court, for their 60-minute slot', () => {
+    const grid = renderSunday(TIMES, at('14:40', SUNDAY));
+    const current = within(grid)
+      .getAllByText(/^\d{1,2}:\d{2} [ap]m$/)
+      .filter((el) => el.closest('[data-current]'));
+    expect(current.map((el) => el.textContent)).toEqual(['2:15 pm']);
+    const label = current[0]!.closest<HTMLElement>('[style*="grid-row"]')!;
+    expect(label.style.gridRow).toBe('15 / 28');
+    // 2:15 to 3:15 pm; the label itself runs on to the 3:20 pm start.
+    expect(grid.querySelector<HTMLElement>('[class*="timeBand"]')!.style.gridRow).toBe('15 / 27');
+    expect(screen.getByText('2:40 pm', { selector: 'time' }).parentElement).toHaveTextContent(/^Now\s*2:40 pm$/);
+  });
+
+  it('bands nothing in the changeover between games, while the now line still shows', () => {
+    const grid = renderSunday(TIMES, at('15:17', SUNDAY));
+    expect(grid.querySelector('[class*="timeBand"]')).toBeNull();
+    expect(grid.querySelector('[data-current]')).toBeNull();
+    expect(screen.getByText('3:17 pm', { selector: 'time' }).parentElement).toHaveTextContent(/^Now\s*3:17 pm$/);
+  });
+
+  it('never draws a game over the next one on its court when games are 45 minutes apart', () => {
+    const grid = renderSunday(['18:00', '18:45', '19:30', '20:15']);
+    expect(columnTimes(grid)).toEqual(['6:00 pm', '6:45 pm', '7:30 pm', '8:15 pm']);
+    const rows = within(grid).getAllByRole('article').map(cellRows);
+    rows.slice(1).forEach(([first], i) => expect(rows[i]![0] + rows[i]![1]).toBeLessThanOrEqual(first));
+    // The last game keeps its full 60-minute slot: 12 five-minute rows.
+    expect(rows.at(-1)![1]).toBe(12);
+  });
+
+  // Reported 06/10/2026: the 6:00 pm game still read On court until 7:00 pm, beside the
+  // 6:45 pm game on the same court, and the court panel featured the earlier one.
+  it('has one game on court per court when games are 45 minutes apart', async () => {
+    const user = userEvent.setup();
+    const grid = renderSunday(['18:00', '18:45', '19:30', '20:15'], at('18:50', SUNDAY));
+    const cards = within(grid).getAllByRole('article');
+    const lead = (card: HTMLElement) => card.textContent?.match(/^\d{1,2}:\d{2} [ap]m/)?.[0];
+    expect(cards.filter((c) => c.dataset.status === 'on-court').map(lead)).toEqual(['6:45 pm']);
+    expect(cards[0]!.dataset.status).toBe('awaiting-score');
+    expect(within(cards[0]!).getByText('Awaiting score')).toBeInTheDocument();
+    expect(within(grid).getAllByText('On court')).toHaveLength(1);
+
+    const main = court('Main Gym');
+    expect(within(main).getByText('On court')).toBeInTheDocument();
+    expect(within(main).getByText('started 6:45 pm')).toBeInTheDocument();
+    expect(within(main).getByText('Awaiting score').closest('div')).toHaveTextContent('6:00 pm');
+    expect(within(main).getByText('Up next').closest('div')).toHaveTextContent('7:30 pm');
+
+    // The 6:00 pm team plays again at 8:15 pm; its first game is over.
+    const first = sundayLeague().teams[0]!;
+    await user.click(screen.getByRole('button', { name: first.name }));
+    const answer = screen.getByRole('heading', { name: `Your team: ${first.name}` }).parentElement!;
+    expect(answer).toHaveTextContent(/Next: 8:15 pm Main Gym, vs /);
+    expect(answer).not.toHaveTextContent('On court now');
+  });
+
+  it('still keeps each game on court for its full 60 minutes when games are 65 minutes apart', () => {
+    const grid = renderSunday(TIMES, at('14:12', SUNDAY));
+    const cards = within(grid).getAllByRole('article');
+    expect(cards.map((c) => c.dataset.status)).toEqual([
+      'awaiting-score',
+      'upcoming',
+      'upcoming',
+      'upcoming',
+      'upcoming',
+    ]);
+    cleanup();
+    const later = renderSunday(TIMES, at('14:09', SUNDAY));
+    expect(within(later).getAllByRole('article')[0]!.dataset.status).toBe('on-court');
+  });
+
+  it('keeps a whole number of rows when a game starts on an odd minute', () => {
+    const grid = renderSunday(['13:10', '14:13']);
+    expect(columnTimes(grid)).toEqual(['1:10 pm', '2:13 pm']);
+    const inner = grid.firstElementChild as HTMLElement;
+    expect(inner.style.getPropertyValue('--rows')).toBe('25');
+    // The last label runs past the last row (25 rows after the header: line 27).
+    expect(labelRanges(grid)).toEqual(['2 / 14', '14 / 27']);
+  });
+
+  it('stacks two starts from the same five minutes in one label, one per court', () => {
+    const grid = renderSunday([
+      ['13:10', 1],
+      ['13:12', 2],
+    ]);
+    const [first, second] = within(grid)
+      .getAllByText(/^\d{1,2}:\d{2} [ap]m$/)
+      .filter((el) => !el.closest('article'));
+    expect([first!.textContent, second!.textContent]).toEqual(['1:10 pm', '1:12 pm']);
+    expect(first!.parentElement).toBe(second!.parentElement);
+    const cards = within(grid).getAllByRole('article');
+    expect(cards.map((card) => card.textContent?.match(/^\d{1,2}:\d{2} [ap]m, \w+ Gym/)?.[0])).toEqual([
+      '1:10 pm, Main Gym',
+      '1:12 pm, Side Gym',
+    ]);
   });
 });
 

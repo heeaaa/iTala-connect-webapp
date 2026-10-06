@@ -22,6 +22,32 @@ async function noSidewaysScroll(page: Page) {
   expect(width).toBeLessThanOrEqual(page.viewportSize()!.width);
 }
 
+/**
+ * Every game card in the day grid: its start time (from the card's own
+ * screen-reader text), the time-column label printing that time, and the
+ * card's box. The label's rule should sit level with the card's top edge.
+ */
+async function gridGeometry(page: Page) {
+  return page.getByRole('region', { name: 'Games by time and court' }).evaluate((grid) => {
+    const labels = [...grid.querySelectorAll('[aria-hidden="true"] > time')].map((t) => ({
+      text: t.textContent,
+      top: t.parentElement!.getBoundingClientRect().top,
+    }));
+    return [...grid.querySelectorAll('article')].map((card) => {
+      const box = card.getBoundingClientRect();
+      const time = card.querySelector('time')!.textContent;
+      const label = labels.find((l) => l.text === time);
+      return {
+        time,
+        left: Math.round(box.left),
+        top: box.top,
+        bottom: box.bottom,
+        gap: label ? box.top - label.top : null,
+      };
+    });
+  });
+}
+
 test.describe('Today screen prototype (sample data)', () => {
   test('score fields stay inside game cards with long team names on a phone', async ({ page }, info) => {
     test.skip(info.project.name !== 'mobile');
@@ -124,6 +150,66 @@ test.describe('Today screen prototype (sample data)', () => {
     await page.goto('/prototype/today?theme=light&courts=4&owner=1');
     await expect(page.getByRole('region', { name: 'Court 4' })).toBeAttached();
     await expect(page.getByRole('textbox', { name: /score, 6:00 pm/ }).first()).toBeVisible();
+    await noSidewaysScroll(page);
+    await expectNoSeriousA11yViolations(page);
+  });
+
+  test('each time in the grid is a real start time, level with its games when they run 65 minutes apart', async ({
+    page,
+  }) => {
+    // Reported 05/10/2026: an hourly ruler from the first game read 7:00, 8:00 and 9:00 pm beside 7:05, 8:10 and 9:15 pm games.
+    await page.goto('/prototype/today?cadence=65');
+    const cards = await gridGeometry(page);
+    expect([...new Set(cards.map((c) => c.time))].sort()).toEqual(['6:00 pm', '7:05 pm', '8:10 pm', '9:15 pm']);
+    for (const card of cards) {
+      // The card's own 0.375rem top margin is the only space between the label's rule and the card.
+      expect(card.gap, `${card.time} label`).not.toBeNull();
+      expect(card.gap!).toBeGreaterThanOrEqual(0);
+      expect(card.gap!).toBeLessThanOrEqual(8);
+    }
+    const column = page.getByRole('region', { name: 'Games by time and court' }).locator('[aria-hidden="true"] > time');
+    await expect(column).toHaveText(['6:00 pm', '7:05 pm', '8:10 pm', '9:15 pm']);
+    await noSidewaysScroll(page);
+    await expectNoSeriousA11yViolations(page);
+  });
+
+  test('games 45 minutes apart never overlap on a court, and each keeps its own label', async ({ page }) => {
+    await page.goto('/prototype/today?cadence=45&day=2026-10-02');
+    const cards = await gridGeometry(page);
+    expect(cards).toHaveLength(8);
+    for (const a of cards) {
+      expect(a.gap, `${a.time} label`).not.toBeNull();
+      expect(Math.abs(a.gap!)).toBeLessThanOrEqual(8);
+      for (const b of cards) {
+        if (a !== b && a.left === b.left && a.top < b.top) expect(a.bottom).toBeLessThanOrEqual(b.top);
+      }
+    }
+    await noSidewaysScroll(page);
+  });
+
+  test('games 45 minutes apart leave one game on court per court, the one that started last', async ({ page }) => {
+    // Reported 06/10/2026: the 6:00 pm games still read On court beside the 6:45 pm games until 7:00 pm.
+    await page.goto('/prototype/today?cadence=45&at=18:50');
+    const grid = page.getByRole('region', { name: 'Games by time and court' });
+    const statuses = await grid
+      .locator('article')
+      .evaluateAll((cards) =>
+        cards.map((card) => `${card.querySelector('.sr-only')!.textContent} ${card.getAttribute('data-status')}`),
+      );
+    expect(statuses).toEqual([
+      '6:00 pm, Court 1 final',
+      '6:00 pm, Court 2 awaiting-score',
+      '6:45 pm, Court 1 on-court',
+      '6:45 pm, Court 2 on-court',
+      '7:30 pm, Court 1 upcoming',
+      '7:30 pm, Court 2 upcoming',
+      '8:15 pm, Court 1 upcoming',
+      '8:15 pm, Court 2 upcoming',
+    ]);
+    const court1 = page.getByRole('region', { name: 'Court 1' });
+    await expect(court1.getByText('started 6:45 pm')).toBeVisible();
+    await expect(court1.getByText('Final').locator('..')).toContainText('6:00 pm');
+    await expect(court1.getByText('Up next').locator('..')).toContainText('7:30 pm');
     await noSidewaysScroll(page);
     await expectNoSeriousA11yViolations(page);
   });

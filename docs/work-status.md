@@ -1,6 +1,58 @@
 # Work status
 
-Last updated: 03/10/2026 (Codex, Connect Reports integration)
+Last updated: 06/10/2026 (Claude, On court and score lock)
+
+## Current handoff (05/10/2026, schedule start times)
+
+**Objective:** users reported that the public Schedule grid showed the wrong game times. The live Brotherhood Basketball 2026 page (read-only GET, Sun 11/10/2026, one court) has games at 1:10, 2:15, 3:20, 4:25 and 5:30 pm, 65 minutes apart, but the time column read 1:10, 2:10, 3:10, 4:10, 5:10 and 6:10 pm. It was an hourly ruler counted from the first game while the cards sat at their real times, so every card drifted 5 minutes further from its label. All nine regular-season days share the pattern. The old app labelled every row with its exact start time (P-05), so this was a parity regression.
+
+**Decision (user, 05/10/2026):** after a mock-up of Current, Option A (the column shows real start times) and Option B (times on the cards over a clock-hour scale), the user chose Option A plus the overlap fix, and a pushed branch with a draft PR. Mock-up: private artifact https://claude.ai/artifact/H4br24sajNi489bftcAy2u.
+
+**Changed (branch `fix/schedule-start-times` from `main` at `0d98543`):**
+- `src/domain/game-day.ts`: `startMarks` (one time-column mark per distinct start on the day; starts in one 5-minute step share a mark), `markInProgress` (the band) and `cellEnd` (a cell stops at the next game on its court when that is under 60 minutes away).
+- `src/components/event/today/day-grid.tsx` and `today.module.css`: the gutter labels only real start times, level with their cards, and is visual only (each cell now names its start time and court for screen readers, and cells are in time-then-court reading order). The band marks the start time whose games are on court, until the slot ends or the next start, so a changeover or break shows no band (refined after review; the approved plan said "to the next start", which would have kept 11:00 am banded through a lunch break). Row counts round up, so odd minutes such as 2:13 pm keep a valid grid. `gridHour` and `hourBand` are renamed `gridTime` and `timeBand`.
+- Independent review (read-only subagent, node simulations of the row maths): no material defects. Acted on: reading order, exact grid-row assertions, the band over breaks. Left as cosmetic: with a start off the 5-minute grid (1:13 and 2:15 pm) the now line can sit up to 4 minutes inside the next row before the band moves, and the last card can end one 5-minute row short of the grid bottom.
+- `/prototype/today?cadence=65` or `45`, with a Game gap control, for the new E2E checks.
+- DESIGN.md (day grid, now line, palette roles), `.impeccable/design.json`, the Today surface brief and PRD P-05.
+
+**Verified on this laptop (Windows, Node 24.13.0):**
+- Bug proof: the new regression tests in `tests/component/today-schedule.test.tsx` failed 3/3 on `0d98543` (labels "1:10, 2:10, ..., 6:10 pm"; label rows 2, 14, 26, 38, 50, 62 against card rows 2, 15, 28, 41, 54; cards without a time) and pass after the fix (7/7 in the block).
+- After the review follow-ups (reading order, band rule): the four affected test files passed 86/86, then `npm run lint`, `npm run typecheck`, a production build without the harness, `npm run check:secrets` (also scanned against this laptop's `.env` and `.env.local` server-only values, names only) and `today-prototype.spec.ts` on that build (16 passed, 2 skipped by design) all passed.
+- Before the follow-ups, unit and component suite with coverage, one file at a time (`--no-file-parallelism`): 1060 passed, 1 failed, with every threshold met (95.29% statements, 90.68% branches, 96.27% lines; `game-day.ts` and `day-grid.tsx` 100%). The one failure, `clean-build-cache.test.ts` junction refusal, fails identically on a clean `origin/main` worktree here, inside and outside the sandbox (baseline; CI on Linux is the check). With the default parallel workers, 6 to 10 admin-screen tests (admins-view, event-editor, default-rules, results-view, confirm-form) also timed out, a different set each run; they import no changed code and passed alone and in the sequential run.
+- `npm ci` was needed first: `exceljs`, `pdf-lib`, `@pdf-lib/fontkit` and `fflate` from the Reports merge were missing locally. The lockfile is unchanged.
+- Production build with `ENABLE_PROTOTYPES=1` and local-only public values passed (the two known Big Shoulders font warnings). `today-prototype.spec.ts` through `test-results/playwright.prototype.config.ts`: 16 passed, 2 skipped by design (phone-only tests on desktop), including the two new geometry tests and axe at 390 and 1440 px.
+- Harness captures (`.impeccable/review/schedule-times/`, ignored): before 1/5, 1/8 and 2/8 labels true with 6 overlapping cards; after 5/5, 8/8 and 8/8 with every card 6 px under its own label and no overlaps.
+- The local-only harness `src/app/prototype/zz-guard` no longer type-checks against `LinkPageData` (`link/page.tsx`), which blocks local builds; it was parked during the builds and put back unchanged.
+
+**CI on draft PR #15 (`20614a4`, run 37359094623, all jobs passed):** unit and component 1066/1066 with coverage 95.29% statements, 90.68% branches, 96.27% lines (so the Windows-only `clean-build-cache.test.ts` failure does not occur on Linux); pgTAP 21 files, 428 tests, PASS; integration 39/39; E2E 101 passed, 5 skipped, including both new geometry tests on the phone and desktop projects; lint, typecheck and gitleaks passed. The Netlify deploy preview built. It returns 401 (Netlify Team protection) to curl and headless Chromium, so the user checked it in their signed-in browser on 06/10/2026 and sent desktop screenshots: Brotherhood Basketball 2026, Sun 11/10/2026 (one court, light) reads 1:10, 2:15, 3:20, 4:25 and 5:30 pm, each level with its game; BPBL 2026, Sat 17/10/2026 (two courts, dark, games on the half hour) reads 12:30 to 6:30 pm with both courts' cards level with the labels and the second court correctly empty until 4:30 pm. BPBL cards show their game label ("Season 9") where the legend shows the division name; that comes from the data and predates this change.
+
+### On court and the score lock (06/10/2026, same branch and PR #15)
+
+**Objective:** with games under 60 minutes apart on one court, the earlier game still read On court for its full 60-minute slot, so from 6:45 to 7:00 pm two games on one court read On court and the court panel featured the earlier one. Games 60 or more minutes apart (Brotherhood, BPBL, every generated schedule) were never affected.
+
+**Decisions (user, 06/10/2026):** fix it on this branch; no strict new server-side validation (none was added: no server, action or database change). The owner score lock follows the scores alone: the boxes lock as soon as both scores are saved, whatever the time, including during a game (so updating a running score takes one tap on the lock), and never while a score is missing. Before, they locked only once the game read Final.
+
+**Changed:**
+- `src/domain/game-day.ts`: `cellEnd` is now `slotEnd` (a game without a court keeps its full slot), and `gameStatus(game, clock, games, slotMinutes?)` ends On court there, so the grid cell and the status share one rule. `courtStations` and `nextGameForTeam` pass the games.
+- Callers pass the games: the day grid, the team finder ("On court now") and the prototype. `day-grid.tsx`: the lock needs only both scores.
+- `src/prototype/league-night.ts`: sample scores finish when the next game on the court starts.
+- PRD P-08 and P-13, DESIGN.md (score input), the Today surface brief.
+
+**Verified on this laptop (Windows, Node 24.13.0):**
+- Bug proof: five new tests failed on the unfixed code (court summary at 6:50 pm had no Final; the team's next game was still the 6:00 pm game; the grid had two On court cards, 6:00 and 6:45 pm; both lock tests "Received element is not disabled") and the four affected files passed 96/96 after the fix. A 65-minute guard test passed before and after. Two existing LiveEvent tests now open the lock before typing into an on-court game with both scores, which is the new expected flow.
+- `npm run lint`, `npm run typecheck` (zz-guard parked), a clean `npm run build` (the two known font warnings) and `npm run check:secrets` (also against this laptop's `.env` and `.env.local` server-only values, names only) passed.
+- Coverage, one file at a time: 1075 passed, 1 failed (the Windows-only `clean-build-cache.test.ts` baseline above); thresholds met (95.29% statements, 90.72% branches, 96.27% lines); `game-day.ts` and `day-grid.tsx` 100%.
+- `today-prototype.spec.ts` on a prototype build: 18 passed, 2 skipped by design, including the new 45-minute On court test with axe at 390 and 1440 px. The new E2E test was not run against the unfixed code; the unit and component tests are the bug proof.
+- The scratch sweep that could not run on 05/10 (`test-results/zz-times/sweep.mjs`, ignored) ran: 66 page checks at 320, 360, 390, 768, 1024 and 1440 px passed (labels level with cards, no overlaps, no sideways scroll, band timing), now with 45 minutes at 6:50 pm on two and four courts and at most one On court card per court; owner Tab order follows time then court at 390 and 1440 px.
+- Lock harness (`src/app/prototype/zz-lock`, local only, parked in the session scratchpad; `test-results/zz-times/lock.mjs`): the real LiveEvent island at 12:50 pm, dark and light, at 320, 390 and 1440 px. The padlock shows only on games with both scores (final, on court, and an upcoming 0-0), never on a game missing a score; it sits inside the card, clear of the label and the On court tag, at 24 px or more; no sideways scroll or serious axe findings; unlocking the on-court game reopens its boxes. Screenshots in `.impeccable/review/oncourt-lock/` (ignored) were inspected at 320 px dark and 1440 px light.
+
+**Independent review (read-only subagent) and follow-up:** the On court rule and every caller checked out. It found three lock problems, all now fixed with failing-first tests (3 failed on the first fix, 17/17 pass after):
+- A failed save put back the previous keystroke (typing 1 then 18 left an unsaved 20-1), which the new rule then locked. `live-event.tsx` now remembers the last score the server confirmed (a save or Realtime), puts that back, and leaves the boxes open to try again.
+- A save between keystrokes locked the box under the cursor, losing the next digit and focus. The lock now waits while focus is in that game's boxes (moving between the two sides still counts as entering) and applies when the owner leaves them; tapping the padlock locks at once.
+- On desktop the padlock appearing pushed the boxes down. Owner cards now always keep its room (hidden and disabled until both scores are in), so all owner card headers match.
+After the follow-up: the four affected files 100/100; lint, typecheck, a clean build and `check:secrets` (also against `.env` and `.env.local` server-only values, names only) passed; coverage one file at a time 1079 passed, 1 failed (the same Windows-only baseline), 95.34% statements, 90.76% branches, 96.32% lines, `live-event.tsx` 100% lines; `today-prototype.spec.ts` 18 passed, 2 skipped; the sweep 66/66; the lock harness at 320, 390 and 1440 px in both themes passed, including typing the missing score without the box moving and a real failed save ("Please sign in again.") that put back the stored score and left the box open.
+
+**Not run here:** the Docker suites; CI on PR #15 runs them on push. The public-event E2E journey (owner fills both scores of an unscored game in one card) is unaffected by the lock change by reading; CI confirms it.
 
 ## Current handoff (03/10/2026, Connect Reports integration)
 

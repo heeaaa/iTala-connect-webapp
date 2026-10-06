@@ -414,13 +414,13 @@ The palette is whatever the organiser chose; the system defines roles and the de
 #### Neutral
 - **Floor** (`--ev-bg`, default Night Floor): the page ground and the fill of every grid cell and input.
 - **Body Ink** (`--ev-text`, default Chalk Grey): body copy, team names in cells, chip labels.
-- **Muted Ink** (`--ev-muted`, default Bench Grey): dates, statuses, legends, grid hours, station terms, filtered-out games, the "Powered by iTala Connect" footer.
+- **Muted Ink** (`--ev-muted`, default Bench Grey): dates, statuses, legends, grid start times, station terms, filtered-out games, the "Powered by iTala Connect" footer.
 - **Heading Ink** (`--ev-heading`, default White): event name, section titles, court names, team names on the court, score numerals, times in stations.
 
 #### Derived paint (computed from the live tokens with `color-mix` in sRGB)
-- **Quiet Rule** (`rule`, `--ev-muted` 38% into `--ev-bg`): 1 px station and grid-hour rules, the tab sideline, the footer rule, final and awaiting-score cell borders, filtered-out cells.
+- **Quiet Rule** (`rule`, `--ev-muted` 38% into `--ev-bg`): 1 px station and grid start-time rules, the tab sideline, the footer rule, final and awaiting-score cell borders, filtered-out cells.
 - **Floor Tint** (`floor-tint`, `--ev-accent` 5% into `--ev-bg`): the court's playing surface and the lettering patches that stop lines crossing names and scores.
-- **Paint Band** (`paint-band`, `--ev-accent` 13% into `--ev-bg`): the hour in progress across the day grid, and the fill of on-court cells.
+- **Paint Band** (`paint-band`, `--ev-accent` 13% into `--ev-bg`): the start time in progress across the day grid, and the fill of on-court cells.
 - **Faded Paint** (`paint-faded`, `--ev-accent` 55% into `--ev-bg`): dashed up-next cell borders, court lines once a court is final or empty, the scrollbar thumb.
 - **Filter Tint** (`--ev-accent` 9% into `--ev-bg`): fill of cells matching the chosen team.
 
@@ -482,7 +482,7 @@ All three are self-hosted through `next/font` (`src/app/event-fonts.ts`) as `--f
 - **Body** (Archivo 400, 1rem, 1.5): running text, empty states (1.0625rem, muted).
 - **Team name** (Archivo 500, 0.9375rem, 1.25): grid cells and stations, hyphenating only when one word cannot fit; 700 with the paint underline for the spectator's team. On the drawn court, 700 at clamp(0.875rem, 4.3cqi, 1.3rem), centred and balanced.
 - **Label** (Big Shoulders 700, 0.875rem, 0.05em, uppercase): station terms ("Final", "Up next").
-- **Small** (Archivo 600, 0.8125rem): legends, grid hours, footer; cell labels and statuses at 0.75rem.
+- **Small** (Archivo 600, 0.8125rem): legends, grid start times, footer; cell labels and statuses at 0.75rem.
 
 #### Named Rules
 **The Tabular Numerals Rule.** Every score, time and date uses `font-variant-numeric: tabular-nums` so live changes never shift the layout.
@@ -520,10 +520,10 @@ All three are self-hosted through `next/font` (`src/app/event-fonts.ts`) as `--f
 ### Event pages
 A single centred column capped at 85rem, with a 1rem side gutter on phones and 2rem from 48rem up. The event name, tabs and content share that measure. Sections stack with space (2.5rem between main sections, 2rem between courts, 1.5rem above the layout), never inside cards.
 
-- **Phones (below 40rem):** courts stack one per row; with three or more courts they become a horizontal snap rail at 88% width each so the page stays short. The day grid keeps two courts in view without sideways scroll (3.5rem hour gutter, 8.25rem minimum columns) and scrolls inside itself beyond that, never the page. Its hour minimum tightens to 5.5rem, cell spacing and names tighten, and the lock sits in the card's top-right corner without making the division label narrower than necessary. The team finder collapses behind a full-width outlined toggle.
+- **Phones (below 40rem):** courts stack one per row; with three or more courts they become a horizontal snap rail at 88% width each so the page stays short. The day grid keeps two courts in view without sideways scroll (3.5rem time gutter, 8.25rem minimum columns) and scrolls inside itself beyond that, never the page. Its hour minimum tightens to 5.5rem, cell spacing and names tighten, and the lock sits in the card's top-right corner without making the division label narrower than necessary. The team finder collapses behind a full-width outlined toggle.
 - **40rem and up:** courts sit side by side (auto-fit, minimum 20rem each).
 - **68rem and up:** a 19rem sticky sidebar holds the team finder beside the main column (3rem gap).
-- **Day grid:** time-proportional rows in 5-minute steps (an hour is 6.75rem tall), a sticky hour gutter, one column per court (minimum 10.5rem). Rows grow when names wrap, so nothing is cut off.
+- **Day grid:** time-proportional rows in 5-minute steps (an hour is 6.75rem tall), a sticky time gutter, one column per court (minimum 10.5rem). The gutter labels each real start time on the day, level with the top of the games that start then, and no other times, so an organiser's own times (games 65 minutes apart, a game moved to 7:30 pm) read true. Two starts in one 5-minute step share a label. The gutter is visual only: each game cell names its start time and court for screen readers, and cells follow reading order (time, then court) whatever order the games were stored in. A cell runs for its 60-minute slot, or until the next game on its court starts if that is sooner, so cells never overlap. Rows grow when names wrap, so nothing is cut off.
 - **Touch:** every interactive element is at least 2.75rem (44 px) tall.
 
 ### Platform screens
@@ -539,7 +539,7 @@ A centred column capped at 76rem, with a 1rem gutter on phones and 2rem from 48r
 ## Elevation & Depth
 
 ### Event pages
-Flat. There are no shadows anywhere in this world. Depth is expressed as paint on a floor: tonal tints of the accent mixed into the floor (Floor Tint, Paint Band) and stroke weight. Layering exists only where sticky or overlapping elements need an opaque floor behind them (the sticky hour gutter, lettering patches on the court).
+Flat. There are no shadows anywhere in this world. Depth is expressed as paint on a floor: tonal tints of the accent mixed into the floor (Floor Tint, Paint Band) and stroke weight. Layering exists only where sticky or overlapping elements need an opaque floor behind them (the sticky time gutter, lettering patches on the court).
 
 #### Named Rules
 **The Flat Paint Rule.** No box-shadow, no glow, no gradient, no texture. If something needs emphasis, give it heavier paint or a tint, not a lift.
@@ -597,7 +597,7 @@ Components are painted outlines on the floor: confident, legible from arm's leng
 - **Day strip:** dates in muted small type with a 2 px transparent underline; the chosen day is heading ink with a 2 px paint underline. "Tonight" sits above today's date in paint-coloured Big Shoulders as part of the date label. On phones, the horizontal scrollbar thumb uses muted ink, distinct from the accent paint of the chosen day.
 
 #### Inputs / Fields
-- **Score input** (event owners only): 3.75rem wide (3rem on phones), 2.75rem tall, 1 px muted outline, 2px corners, floor fill, right-aligned Big Shoulders 700 numerals while editable. A locked final displays the disabled score without an input outline or fill; an unlocked or missing score retains the editable field.
+- **Score input** (event owners only): 3.75rem wide (3rem on phones), 2.75rem tall, 1 px muted outline, 2px corners, floor fill, right-aligned Big Shoulders 700 numerals while editable. Once both scores are in, whatever the time, the score is locked: it displays without an input outline or fill, and the padlock in the card corner opens it again. The lock waits while focus is in that game's boxes, so it never lands on a box being typed in. An unlocked or missing score retains the editable field. From 40rem the owner's card header always keeps the padlock's 2.75rem (hidden until both scores are in), so the padlock appearing never moves the score boxes.
 - **Invalid:** outline switches to body ink and dashed, so the error does not rely on colour.
 - **Focus:** the shared focus outline (3 px solid paint, 3 px offset).
 
@@ -608,7 +608,7 @@ The court panel: stencil court name on the left, status words on the right ("On 
 An outlined game on the time grid: floor fill, 2px corners, division swatch and label, then two team rows with Big Shoulders numerals. Up next is dashed Faded Paint; on court is solid paint over Paint Band with an "On court" tag in solid paint; final and awaiting score are 1 px Quiet Rule, and final adds a 2.25rem, 4 px paint tick at the bottom left. With a team filter, matching cells take 3 px paint in their own pattern and the rest fall back to Quiet Rule and muted ink.
 
 #### Now line
-The one moving mark: a 2 px paint line across the day grid at the current time, running under the cells, with a solid paint tag in the hour gutter showing "Now" and the time. It eases to its new position over 900ms. The hour in progress is banded in Paint Band.
+The one moving mark: a 2 px paint line across the day grid at the current time, running under the cells, with a solid paint tag in the time gutter showing "Now" and the time. It eases to its new position over 900ms. While a start time's games are on court, its row is banded in Paint Band until the 60-minute slot ends or the next start begins, whichever comes first, and its label turns Heading Ink. Between games and over a break only the now line shows.
 
 #### Footer
 "Powered by iTala Connect" in Muted Ink at 0.8125rem over a 1 px Quiet Rule, at the page measure. It is the only iTala element on an event page and uses event tokens only.

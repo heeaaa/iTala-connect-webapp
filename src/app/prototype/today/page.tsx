@@ -32,6 +32,7 @@ export default async function TodayPrototypePage({ searchParams }: PageProps<'/p
   const at = one('at');
   const liveClock = at === 'live';
   const courts = one('courts') === '4' ? 4 : 2;
+  const cadence = one('cadence') === '65' ? 65 : one('cadence') === '45' ? 45 : 60;
   const theme = one('theme') === 'light' ? LIGHT_ORGANISER_THEME : DEFAULT_EVENT_THEME;
   const clock = liveClock
     ? clockInZone(new Date(), 'America/Vancouver')
@@ -39,9 +40,9 @@ export default async function TodayPrototypePage({ searchParams }: PageProps<'/p
 
   return (
     <PrototypeToday
-      // A new clock or court count starts the sample scores afresh.
-      key={`${clock.date}-${clock.minutes}-${courts}`}
-      event={sampleLeague({ courts, clock, theme })}
+      // A new clock, court count or game gap starts the sample scores afresh.
+      key={`${clock.date}-${clock.minutes}-${courts}-${cadence}`}
+      event={sampleLeague({ courts, clock, theme, cadence })}
       clock={clock}
       liveClock={liveClock}
       selectedDay={one('day') ?? null}
