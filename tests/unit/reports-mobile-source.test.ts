@@ -106,6 +106,65 @@ describe('verified Mobile report enrichment', () => {
     expect(enriched.players).toEqual([{ id: 'player-1', name: 'Ari' }]);
   });
 
+  it('works out what the game tracked and names the players who were present', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          leagueId: 'league-1',
+          games: [
+            {
+              id: mobileGameId,
+              league_id: 'league-1',
+              home_team_id: 'home-mobile',
+              away_team_id: 'away-mobile',
+              status: 'final',
+              default_winner_team_id: null,
+              track_misses: true,
+              track_turnovers: null,
+              attendance: ['player-1', 'player-2'],
+            },
+          ],
+          events: [
+            {
+              id: 'event-1',
+              league_id: 'league-1',
+              game_id: mobileGameId,
+              team_id: 'home-mobile',
+              player_id: 'player-1',
+              type: 'fg2_make',
+            },
+          ],
+          teams: [
+            { id: 'home-mobile', league_id: 'league-1', team_only: false, player_ids: ['player-1', 'player-2'] },
+            { id: 'away-mobile', league_id: 'league-1', team_only: false, player_ids: [] },
+          ],
+          players: [
+            { id: 'player-1', league_id: 'league-1', name: 'Ari' },
+            { id: 'player-2', league_id: 'league-1', name: 'Bea' },
+          ],
+          readAt: '2026-10-02T00:00:01.000Z',
+        }),
+      ),
+    );
+    const enriched = await enrichReportSourceWithMobile(source, definition);
+    expect(enriched.games[0]!.manifests).toEqual([
+      expect.objectContaining({
+        teamId: 'home-connect',
+        shots: { fg2: 'complete', fg3: 'complete', ft: 'complete' },
+        turnovers: 'unknown',
+        appearances: 'confirmed',
+        playerIds: ['player-1', 'player-2'],
+        eventCount: 1,
+      }),
+      expect.objectContaining({ teamId: 'away-connect', appearances: 'confirmed', playerIds: [], eventCount: 0 }),
+    ]);
+    expect(enriched.players).toEqual([
+      { id: 'player-1', name: 'Ari' },
+      { id: 'player-2', name: 'Bea' },
+    ]);
+  });
+
   it('rejects a Mobile game whose sides differ from the approved Connect mapping', async () => {
     mobileHome = 'foreign-team';
     const enriched = await enrichReportSourceWithMobile(source, definition);

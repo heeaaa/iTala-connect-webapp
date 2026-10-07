@@ -77,6 +77,14 @@ test('links a hand-made division to a mobile league, then shows its results', as
   await expect(page.getByRole('heading', { name: 'Link “Open” to the mobile app', level: 1 })).toBeVisible();
   const main = page.getByRole('main');
   await expect(main.getByRole('table')).toHaveCount(0);
+  // Drop-in spaces (recreational, like the fixture's "Friday Drop-in") are not leagues to link.
+  const leagueOptions = main.getByLabel('Mobile app league').locator('option');
+  await expect(leagueOptions).toHaveText([
+    'Choose a league…',
+    'Autumn League (2025) · archived',
+    'Harbour League (2026)',
+    'New League (2026)',
+  ]);
 
   // Choosing a league changes nothing until its teams are asked for.
   await main.getByLabel('Mobile app league').selectOption({ label: 'Harbour League (2026)' });

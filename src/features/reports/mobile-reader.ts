@@ -12,6 +12,16 @@ const mobileGame = z.object({
   away_team_id: id,
   status: z.literal('final'),
   default_winner_team_id: id.nullable().optional(),
+  // What the game itself stored (null: it followed its league). Older readers omit these.
+  track_misses: z.boolean().nullable().optional(),
+  track_turnovers: z.boolean().nullable().optional(),
+  attendance: z.array(id).max(200).nullable().optional(),
+});
+const mobileTeam = z.object({
+  id,
+  league_id: id,
+  team_only: z.boolean(),
+  player_ids: z.array(id).max(200),
 });
 const mobileEvent = z.object({
   id,
@@ -27,6 +37,7 @@ const responseSchema = z.object({
   games: z.array(mobileGame).max(100),
   events: z.array(mobileEvent).max(20000),
   players: z.array(mobilePlayer).max(20000),
+  teams: z.array(mobileTeam).max(200).default([]),
   readAt: z.iso.datetime(),
 });
 
@@ -61,6 +72,7 @@ export function createReportsMobileReader(baseUrl: string, secret: string, reque
       parsed.games.some((game) => game.league_id !== leagueId || !gameIds.includes(game.id)) ||
       parsed.events.some((event) => event.league_id !== leagueId || !returned.has(event.game_id)) ||
       parsed.players.some((player) => player.league_id !== leagueId) ||
+      parsed.teams.some((team) => team.league_id !== leagueId) ||
       returned.size !== parsed.games.length ||
       new Set(parsed.events.map((event) => event.id)).size !== parsed.events.length
     )

@@ -1,7 +1,7 @@
 import type { ReportDefinition } from './model';
 
 /** A saved filter opens the normal report builder, where the source is read again. */
-export function presetUrl(definition: ReportDefinition): string {
+export function presetUrl(definition: ReportDefinition, base = '/admin/reports'): string {
   const params = new URLSearchParams({
     event: definition.eventId,
     template: definition.template,
@@ -17,5 +17,6 @@ export function presetUrl(definition: ReportDefinition): string {
   if (definition.standingsScope) params.set('standings', definition.standingsScope);
   if (definition.minAppearances !== undefined) params.set('minAppearances', String(definition.minAppearances));
   if (definition.minAttempts !== undefined) params.set('minAttempts', String(definition.minAttempts));
-  return `/admin/reports?${params.toString()}`;
+  if (definition.allStats) params.set('stats', 'all');
+  return `${base}?${params.toString()}`;
 }

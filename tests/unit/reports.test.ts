@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { buildReport, ReportInputError } from '@/features/reports/build';
 import type { ReportDefinition, ReportSource } from '@/features/reports/model';
+import { reportDocumentSchema } from '@/features/reports/schema';
 
 const source: ReportSource = {
   event: { id: 'event', name: 'October League', timezone: 'Pacific/Auckland' },
@@ -100,34 +101,138 @@ describe('Connect Reports calculations', () => {
     const whole = report('box-score', { divisionId: 'division' });
     const day = report('box-score', { divisionId: 'division', dateMode: 'day', dates: ['2026-10-01'] });
     const selected = report('box-score', { divisionId: 'division', gameIds: ['g2'] });
-    expect(whole.tables).toHaveLength(2);
-    expect(whole.tables[0]!.columns.map((column) => column.key)).toEqual(
+    // Two games: the player totals come first, then one box score per game.
+    expect(whole.tables.map((t) => t.title)).toEqual([
+      'Player totals · 2 games',
+      'Thu 01/10/2026 · 10:00 am · Senior: Aces 6 - 2 Blues',
+      'Fri 02/10/2026 · 10:00 am · Senior: Blues 4 - 0 Aces',
+    ]);
+    expect(whole.tables[1]!.columns.map((column) => column.key)).toEqual(
       expect.arrayContaining(['gameId', 'teamId', 'playerId']),
     );
-    expect(whole.tables[0]!.rows).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ gameId: 'g1', teamId: 'a', entry: 'Recorded team', points: 1 }),
-        expect.objectContaining({ gameId: 'g1', teamId: 'a', entry: 'Recorded player', playerId: 'p', points: 5 }),
-      ]),
-    );
     expect(day.gameIds).toEqual(['g1']);
+    expect(day.tables.map((t) => t.title)).toEqual(['Thu 01/10/2026 · 10:00 am · Senior: Aces 6 - 2 Blues']);
     expect(selected.gameIds).toEqual(['g2']);
+    // A game with only a Connect score shows each side's final score.
     expect(selected.tables[0]!.rows).toEqual([
-      expect.objectContaining({ team: 'Blues', entry: 'Connect score', points: 4 }),
-      expect.objectContaining({ team: 'Aces', entry: 'Connect score', points: 0 }),
+      expect.objectContaining({ team: 'Blues', entry: 'Final score', player: 'Final score', points: 4, fg2: null }),
+      expect.objectContaining({ team: 'Aces', entry: 'Final score', player: 'Final score', points: 0, fg2: null }),
     ]);
     expect(() => report('box-score', { gameIds: ['foreign'] })).toThrow('Game unavailable');
+  });
+
+  it("lists each player's stat line with a team total in a game's box score", () => {
+    const box = report('box-score', { gameIds: ['g1'] });
+    expect(box.tables).toHaveLength(1);
+    expect(box.tables[0]!.rows).toEqual([
+      expect.objectContaining({
+        gameId: 'g1',
+        teamId: 'a',
+        team: 'Aces',
+        entry: 'Player',
+        playerId: 'p',
+        player: 'Ari',
+        points: 5,
+        fg2: 1,
+        fg3: 1,
+        ft: 0,
+      }),
+      expect.objectContaining({
+        teamId: 'a',
+        entry: 'Team (no player)',
+        player: 'Team (no player)',
+        points: 1,
+        fg2: 0,
+        fg3: 0,
+        ft: 1,
+      }),
+      expect.objectContaining({
+        teamId: 'a',
+        entry: 'Team total',
+        player: 'Team total',
+        points: 6,
+        fg2: 1,
+        fg3: 1,
+        ft: 1,
+      }),
+      expect.objectContaining({
+        teamId: 'b',
+        team: 'Blues',
+        entry: 'Player',
+        playerId: 'q',
+        player: 'Quinn',
+        points: 2,
+        fg2: 1,
+      }),
+      expect.objectContaining({ teamId: 'b', entry: 'Team total', points: 2, fg2: 1, fg3: 0, ft: 0 }),
+    ]);
+    expect(box.notes).toContain(
+      'Team total adds up the recorded stats. When it differs from the official score, the final score follows it.',
+    );
+  });
+
+  it('orders players by points and shows the official score when the recorded total differs', () => {
+    const busy: ReportSource = structuredClone(source);
+    busy.players.push({ id: 'r', name: 'Rua' });
+    busy.games[0]!.homeScore = 9;
+    busy.games[0]!.mobileEvents.push(
+      { id: 'e5', teamId: 'a', playerId: 'r', type: 'fg3_make' },
+      { id: 'e6', teamId: 'a', playerId: 'r', type: 'fg3_make' },
+    );
+    busy.games[0]!.manifests[0]!.eventCount = 5;
+    const box = buildReport(busy, definition('box-score', { gameIds: ['g1'] }), '2026-10-02T01:00:00.000Z');
+    expect(box.tables[0]!.title).toBe('Thu 01/10/2026 · 10:00 am · Senior: Aces 9 - 2 Blues');
+    expect(box.tables[0]!.rows.filter((r) => r.teamId === 'a').map((r) => [r.player, r.points])).toEqual([
+      ['Rua', 6],
+      ['Ari', 5],
+      ['Team (no player)', 1],
+      ['Team total', 12],
+      ['Final score (3 more in player stats)', 9],
+    ]);
+    // The side whose recorded total matches its score has no extra line.
+    expect(box.tables[0]!.rows.filter((r) => r.teamId === 'b').map((r) => r.player)).toEqual(['Quinn', 'Team total']);
+  });
+
+  it('adds up each player across the games of a box score book', () => {
+    const twice: ReportSource = structuredClone(source);
+    Object.assign(twice.games[1]!, {
+      mobileGameId: 'm2',
+      mobileFinal: true,
+      homeScore: 4,
+      awayScore: 3,
+      mobileEvents: [
+        { id: 'f1', teamId: 'a', playerId: 'p', type: 'fg3_make' },
+        { id: 'f2', teamId: 'b', playerId: 'q', type: 'fg2_make' },
+        { id: 'f3', teamId: 'b', playerId: 'q', type: 'fg2_make' },
+      ],
+    });
+    const book = buildReport(twice, definition('box-score'), '2026-10-02T01:00:00.000Z');
+    const totals = book.tables[0]!;
+    expect(totals.title).toBe('Player totals · 2 games');
+    expect(totals.rows).toEqual([
+      expect.objectContaining({ player: 'Ari', team: 'Aces', games: 2, points: 8, fg2: 1, fg3: 2, ft: 0 }),
+      expect.objectContaining({ player: 'Quinn', team: 'Blues', games: 2, points: 6, fg2: 3, fg3: 0, ft: 0 }),
+    ]);
+    // Score-only books have no player totals to add up.
+    expect(report('box-score', { gameIds: ['g2'] }).tables.map((t) => t.title)).toEqual([
+      'Fri 02/10/2026 · 10:00 am · Senior: Blues 4 - 0 Aces',
+    ]);
   });
 
   it('uses scored Connect games, explains exclusions, and selects nonconsecutive dates', () => {
     const r = report('results', { dateMode: 'dates', dates: ['2026-10-01', '2026-10-03'] });
     expect(r.gameIds).toEqual(['g1']);
-    expect(r.selectedCount).toBe(3);
+    // Games on other days are not part of the selection, so only a chosen game with a problem is left out.
+    expect(r.selectedCount).toBe(2);
     expect(r.exclusions).toEqual([
-      { gameId: 'g2', reason: 'Outside selected dates' },
-      { gameId: 'g3', reason: 'Game has no recorded score' },
+      { gameId: 'g3', label: 'Sat 03/10/2026 · Aces vs Blues', reason: 'Game has no recorded score' },
     ]);
-    expect(r.tables[0]!.rows[0]).toMatchObject({ homeScore: 6, awayScore: 2 });
+    expect(report('results', { relative: 'latest' }).exclusions.map((e) => e.gameId)).toEqual(['g3']);
+    // Downloads keep the sortable date; the preview and PDF show it as DD/MM/YYYY.
+    expect(r.tables[0]!.rows[0]).toMatchObject({ date: '2026-10-01', homeScore: 6, awayScore: 2 });
+    expect(r.notes).toContain(
+      'Standings include all scored group games through 01/10/2026 using wins, point difference and points for.',
+    );
   });
 
   it('builds all six templates without replacing Connect scores with recorded player points', () => {
@@ -186,7 +291,9 @@ describe('Connect Reports calculations', () => {
   });
 
   it('uses only explicitly complete games for shooting percentages and turnover totals', () => {
-    const one = report('leaders');
+    // Shooting and turnovers are part of "Show all player stats"; without it they are left out.
+    expect(report('leaders').tables.some((table) => table.title.startsWith('2PT shooting'))).toBe(false);
+    const one = report('leaders', { allStats: true });
     const shot = one.tables.find((table) => table.title.startsWith('2PT shooting'))!;
     expect(shot.rows.find((row) => row.playerId === 'p')).toMatchObject({
       makes: 1,
@@ -195,16 +302,23 @@ describe('Connect Reports calculations', () => {
       eligibleGames: 1,
     });
     expect(one.tables.some((table) => table.title.startsWith('Turnovers'))).toBe(false);
-    expect(report('leaders', { minAttempts: 2 }).tables.some((table) => table.title.startsWith('2PT shooting'))).toBe(
-      false,
-    );
+    expect(
+      report('leaders', { minAttempts: 2, allStats: true }).tables.some((table) =>
+        table.title.startsWith('2PT shooting'),
+      ),
+    ).toBe(false);
 
     const mixed: ReportSource = structuredClone(source);
     mixed.games[0]!.mobileEvents.push({ id: 'miss', teamId: 'a', playerId: 'p', type: 'fg2_miss' });
     mixed.games[0]!.mobileEvents.push({ id: 'tov', teamId: 'a', playerId: 'p', type: 'tov' });
     mixed.games[0]!.manifests[0]!.eventCount = 5;
     mixed.games[0]!.manifests[0]!.turnovers = 'complete';
-    const measured = buildReport(mixed, definition('leaders'), '2026-10-02T01:00:00.000Z');
+    const measured = buildReport(mixed, definition('leaders', { allStats: true }), '2026-10-02T01:00:00.000Z');
+    expect(
+      buildReport(mixed, definition('leaders'), '2026-10-02T01:00:00.000Z').tables.some((t) =>
+        t.title.startsWith('Turnovers'),
+      ),
+    ).toBe(false);
     expect(
       measured.tables.find((table) => table.title.startsWith('2PT shooting'))!.rows.find((row) => row.playerId === 'p'),
     ).toMatchObject({
@@ -220,7 +334,7 @@ describe('Connect Reports calculations', () => {
     });
 
     mixed.games[0]!.manifests[0]!.shots.fg2 = 'partial';
-    const partial = buildReport(mixed, definition('leaders'), '2026-10-02T01:00:00.000Z');
+    const partial = buildReport(mixed, definition('leaders', { allStats: true }), '2026-10-02T01:00:00.000Z');
     expect(
       partial.tables.find((table) => table.title.startsWith('2PT shooting'))!.rows.some((row) => row.playerId === 'p'),
     ).toBe(false);
@@ -236,17 +350,64 @@ describe('Connect Reports calculations', () => {
     tracked.games[0]!.manifests[0]!.eventCount = 6;
     tracked.games[0]!.manifests[0]!.other = { rebounds: 'complete', assists: 'complete' };
     const one = (template: ReportDefinition['template'], options: Partial<ReportDefinition> = {}) =>
-      buildReport(tracked, definition(template, { gameIds: ['g1'], ...options }), '2026-10-02T01:00:00.000Z');
+      buildReport(
+        tracked,
+        definition(template, { gameIds: ['g1'], allStats: true, ...options }),
+        '2026-10-02T01:00:00.000Z',
+      );
+    // Not ticked: the same game shows points and made shots only.
+    const plain = one('box-score', { allStats: false });
+    expect(plain.tables[0]!.columns.map((c) => c.key)).not.toContain('rebounds');
+    expect(plain.notes.some((note) => note.startsWith('All player stats'))).toBe(false);
+    expect(one('league', { allStats: false }).tables.some((t) => t.title.startsWith('Rebounds'))).toBe(false);
     const box = one('box-score');
+    expect(box.notes.some((note) => note.startsWith('All player stats'))).toBe(true);
     expect(box.tables[0]!.rows.find((row) => row.playerId === 'p')).toMatchObject({ rebounds: 2, assists: 1 });
     expect(box.tables[0]!.rows.find((row) => row.playerId === 'q')).toMatchObject({ rebounds: null, assists: null });
+    // League and team statistics: the other stats are columns of the Players table, no table per stat.
     const league = one('league');
-    expect(league.tables.find((table) => table.title.startsWith('Rebounds'))!.rows[0]).toMatchObject({
-      playerId: 'p',
-      total: 2,
+    expect(league.tables.map((t) => t.title)).toEqual(['Teams', 'Players']);
+    const players = league.tables[1]!;
+    expect(players.columns.map((c) => c.label)).toEqual([
+      'Team',
+      'Team ID',
+      'Player ID',
+      'Player',
+      'Points',
+      '2PT made',
+      '3PT made',
+      'FT made',
+      '2PT attempts',
+      '2PT %',
+      '3PT attempts',
+      '3PT %',
+      'FT attempts',
+      'FT %',
+      'Rebounds',
+      'Assists',
+      'Confirmed appearances',
+      'PPG',
+    ]);
+    expect(players.rows.find((r) => r.playerId === 'p')).toMatchObject({
+      team: 'Aces',
+      points: 5,
+      rebounds: 2,
+      assists: 1,
+      fg2Att: 1,
+      fg2Pct: 100,
       appearances: 1,
-      perGame: 2,
+      ppg: 5,
     });
+    // Quinn's side tracked shooting but not rebounds or assists: those are blank, not zero.
+    expect(players.rows.find((r) => r.playerId === 'q')).toMatchObject({
+      team: 'Blues',
+      rebounds: null,
+      assists: null,
+      fg2Att: 1,
+    });
+    const team = one('team', { teamId: 'a' });
+    expect(team.tables.map((t) => t.title)).toEqual(['Team summary', 'Players', 'Results']);
+    expect(team.tables[1]!.rows.map((r) => r.playerId)).toEqual(['p']);
     expect(one('leaders').tables.some((table) => table.title.startsWith('Rebounds leaders'))).toBe(true);
     expect(one('player-log', { playerId: 'p' }).tables[0]!.rows[0]).toMatchObject({ rebounds: 2, assists: 1 });
   });
@@ -281,5 +442,102 @@ describe('Connect Reports calculations', () => {
     expect(() => buildReport(large, definition('results'), '2026-10-02T01:00:00.000Z')).toThrow(
       'Select at most 100 games',
     );
+  });
+
+  it('lists players by team first, then most points', () => {
+    const many: ReportSource = structuredClone(source);
+    many.players.push({ id: 'r', name: 'Rua' }, { id: 's', name: 'Sam' });
+    many.games[0]!.mobileEvents.push(
+      { id: 'x1', teamId: 'b', playerId: 'r', type: 'fg3_make' },
+      { id: 'x2', teamId: 'a', playerId: 's', type: 'fg3_make' },
+      { id: 'x3', teamId: 'a', playerId: 's', type: 'fg3_make' },
+    );
+    many.games[0]!.manifests[0]!.eventCount = 5;
+    many.games[0]!.manifests[1]!.eventCount = 2;
+    const league = buildReport(many, definition('league', { gameIds: ['g1'] }), '2026-10-02T01:00:00.000Z');
+    const players = league.tables.find((t) => t.title === 'Players')!;
+    expect(players.columns[0]!.label).toBe('Team');
+    expect(players.rows.map((r) => [r.team, r.player, r.points])).toEqual([
+      ['Aces', 'Sam', 6],
+      ['Aces', 'Ari', 5],
+      ['Blues', 'Rua', 3],
+      ['Blues', 'Quinn', 2],
+    ]);
+    // A box score book's player totals read the same way.
+    const book = buildReport(many, definition('box-score'), '2026-10-02T01:00:00.000Z');
+    expect(book.tables[0]!.rows.map((r) => r.player)).toEqual(['Sam', 'Ari', 'Rua', 'Quinn']);
+    expect(book.tables[0]!.columns.slice(0, 5).map((c) => c.label)).toEqual([
+      'Team',
+      'Team ID',
+      'Player ID',
+      'Player',
+      'Games with stats',
+    ]);
+  });
+
+  it('adds turnovers to the box score and game log where the game tracked them', () => {
+    const tov: ReportSource = structuredClone(source);
+    tov.games[0]!.mobileEvents.push({ id: 't1', teamId: 'a', playerId: 'p', type: 'tov' });
+    tov.games[0]!.manifests[0]!.eventCount = 4;
+    tov.games[0]!.manifests[0]!.turnovers = 'complete';
+    const run = (template: ReportDefinition['template'], options: Partial<ReportDefinition> = {}) =>
+      buildReport(
+        tov,
+        definition(template, { gameIds: ['g1'], allStats: true, ...options }),
+        '2026-10-02T01:00:00.000Z',
+      );
+    const box = run('box-score').tables[0]!;
+    expect(box.columns.map((c) => c.label)).toContain('Turnovers');
+    expect(box.rows.find((r) => r.playerId === 'p')).toMatchObject({ turnovers: 1 });
+    expect(box.rows.find((r) => r.playerId === 'q')).toMatchObject({ turnovers: null });
+    expect(run('player-log', { playerId: 'p' }).tables[0]!.rows[0]).toMatchObject({ turnovers: 1 });
+    expect(run('league').tables[1]!.rows.find((r) => r.playerId === 'p')).toMatchObject({ turnovers: 1 });
+    // Without "Show all player stats" there is no turnovers column.
+    expect(run('box-score', { allStats: false }).tables[0]!.columns.map((c) => c.label)).not.toContain('Turnovers');
+  });
+
+  it('saves a one-day report from an event with more than 100 games', () => {
+    // 150 games over 30 days, five a day, and 20 still unscored: a fixed report of one day must still validate.
+    // Saved reports hold Connect IDs, which are UUIDs.
+    const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+    const season: ReportSource = {
+      event: { ...source.event, id: uuid(1) },
+      divisions: [{ id: uuid(2), name: 'Senior' }],
+      teams: [
+        { id: uuid(3), divisionId: uuid(2), name: 'Aces' },
+        { id: uuid(4), divisionId: uuid(2), name: 'Blues' },
+      ],
+      players: [],
+      readAt: source.readAt,
+      games: Array.from({ length: 150 }, (_, i) => ({
+        ...source.games[0]!,
+        id: uuid(1000 + i),
+        divisionId: uuid(2),
+        homeTeamId: uuid(3),
+        awayTeamId: uuid(4),
+        date: `2026-09-${String(Math.floor(i / 5) + 1).padStart(2, '0')}`,
+        homeScore: i < 130 ? 50 : null,
+        awayScore: i < 130 ? 40 : null,
+        mobileEvents: [],
+        manifests: [],
+        mobileGameId: null,
+        mobileFinal: false,
+      })),
+    };
+    const build = (options: Partial<ReportDefinition>) =>
+      buildReport(
+        season,
+        { eventId: uuid(1), template: 'box-score', dateMode: 'all', dates: [], ...options },
+        '2026-10-02T01:00:00.000Z',
+      );
+    for (const options of [{ dateMode: 'day' as const, dates: ['2026-09-03'] }, { relative: 'last-five' as const }]) {
+      const doc = build(options);
+      expect(doc.includedCount).toBe(5);
+      expect(reportDocumentSchema.safeParse(doc).error?.issues).toBeUndefined();
+    }
+    // The last five scored games come before the 20 unscored ones, which are listed as left out.
+    expect(build({ relative: 'last-five' }).exclusions).toHaveLength(20);
+    // All dates: 130 scored games is over the 100-game limit, so it is refused before saving.
+    expect(() => build({ template: 'results' })).toThrow('Select at most 100 games');
   });
 });

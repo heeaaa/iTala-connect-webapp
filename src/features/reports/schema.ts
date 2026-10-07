@@ -21,6 +21,7 @@ export const reportDefinitionSchema = z.strictObject({
   standingsScope: z.enum(['through-cutoff', 'selected-games']).optional(),
   minAppearances: z.int().min(0).max(1000).optional(),
   minAttempts: z.int().min(0).max(1000).optional(),
+  allStats: z.boolean().optional(),
 });
 
 const cell = z.union([z.string().max(2000), z.number().finite(), z.null()]);
@@ -35,10 +36,14 @@ export const reportDocumentSchema = z.strictObject({
   timezone: z.string().max(100),
   generatedAt: z.iso.datetime(),
   sourceReadAt: z.iso.datetime(),
-  selectedCount: z.int().min(0).max(100),
+  // A selection is at most 100 included games, but may cover more games than that (unscored ones,
+  // or before "latest" or "last five" picks), so the selected count and left-out list run higher.
+  selectedCount: z.int().min(0).max(100000),
   includedCount: z.int().min(0).max(100),
   gameIds: z.array(id).max(100),
-  exclusions: z.array(z.strictObject({ gameId: id, reason: z.string().max(500) })).max(100),
+  exclusions: z
+    .array(z.strictObject({ gameId: id, label: z.string().max(300).optional(), reason: z.string().max(500) }))
+    .max(5000),
   notes: z.array(z.string().max(2000)).max(200),
   tables: z
     .array(

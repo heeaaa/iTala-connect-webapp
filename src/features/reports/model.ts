@@ -18,6 +18,8 @@ export interface ReportDefinition {
   standingsScope?: 'through-cutoff' | 'selected-games';
   minAppearances?: number;
   minAttempts?: number;
+  /** "Show all player stats": rebounds, assists, steals, blocks, fouls, shooting and turnovers where tracked. */
+  allStats?: boolean;
 }
 
 export interface ReportTeam {
@@ -94,10 +96,14 @@ export interface ReportDocument {
   selectedCount: number;
   includedCount: number;
   gameIds: string[];
-  exclusions: { gameId: string; reason: string }[];
+  /** Selected games left out, with the reason. `label` names the game ("Sat 04/10/2026 · Aces vs Blues"). */
+  exclusions: { gameId: string; label?: string; reason: string }[];
   notes: string[];
   tables: ReportTable[];
 }
+
+/** Added when Mobile stats could not be read or checked (or more than 100 games would be). */
+export const MOBILE_UNVERIFIED = 'Mobile player statistics could not be verified. Connect scores remain available.';
 
 export const REPORT_TEMPLATES: { id: ReportTemplate; label: string }[] = [
   { id: 'box-score', label: 'Game Box Score Book' },

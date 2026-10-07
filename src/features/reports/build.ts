@@ -1,4 +1,7 @@
 import { computeStandings } from '@/domain/standings';
+import { formatDate, formatDayLabel, formatTime } from '@/lib/format';
+
+import { withoutOptionalStats } from './coverage';
 import {
   REPORT_TEMPLATES,
   type ReportDefinition,
@@ -21,6 +24,8 @@ const OTHER_STATS: { key: OtherCategory; label: string; eventTypes: string[] }[]
   { key: 'fouls', label: 'Fouls', eventTypes: ['pf'] },
 ];
 const MAX_GAMES = 100;
+/** Matches reportDocumentSchema, so a saved report always validates. */
+const MAX_EXCLUSIONS = 5000;
 const isoDay = /^\d{4}-\d{2}-\d{2}$/;
 
 export class ReportInputError extends Error {}
@@ -104,6 +109,11 @@ function matchesDate(g: ReportGame, d: ReportDefinition): boolean {
   return d.dates.includes(g.date);
 }
 
+/**
+ * The chosen dates and recent games are part of the selection, so games outside them are simply
+ * not selected. Only a selected game that cannot be used (no score yet, no teams) is left out,
+ * with its reason, so a one-day report of a long season lists nothing it did not choose.
+ */
 function selectGames(source: ReportSource, d: ReportDefinition) {
   const exclusions: ReportDocument['exclusions'] = [];
   const requestedIds = d.gameIds ? new Set(d.gameIds) : null;
@@ -111,11 +121,13 @@ function selectGames(source: ReportSource, d: ReportDefinition) {
     (g) =>
       (!d.divisionId || g.divisionId === d.divisionId) &&
       (!d.teamId || g.homeTeamId === d.teamId || g.awayTeamId === d.teamId) &&
-      (!requestedIds || requestedIds.has(g.id)),
+      (!requestedIds || requestedIds.has(g.id)) &&
+      matchesDate(g, d),
   );
   const eligible = selected.filter((g) => {
-    const problem = eligibleGame(source, g) ?? (!matchesDate(g, d) ? 'Outside selected dates' : null);
-    if (problem) exclusions.push({ gameId: g.id, reason: problem });
+    const problem = eligibleGame(source, g);
+    if (problem && exclusions.length < MAX_EXCLUSIONS)
+      exclusions.push({ gameId: g.id, label: gameName(source, g), reason: problem });
     return !problem;
   });
   eligible.sort(
@@ -123,13 +135,27 @@ function selectGames(source: ReportSource, d: ReportDefinition) {
   );
   const included = d.relative ? eligible.slice(d.relative === 'latest' ? -1 : -5) : eligible;
   if (included.length > MAX_GAMES) throw new ReportInputError('Select at most 100 games');
-  for (const g of eligible)
-    if (!included.includes(g)) exclusions.push({ gameId: g.id, reason: 'Outside relative selection' });
   return { selectedCount: selected.length, included, exclusions };
 }
 
 function name(source: ReportSource, teamId: string): string {
   return source.teams.find((t) => t.id === teamId)?.name ?? 'Team unavailable';
+}
+/** "Sat 04/10/2026" for a valid day, else the stored text. */
+function dayLabel(day: string): string {
+  return validDay(day) ? formatDayLabel(day) : day || 'Date TBC';
+}
+function timeLabel(time: string): string {
+  try {
+    return formatTime(time);
+  } catch {
+    return '';
+  }
+}
+/** "Sat 04/10/2026 · Aces vs Blues": how a person finds a game, never its ID. */
+function gameName(source: ReportSource, g: ReportGame): string {
+  const side = (teamId: string | null) => (teamId ? name(source, teamId) : 'TBC');
+  return `${dayLabel(g.date)} · ${side(g.homeTeamId)} vs ${side(g.awayTeamId)}`;
 }
 function playerName(source: ReportSource, playerId: string): string {
   return source.players.find((p) => p.id === playerId)?.name ?? 'Player unavailable';
@@ -516,15 +542,160 @@ const RESULT_COLUMNS = columns(
   ['away', 'Away', 'text'],
 );
 
+/** Line names in a box score: the Entry column (kept for downloads) and the Player column say the same. */
+const LINE = {
+  player: 'Player',
+  team: 'Team (no player)',
+  total: 'Team total',
+  final: 'Final score',
+} as const;
+
+/** Each player's totals over the games of a box score book, most points first. */
+/** A stat with its own tracking coverage, shown as a column where a game tracked it. */
+interface ExtraStat {
+  key: string;
+  label: string;
+  eventTypes: string[];
+  covered: (m: SideManifest) => boolean;
+}
+const EXTRA_STATS: ExtraStat[] = [
+  ...OTHER_STATS.map(({ key, label, eventTypes }) => ({
+    key,
+    label,
+    eventTypes,
+    covered: (m: SideManifest) => m.other?.[key] === 'complete',
+  })),
+  { key: 'turnovers', label: 'Turnovers', eventTypes: ['tov'], covered: (m) => m.turnovers === 'complete' },
+];
+const SHOTS = [
+  { key: 'fg2', label: '2PT' },
+  { key: 'fg3', label: '3PT' },
+  { key: 'ft', label: 'FT' },
+] as const;
+function extraCount(events: readonly ReportEvent[], stat: ExtraStat): number {
+  return events.filter((event) => stat.eventTypes.includes(event.type)).length;
+}
+
+/**
+ * Every player's line over the chosen games, like a box score: team first (rows sorted by team,
+ * then most points), points and made shots, then a column for each other stat that some game
+ * tracked: attempts and percentage where misses were tracked, then rebounds, assists, steals,
+ * blocks, fouls and turnovers. A player's value counts only the games that tracked it, and is
+ * blank when none of theirs did. `games` adds "Games with stats"; `appearances` adds confirmed
+ * appearances and points per game.
+ */
+function playerStatsTable(
+  source: ReportSource,
+  games: readonly ReportGame[],
+  title: string,
+  { teamId, show }: { teamId?: string; show: 'games' | 'appearances' },
+): ReportTable {
+  const sides = games.flatMap((g) =>
+    [g.homeTeamId!, g.awayTeamId!]
+      .filter((side) => !teamId || side === teamId)
+      .map((side) => ({ g, teamId: side, m: manifest(g, side) })),
+  );
+  const extras = EXTRA_STATS.filter((stat) => sides.some((side) => side.m && stat.covered(side.m)));
+  const shots = SHOTS.filter(({ key }) => sides.some((side) => side.m?.shots[key] === 'complete'));
+  const rows = playerStints(games)
+    .filter((s) => !teamId || s.teamId === teamId)
+    .map((s) => {
+      const own = (g: ReportGame) => mobileEvents(g, s.teamId).filter((e) => e.playerId === s.playerId);
+      const played = sides.filter(
+        (side) => side.teamId === s.teamId && (own(side.g).length > 0 || !!side.m?.playerIds.includes(s.playerId)),
+      );
+      const shotCells = shots.flatMap(({ key }) => {
+        const covered = played.filter((side) => side.m?.shots[key] === 'complete');
+        if (!covered.length)
+          return [
+            [`${key}Att`, null],
+            [`${key}Pct`, null],
+          ];
+        const made = covered.reduce((n, side) => n + count(own(side.g), `${key}_make`), 0);
+        const attempts = made + covered.reduce((n, side) => n + count(own(side.g), `${key}_miss`), 0);
+        return [
+          [`${key}Att`, attempts],
+          [`${key}Pct`, attempts ? Math.round((made / attempts) * 1000) / 10 : null],
+        ];
+      });
+      const extraCells = extras.map((stat) => {
+        const covered = played.filter((side) => side.m && stat.covered(side.m));
+        return [stat.key, covered.length ? covered.reduce((n, side) => n + extraCount(own(side.g), stat), 0) : null];
+      });
+      const gp = appearances(games, s);
+      return {
+        teamId: s.teamId,
+        team: name(source, s.teamId),
+        playerId: s.playerId,
+        player: playerName(source, s.playerId),
+        games: s.gamesWithEvents.size,
+        points: s.points,
+        fg2: s.fg2,
+        fg3: s.fg3,
+        ft: s.ft,
+        ...Object.fromEntries(shotCells),
+        ...Object.fromEntries(extraCells),
+        appearances: gp,
+        ppg: gp && gp > 0 ? Math.round((s.points / gp) * 10) / 10 : null,
+      };
+    })
+    .sort(
+      (a, b) =>
+        a.team.localeCompare(b.team) ||
+        b.points - a.points ||
+        a.player.localeCompare(b.player) ||
+        a.playerId.localeCompare(b.playerId),
+    );
+  return table(
+    title,
+    columns(
+      ['team', 'Team', 'text'],
+      ['teamId', 'Team ID', 'text'],
+      ['playerId', 'Player ID', 'text'],
+      ['player', 'Player', 'text'],
+      ...(show === 'games' ? [['games', 'Games with stats', 'number'] as [string, string, 'number']] : []),
+      ['points', 'Points', 'number'],
+      ['fg2', '2PT made', 'number'],
+      ['fg3', '3PT made', 'number'],
+      ['ft', 'FT made', 'number'],
+      ...shots.flatMap(({ key, label }) => [
+        [`${key}Att`, `${label} attempts`, 'number'] as [string, string, 'number'],
+        [`${key}Pct`, `${label} %`, 'number'] as [string, string, 'number'],
+      ]),
+      ...extras.map((stat) => [stat.key, stat.label, 'number'] as [string, string, 'number']),
+      ...(show === 'appearances'
+        ? [
+            ['appearances', 'Confirmed appearances', 'number'] as [string, string, 'number'],
+            ['ppg', 'PPG', 'number'] as [string, string, 'number'],
+          ]
+        : []),
+    ),
+    rows,
+  );
+}
+
+/**
+ * One box score per game: for each team, every player's stat line (most points first), points
+ * recorded without a player, and the team total. Connect's score stays the official result in
+ * the title; when the recorded total differs, the final score follows the total. A game with no
+ * approved mobile stats shows each side's final score only.
+ */
 function boxScore(source: ReportSource, games: readonly ReportGame[]): ReportTable[] {
   const out: ReportTable[] = [];
+  if (games.length > 1 && games.some((g) => g.mobileGameId && g.mobileFinal))
+    out.push(playerStatsTable(source, games, `Player totals · ${games.length} games`, { show: 'games' }));
   for (const g of games) {
-    const categories = OTHER_STATS.filter(({ key }) =>
-      [g.homeTeamId!, g.awayTeamId!].some((teamId) => manifest(g, teamId)?.other?.[key] === 'complete'),
+    const categories = EXTRA_STATS.filter((stat) =>
+      [g.homeTeamId!, g.awayTeamId!].some((teamId) => {
+        const m = manifest(g, teamId);
+        return !!m && stat.covered(m);
+      }),
     );
+    const time = timeLabel(g.startTime);
+    const division = source.divisions.find((d) => d.id === g.divisionId)?.name ?? 'Division';
     out.push(
       table(
-        `${g.date} · ${source.divisions.find((division) => division.id === g.divisionId)?.name ?? 'Division'}: ${name(source, g.homeTeamId!)} ${g.homeScore} - ${g.awayScore} ${name(source, g.awayTeamId!)}`,
+        `${dayLabel(g.date)}${time ? ` · ${time}` : ''} · ${division}: ${name(source, g.homeTeamId!)} ${g.homeScore} - ${g.awayScore} ${name(source, g.awayTeamId!)}`,
         columns(
           ['gameId', 'Game ID', 'text'],
           ['teamId', 'Team ID', 'text'],
@@ -539,88 +710,54 @@ function boxScore(source: ReportSource, games: readonly ReportGame[]): ReportTab
           ...categories.map(({ key, label }) => [key, label, 'number'] as [string, string, 'number']),
         ),
         [g.homeTeamId!, g.awayTeamId!].flatMap((teamId) => {
-          const events = mobileEvents(g, teamId);
-          const side = manifest(g, teamId);
-          const ids = new Set([
-            ...events.flatMap((e) => (e.playerId ? [e.playerId] : [])),
-            ...(manifest(g, teamId)?.playerIds ?? []),
-          ]);
-          const summary = {
-            gameId: g.id,
-            teamId,
-            team: name(source, teamId),
-            entry: 'Connect score',
+          const side = { gameId: g.id, teamId, team: name(source, teamId) };
+          const official = sideScore(g, teamId);
+          const finalLine = {
+            ...side,
+            entry: LINE.final,
             playerId: '',
-            player: '',
-            points: sideScore(g, teamId),
+            player: LINE.final,
+            points: official,
             fg2: null,
             fg3: null,
             ft: null,
             ...Object.fromEntries(categories.map(({ key }) => [key, null])),
           };
-          const players = [...ids].map((id) => {
-            const own = events.filter((e) => e.playerId === id);
-            return {
-              gameId: g.id,
-              teamId,
-              team: name(source, teamId),
-              entry: 'Recorded player',
+          if (!g.mobileGameId || !g.mobileFinal) return [finalLine];
+          const events = mobileEvents(g, teamId);
+          const m = manifest(g, teamId);
+          const stats = (own: readonly ReportEvent[]) => ({
+            points: recordedPoints(own),
+            fg2: count(own, 'fg2_make'),
+            fg3: count(own, 'fg3_make'),
+            ft: count(own, 'ft_make'),
+            ...Object.fromEntries(
+              categories.map((stat) => [stat.key, m && stat.covered(m) ? extraCount(own, stat) : null]),
+            ),
+          });
+          const ids = new Set([...events.flatMap((e) => (e.playerId ? [e.playerId] : [])), ...(m?.playerIds ?? [])]);
+          const players = [...ids]
+            .map((id) => ({
+              ...side,
+              entry: LINE.player,
               playerId: id,
               player: playerName(source, id),
-              points: recordedPoints(own),
-              fg2: count(own, 'fg2_make'),
-              fg3: count(own, 'fg3_make'),
-              ft: count(own, 'ft_make'),
-              ...Object.fromEntries(
-                categories.map(({ key }) => [key, side?.other?.[key] === 'complete' ? otherCount(own, key) : null]),
-              ),
-            };
-          });
-          const teamEvents = events.filter((event) => !event.playerId);
-          const teamPoints = recordedPoints(teamEvents);
-          const teamRow = teamPoints
-            ? [
-                {
-                  gameId: g.id,
-                  teamId,
-                  team: name(source, teamId),
-                  entry: 'Recorded team',
-                  playerId: '',
-                  player: '',
-                  points: teamPoints,
-                  fg2: count(teamEvents, 'fg2_make'),
-                  fg3: count(teamEvents, 'fg3_make'),
-                  ft: count(teamEvents, 'ft_make'),
-                  ...Object.fromEntries(
-                    categories.map(({ key }) => [
-                      key,
-                      side?.other?.[key] === 'complete' ? otherCount(teamEvents, key) : null,
-                    ]),
-                  ),
-                },
-              ]
+              ...stats(events.filter((e) => e.playerId === id)),
+            }))
+            .sort(
+              (a, b) => b.points - a.points || a.player.localeCompare(b.player) || a.playerId.localeCompare(b.playerId),
+            );
+          const teamOnly = stats(events.filter((e) => !e.playerId));
+          const teamLine = Object.values(teamOnly).some((value) => typeof value === 'number' && value > 0)
+            ? [{ ...side, entry: LINE.team, playerId: '', player: LINE.team, ...teamOnly }]
             : [];
-          const difference =
-            manifest(g, teamId)?.scoring === 'complete' ? sideScore(g, teamId) - recordedPoints(events) : null;
-          const differenceRow =
-            difference === null || difference === 0
-              ? []
-              : [
-                  {
-                    gameId: g.id,
-                    teamId,
-                    team: name(source, teamId),
-                    entry: 'Score difference',
-                    playerId: '',
-                    player: '',
-                    points: difference,
-                    fg2: null,
-                    fg3: null,
-                    ft: null,
-                    ...Object.fromEntries(categories.map(({ key }) => [key, null])),
-                  },
-                ];
-          return [summary, ...players, ...teamRow, ...differenceRow];
+          const total = { ...side, entry: LINE.total, playerId: '', player: LINE.total, ...stats(events) };
+          const gap = official - total.points;
+          const officialLine = {
+            ...finalLine,
+            player: `${LINE.final} (${gap > 0 ? `${gap} not in player stats` : `${-gap} more in player stats`})`,
+          };
+          return [...players, ...teamLine, total, ...(gap === 0 ? [] : [officialLine])];
         }),
       ),
     );
@@ -731,9 +868,12 @@ function leaderboards(source: ReportSource, games: readonly ReportGame[], d: Rep
 
 function playerLog(source: ReportSource, games: readonly ReportGame[], playerId: string): ReportTable[] {
   const rows: ReportTable['rows'] = [];
-  const categories = OTHER_STATS.filter(({ key }) =>
+  const categories = EXTRA_STATS.filter((stat) =>
     games.some((game) =>
-      [game.homeTeamId!, game.awayTeamId!].some((teamId) => manifest(game, teamId)?.other?.[key] === 'complete'),
+      [game.homeTeamId!, game.awayTeamId!].some((teamId) => {
+        const m = manifest(game, teamId);
+        return !!m && stat.covered(m);
+      }),
     ),
   );
   for (const g of games) {
@@ -757,7 +897,7 @@ function playerLog(source: ReportSource, games: readonly ReportGame[], playerId:
         fg3: count(events, 'fg3_make'),
         ft: count(events, 'ft_make'),
         ...Object.fromEntries(
-          categories.map(({ key }) => [key, m?.other?.[key] === 'complete' ? otherCount(events, key) : null]),
+          categories.map((stat) => [stat.key, m && stat.covered(m) ? extraCount(events, stat) : null]),
         ),
       });
     }
@@ -790,8 +930,12 @@ function playerLog(source: ReportSource, games: readonly ReportGame[], playerId:
   ];
 }
 
-export function buildReport(source: ReportSource, d: ReportDefinition, generatedAt: string): ReportDocument {
-  validate(source, d);
+export function buildReport(input: ReportSource, d: ReportDefinition, generatedAt: string): ReportDocument {
+  validate(input, d);
+  // Unless "Show all player stats" is ticked, only points, made shots and appearances are reported.
+  const source: ReportSource = d.allStats
+    ? input
+    : { ...input, games: input.games.map((g) => ({ ...g, manifests: withoutOptionalStats(g.manifests) })) };
   const { selectedCount, included, exclusions } = selectGames(source, d);
   const title = REPORT_TEMPLATES.find((t) => t.id === d.template)!.label;
   const notes = [
@@ -803,17 +947,14 @@ export function buildReport(source: ReportSource, d: ReportDefinition, generated
   switch (d.template) {
     case 'box-score':
       tables = boxScore(source, included);
+      notes.push(
+        'Team total adds up the recorded stats. When it differs from the official score, the final score follows it.',
+      );
       break;
     case 'league':
       tables = [
         table('Teams', TEAM_COLUMNS, teamRows(source, included)),
-        table('Players', PLAYER_COLUMNS, playerRows(source, included)),
-        ...shootingTables(source, included),
-        ...(() => {
-          const turnovers = turnoverTable(source, included);
-          return turnovers ? [turnovers] : [];
-        })(),
-        ...otherTables(source, included),
+        playerStatsTable(source, included, 'Players', { show: 'appearances' }),
       ];
       break;
     case 'team':
@@ -823,18 +964,8 @@ export function buildReport(source: ReportSource, d: ReportDefinition, generated
           TEAM_COLUMNS,
           teamRows(source, included).filter((r) => r.teamId === d.teamId),
         ),
-        table(
-          'Players',
-          PLAYER_COLUMNS,
-          playerRows(source, included).filter((r) => r.teamId === d.teamId),
-        ),
+        playerStatsTable(source, included, 'Players', { teamId: d.teamId, show: 'appearances' }),
         table('Results', RESULT_COLUMNS, resultsRows(source, included)),
-        ...shootingTables(source, included, d.teamId),
-        ...(() => {
-          const turnovers = turnoverTable(source, included, d.teamId);
-          return turnovers ? [turnovers] : [];
-        })(),
-        ...otherTables(source, included, d.teamId),
       ];
       break;
     case 'results':
@@ -842,7 +973,7 @@ export function buildReport(source: ReportSource, d: ReportDefinition, generated
       notes.push(
         d.standingsScope === 'selected-games'
           ? 'Selected-games standings.'
-          : `Standings include all scored group games through ${included.at(-1)?.date ?? 'the selected cutoff'} using wins, point difference and points for.`,
+          : `Standings include all scored group games through ${included.length ? formatDate(included.at(-1)!.date) : 'the selected cutoff'} using wins, point difference and points for.`,
       );
       break;
     case 'leaders':
@@ -855,6 +986,10 @@ export function buildReport(source: ReportSource, d: ReportDefinition, generated
       notes.push('Games without explicit player evidence are omitted; omission does not mean did not play.');
       break;
   }
+  if (d.allStats)
+    notes.push(
+      'All player stats: rebounds, assists, steals, blocks and fouls for games recorded in the mobile app; shooting and turnovers only where the game stored that it tracked them.',
+    );
   if (!included.length) notes.push('No eligible games match this selection.');
   if (source.warnings?.length) notes.push(...source.warnings);
   if (included.some((g) => !g.mobileGameId || !g.mobileFinal))
