@@ -109,10 +109,23 @@ test('an organiser builds a day of box scores, one game, and a fixed report', as
   await expect(page.getByRole('heading', { name: 'Reports', level: 1 })).toBeVisible();
   await expect(page.getByText('Choose an event to see its leagues, teams and games.')).toBeVisible();
 
-  // The event's leagues, teams and games load as soon as it is chosen, with no submit.
+  // The event's leagues, teams and games load as soon as it is chosen, with no submit. Hold that
+  // load for a moment, as a slow connection would, and choose the report meanwhile: it is kept
+  // when the lists arrive (bug found on the PR preview, 07/10/2026).
+  await page.route(
+    (url) => url.pathname === '/admin/reports' && url.searchParams.has('event') && !url.searchParams.has('preview'),
+    async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await route.continue();
+    },
+    { times: 1 },
+  );
   await page.getByRole('combobox', { name: 'Event' }).selectOption({ label: name });
-  await expect(page).toHaveURL(new RegExp(`/admin/reports\\?template=results&event=${event.id}$`));
+  await expect(page.getByText('Loading this event’s leagues, teams and games…')).toBeVisible();
   await page.getByRole('combobox', { name: 'Report' }).selectOption({ label: 'Game Box Score Book' });
+  await expect(page).toHaveURL(new RegExp(`/admin/reports\\?template=results&event=${event.id}$`));
+  await expect(page.getByRole('combobox', { name: 'League / division' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Report' })).toHaveValue('box-score');
   await page.getByRole('combobox', { name: 'League / division' }).selectOption({ label: 'Open' });
   const teamOptions = page.getByRole('combobox', { name: 'Team' }).locator('option');
   await expect(teamOptions).toHaveCount(4);

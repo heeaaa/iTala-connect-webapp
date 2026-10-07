@@ -154,6 +154,78 @@ test('"Show all player stats" adds rebounds, assists, steals, blocks and fouls t
   await expectNoSeriousA11yViolations(page);
 });
 
+test('league statistics list every player by team, with all their stats as columns', async ({ page }) => {
+  await page.goto(
+    '/prototype/reports?event=00000000-0000-4000-8000-000000000001&template=league&dateMode=all&stats=all&preview=1',
+  );
+  await expect(page.getByRole('heading', { name: 'Cumulative League Statistics' })).toBeVisible();
+  // One Players table, not a table per stat.
+  await expect(page.getByRole('heading', { level: 3 })).toHaveText(['Teams', 'Players']);
+  const players = page.getByRole('region', { name: 'Players table' });
+  await expect(players.locator('thead th')).toHaveText([
+    'Team',
+    'Player',
+    'Points',
+    '2PT made',
+    '3PT made',
+    'FT made',
+    'Rebounds',
+    'Assists',
+    'Steals',
+    'Blocks',
+    'Fouls',
+    'Confirmed appearances',
+    'PPG',
+  ]);
+  // Sorted by team, then most points: Bea Cooper (19 + 16) before Jo Lee (15 + 12) for Harbour Hawks.
+  const rows = players.locator('tbody tr');
+  await expect(rows.nth(0)).toContainText('Harbour Hawks');
+  await expect(rows.nth(0)).toContainText('Bea Cooper');
+  await expect(rows.nth(1)).toContainText('Jo Lee');
+  // Swiping the stats sideways keeps the team and the player in view.
+  await players.evaluate((element) => element.scrollBy({ left: 2000 }));
+  const region = (await players.boundingBox())!;
+  for (const name of ['Harbour Hawks', 'Bea Cooper']) {
+    const cell = (await players.getByRole('cell', { name }).first().boundingBox())!;
+    expect(cell.x).toBeGreaterThanOrEqual(region.x - 1);
+    expect(cell.x + cell.width).toBeLessThanOrEqual(region.x + region.width + 1);
+  }
+  await noSidewaysScroll(page);
+  await expectNoSeriousA11yViolations(page);
+});
+
+test('choices made while the page is loading are kept when it arrives', async ({ page }) => {
+  // On the live site an event's lists take a moment to load. Hold the page's server responses the
+  // same way, so the organiser chooses while they load, as they did when the bug was found.
+  await page.route(
+    (url) => url.pathname === '/prototype/reports' && url.searchParams.has('event'),
+    async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await route.continue();
+    },
+  );
+  await page.goto('/prototype/reports');
+  await page.getByRole('combobox', { name: 'Event' }).selectOption({ label: 'Te Whānau League 2026' });
+  await expect(page.getByText('Loading this event’s leagues, teams and games…')).toBeVisible();
+  await page.getByRole('combobox', { name: 'Report' }).selectOption({ label: 'Cumulative League Statistics' });
+  await expect(page.getByRole('combobox', { name: 'League / division' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Report' })).toHaveValue('league');
+
+  // The same while a report builds: a box ticked meanwhile stays ticked.
+  await page.getByRole('button', { name: 'Show report' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Building the report…' })).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Show all player stats' }).check();
+  await expect(page.getByRole('heading', { name: 'Cumulative League Statistics' })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Show all player stats' })).toBeChecked();
+  await expect(page.getByRole('combobox', { name: 'Report' })).toHaveValue('league');
+
+  // Back (not the form's own doing) shows what the address says, as before.
+  await page.goBack();
+  await expect(page.getByRole('heading', { name: 'Cumulative League Statistics' })).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: 'Report' })).toHaveValue('results');
+  await expect(page.getByRole('checkbox', { name: 'Show all player stats' })).toHaveCount(0);
+});
+
 test('a recorded total that differs from the official score shows the final score under it', async ({ page }) => {
   await page.goto('/prototype/reports');
   await page.getByRole('combobox', { name: 'Event' }).selectOption({ label: 'Te Whānau League 2026' });

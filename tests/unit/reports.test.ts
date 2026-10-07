@@ -364,13 +364,50 @@ describe('Connect Reports calculations', () => {
     expect(box.notes.some((note) => note.startsWith('All player stats'))).toBe(true);
     expect(box.tables[0]!.rows.find((row) => row.playerId === 'p')).toMatchObject({ rebounds: 2, assists: 1 });
     expect(box.tables[0]!.rows.find((row) => row.playerId === 'q')).toMatchObject({ rebounds: null, assists: null });
+    // League and team statistics: the other stats are columns of the Players table, no table per stat.
     const league = one('league');
-    expect(league.tables.find((table) => table.title.startsWith('Rebounds'))!.rows[0]).toMatchObject({
-      playerId: 'p',
-      total: 2,
+    expect(league.tables.map((t) => t.title)).toEqual(['Teams', 'Players']);
+    const players = league.tables[1]!;
+    expect(players.columns.map((c) => c.label)).toEqual([
+      'Team',
+      'Team ID',
+      'Player ID',
+      'Player',
+      'Points',
+      '2PT made',
+      '3PT made',
+      'FT made',
+      '2PT attempts',
+      '2PT %',
+      '3PT attempts',
+      '3PT %',
+      'FT attempts',
+      'FT %',
+      'Rebounds',
+      'Assists',
+      'Confirmed appearances',
+      'PPG',
+    ]);
+    expect(players.rows.find((r) => r.playerId === 'p')).toMatchObject({
+      team: 'Aces',
+      points: 5,
+      rebounds: 2,
+      assists: 1,
+      fg2Att: 1,
+      fg2Pct: 100,
       appearances: 1,
-      perGame: 2,
+      ppg: 5,
     });
+    // Quinn's side tracked shooting but not rebounds or assists: those are blank, not zero.
+    expect(players.rows.find((r) => r.playerId === 'q')).toMatchObject({
+      team: 'Blues',
+      rebounds: null,
+      assists: null,
+      fg2Att: 1,
+    });
+    const team = one('team', { teamId: 'a' });
+    expect(team.tables.map((t) => t.title)).toEqual(['Team summary', 'Players', 'Results']);
+    expect(team.tables[1]!.rows.map((r) => r.playerId)).toEqual(['p']);
     expect(one('leaders').tables.some((table) => table.title.startsWith('Rebounds leaders'))).toBe(true);
     expect(one('player-log', { playerId: 'p' }).tables[0]!.rows[0]).toMatchObject({ rebounds: 2, assists: 1 });
   });
@@ -405,6 +442,58 @@ describe('Connect Reports calculations', () => {
     expect(() => buildReport(large, definition('results'), '2026-10-02T01:00:00.000Z')).toThrow(
       'Select at most 100 games',
     );
+  });
+
+  it('lists players by team first, then most points', () => {
+    const many: ReportSource = structuredClone(source);
+    many.players.push({ id: 'r', name: 'Rua' }, { id: 's', name: 'Sam' });
+    many.games[0]!.mobileEvents.push(
+      { id: 'x1', teamId: 'b', playerId: 'r', type: 'fg3_make' },
+      { id: 'x2', teamId: 'a', playerId: 's', type: 'fg3_make' },
+      { id: 'x3', teamId: 'a', playerId: 's', type: 'fg3_make' },
+    );
+    many.games[0]!.manifests[0]!.eventCount = 5;
+    many.games[0]!.manifests[1]!.eventCount = 2;
+    const league = buildReport(many, definition('league', { gameIds: ['g1'] }), '2026-10-02T01:00:00.000Z');
+    const players = league.tables.find((t) => t.title === 'Players')!;
+    expect(players.columns[0]!.label).toBe('Team');
+    expect(players.rows.map((r) => [r.team, r.player, r.points])).toEqual([
+      ['Aces', 'Sam', 6],
+      ['Aces', 'Ari', 5],
+      ['Blues', 'Rua', 3],
+      ['Blues', 'Quinn', 2],
+    ]);
+    // A box score book's player totals read the same way.
+    const book = buildReport(many, definition('box-score'), '2026-10-02T01:00:00.000Z');
+    expect(book.tables[0]!.rows.map((r) => r.player)).toEqual(['Sam', 'Ari', 'Rua', 'Quinn']);
+    expect(book.tables[0]!.columns.slice(0, 5).map((c) => c.label)).toEqual([
+      'Team',
+      'Team ID',
+      'Player ID',
+      'Player',
+      'Games with stats',
+    ]);
+  });
+
+  it('adds turnovers to the box score and game log where the game tracked them', () => {
+    const tov: ReportSource = structuredClone(source);
+    tov.games[0]!.mobileEvents.push({ id: 't1', teamId: 'a', playerId: 'p', type: 'tov' });
+    tov.games[0]!.manifests[0]!.eventCount = 4;
+    tov.games[0]!.manifests[0]!.turnovers = 'complete';
+    const run = (template: ReportDefinition['template'], options: Partial<ReportDefinition> = {}) =>
+      buildReport(
+        tov,
+        definition(template, { gameIds: ['g1'], allStats: true, ...options }),
+        '2026-10-02T01:00:00.000Z',
+      );
+    const box = run('box-score').tables[0]!;
+    expect(box.columns.map((c) => c.label)).toContain('Turnovers');
+    expect(box.rows.find((r) => r.playerId === 'p')).toMatchObject({ turnovers: 1 });
+    expect(box.rows.find((r) => r.playerId === 'q')).toMatchObject({ turnovers: null });
+    expect(run('player-log', { playerId: 'p' }).tables[0]!.rows[0]).toMatchObject({ turnovers: 1 });
+    expect(run('league').tables[1]!.rows.find((r) => r.playerId === 'p')).toMatchObject({ turnovers: 1 });
+    // Without "Show all player stats" there is no turnovers column.
+    expect(run('box-score', { allStats: false }).tables[0]!.columns.map((c) => c.label)).not.toContain('Turnovers');
   });
 
   it('saves a one-day report from an event with more than 100 games', () => {

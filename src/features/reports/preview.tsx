@@ -79,7 +79,17 @@ export function ReportPreview({ report, saved = false }: { report: ReportDocumen
                 {columns.length > 4 ? (
                   <p className={styles.scrollHint}>Swipe the table sideways for more columns.</p>
                 ) : null}
-                <div className={styles.tableScroll} tabIndex={0} role="region" aria-label={`${table.title} table`}>
+                <div
+                  className={
+                    // Players listed by team: the team and the player both stay in view while the stats scroll.
+                    columns[0]?.key === 'team' && columns[1]?.key === 'player'
+                      ? `${styles.tableScroll} ${styles.teamPlayer}`
+                      : styles.tableScroll
+                  }
+                  tabIndex={0}
+                  role="region"
+                  aria-label={`${table.title} table`}
+                >
                   <table>
                     <thead>
                       <tr>

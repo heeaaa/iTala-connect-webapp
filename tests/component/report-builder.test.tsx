@@ -305,3 +305,69 @@ describe('Report form', () => {
     });
   });
 });
+
+/** What the page passes once it lands on an address (src/app/admin/reports/page.tsx). */
+function landing(search: string, chosen = true) {
+  const query = Object.fromEntries(new URLSearchParams(search));
+  return (
+    <ReportBuilder
+      events={events}
+      eventId={chosen ? (query.event ?? '') : ''}
+      options={chosen && query.event === SAMPLE_REPORT_EVENT ? options : null}
+      initial={stateFromQuery(query)}
+    />
+  );
+}
+const pushedSearch = () => pushed().search.slice(1);
+
+describe('Report form across page loads', () => {
+  it('keeps a report chosen while the event loads (bug found 07/10/2026)', async () => {
+    const { rerender } = render(landing(''));
+    const user = userEvent.setup();
+    await user.selectOptions(select('Event'), 'Te Whānau League 2026');
+    expect(pushedSearch()).toBe(`template=results&event=${SAMPLE_REPORT_EVENT}`);
+    // Still loading: the organiser picks the report.
+    await user.selectOptions(select('Report'), 'Cumulative League Statistics');
+    rerender(landing(pushedSearch()));
+    expect(select('League / division')).toBeInTheDocument();
+    expect(select('Report')).toHaveValue('league');
+  });
+
+  it('shows what the address says when the page was not loaded by the form', async () => {
+    const { rerender } = render(landing(`template=league&event=${SAMPLE_REPORT_EVENT}`));
+    const user = userEvent.setup();
+    await user.selectOptions(select('Report'), 'Player Leaderboards');
+    // A saved filter (or Back) opens another address.
+    rerender(landing(`template=box-score&event=${SAMPLE_REPORT_EVENT}&division=${OPEN}&preview=1`));
+    expect(select('Report')).toHaveValue('box-score');
+    expect(select('League / division')).toHaveValue(OPEN);
+  });
+
+  it('keeps a change made while a report builds, and the report it asked for', async () => {
+    const { rerender } = render(landing(`template=box-score&event=${SAMPLE_REPORT_EVENT}`));
+    const user = userEvent.setup();
+    await user.selectOptions(select('League / division'), WOMEN);
+    await user.click(screen.getByRole('button', { name: 'Show report' }));
+    const asked = pushedSearch();
+    expect(asked).toContain(`division=${WOMEN}`);
+    await user.click(screen.getByRole('checkbox', { name: 'Show all player stats' }));
+    rerender(landing(asked));
+    expect(screen.getByRole('checkbox', { name: 'Show all player stats' })).toBeChecked();
+    expect(select('League / division')).toHaveValue(WOMEN);
+    expect(select('Report')).toHaveValue('box-score');
+  });
+
+  it('starts another event afresh, keeping the report and "Show all player stats"', async () => {
+    const { rerender } = render(landing(`template=box-score&event=${SAMPLE_REPORT_EVENT}&division=${OPEN}&stats=all`));
+    const user = userEvent.setup();
+    await user.selectOptions(select('Event'), 'Winter Cup');
+    expect(Object.fromEntries(pushed().searchParams)).toEqual({ template: 'box-score', stats: 'all', event: uuid(2) });
+    // The other event's page: its own lists (none in this sample), the same report and box ticked.
+    rerender(landing(pushedSearch(), false));
+    await user.selectOptions(select('Event'), 'Te Whānau League 2026');
+    rerender(landing(pushedSearch()));
+    expect(select('Report')).toHaveValue('box-score');
+    expect(select('League / division')).toHaveValue('');
+    expect(screen.getByRole('checkbox', { name: 'Show all player stats' })).toBeChecked();
+  });
+});

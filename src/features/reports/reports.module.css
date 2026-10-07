@@ -426,6 +426,21 @@
 .tableScroll thead th:first-child {
   z-index: 2;
 }
+/* Players by team: a fixed-width team column, so the player column can stay in view beside it. */
+.teamPlayer tr > :first-child {
+  width: 8rem;
+  min-width: 8rem;
+  max-width: 8rem;
+  white-space: normal;
+}
+.teamPlayer tr > :nth-child(2) {
+  position: sticky;
+  left: 8rem;
+  z-index: 1;
+}
+.teamPlayer thead th:nth-child(2) {
+  z-index: 2;
+}
 /* A box score's team heading opens each team's block. */
 .teamRow th {
   padding-top: 1rem;

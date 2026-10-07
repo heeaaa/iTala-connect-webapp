@@ -50,7 +50,6 @@ export default async function ReportsPrototype({
       <main className={`${platformStyles.wrap} pb-12`}>
         <TitlePlate title="Reports" sub="Sample data for visual review" />
         <ReportBuilder
-          key={JSON.stringify([chosen, initial])}
           events={[{ id: SAMPLE_REPORT_EVENT, name: source.event.name }]}
           eventId={chosen ? SAMPLE_REPORT_EVENT : ''}
           options={chosen ? builderOptions(source, [], { today: '2026-10-17' }) : null}

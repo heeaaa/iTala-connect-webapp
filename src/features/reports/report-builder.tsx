@@ -1,6 +1,6 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState, useTransition, type FormEvent } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, useTransition, type FormEvent } from 'react';
 
 import { platformStyles as s } from '@/components/platform/platform-frame';
 import { formatDate, formatDayLabel } from '@/lib/format';
@@ -16,6 +16,7 @@ import {
   pickDay,
   playersFor,
   settle,
+  stateFromQuery,
   teamsFor,
   TEMPLATE_FIELDS,
   type BuilderOptions,
@@ -54,12 +55,56 @@ const DATE_MODES: { id: DateMode; label: string }[] = [
   { id: 'dates', label: 'Several days' },
 ];
 
+/** What the page describes for an address: the form is rebuilt when this changes. */
+const pageKey = (eventId: string, initial: BuilderState) => JSON.stringify([eventId, initial]);
+/** The page key a navigation to these search parameters will land on. */
+const landingKey = (eventId: string, params: URLSearchParams) =>
+  pageKey(eventId, stateFromQuery(Object.fromEntries(params)));
+
 /**
  * The report form. Every choice updates the ones that depend on it straight away: an event loads
  * its leagues, teams and games; a league narrows the teams, days and games; a day narrows the
  * games. Only "Show report" builds the report, through the same address a saved filter opens.
+ *
+ * Each page load rebuilds the form from its address. A load the form itself started (an event's
+ * lists, a report, more players) instead starts from the person's latest choices, so anything
+ * chosen while it loaded is kept (bug found 07/10/2026: a report type picked while an event's
+ * lists loaded went back to "Results and Standings"). A load from elsewhere, such as Back or a
+ * saved filter, shows what its address says.
  */
-export function ReportBuilder({ events, eventId, options, initial, basePath = '/admin/reports' }: ReportBuilderProps) {
+export function ReportBuilder(props: ReportBuilderProps) {
+  const key = pageKey(props.eventId, props.initial);
+  const [own, setOwn] = useState<{ landing: string; latest: BuilderState } | null>(null);
+  const [page, setPage] = useState({ key, initial: props.initial });
+  if (page.key !== key) {
+    // A page has landed: the form's own load starts from the person's choices, any other from its
+    // address. Either way that navigation is now used up.
+    setPage({ key, initial: own?.landing === key ? own.latest : props.initial });
+    setOwn(null);
+  }
+  const navigating = useCallback((landing: string, latest: BuilderState) => setOwn({ landing, latest }), []);
+  const edited = useCallback(
+    (latest: BuilderState) =>
+      setOwn((current) => (current && current.latest !== latest ? { ...current, latest } : current)),
+    [],
+  );
+  return <BuilderForm key={page.key} {...props} initial={page.initial} onNavigate={navigating} onEdit={edited} />;
+}
+
+function BuilderForm({
+  events,
+  eventId,
+  options,
+  initial,
+  basePath = '/admin/reports',
+  onNavigate,
+  onEdit,
+}: ReportBuilderProps & {
+  /** The form is about to load this page; these are the choices to start it from. */
+  onNavigate: (landing: string, latest: BuilderState) => void;
+  /** Every change, so choices made while a page loads are not lost. */
+  onEdit: (latest: BuilderState) => void;
+}) {
   const router = useRouter();
   const id = useId();
   const [busy, startBusy] = useTransition();
@@ -75,6 +120,7 @@ export function ReportBuilder({ events, eventId, options, initial, basePath = '/
   // The lists belong to the event the page was read for; while another one loads there are none.
   const o = event && event === eventId ? options : null;
   const ready = !!o;
+  useEffect(() => onEdit(state), [onEdit, state]);
 
   const change = (patch: Partial<BuilderState>) => {
     setProblem(null);
@@ -85,8 +131,13 @@ export function ReportBuilder({ events, eventId, options, initial, basePath = '/
     setEvent(next);
     setProblem(null);
     setTask('event');
-    const params = new URLSearchParams({ template: state.template });
+    // Another event starts its filters afresh, keeping the report and "Show all player stats".
+    const fresh: BuilderState = { ...stateFromQuery({}), template: state.template, allStats: state.allStats };
+    setState(fresh);
+    const params = new URLSearchParams({ template: fresh.template });
+    if (fresh.allStats) params.set('stats', 'all');
     if (next) params.set('event', next);
+    onNavigate(landingKey(next, params), fresh);
     startBusy(() => router.push(`${basePath}?${params.toString()}`, { scroll: false }));
   };
 
@@ -97,6 +148,7 @@ export function ReportBuilder({ events, eventId, options, initial, basePath = '/
     const params = new URLSearchParams({ event, template: state.template });
     if (state.divisionId) params.set('division', state.divisionId);
     if (state.teamId) params.set('team', state.teamId);
+    onNavigate(landingKey(event, params), state);
     startBusy(() => router.push(`${basePath}?${params.toString()}`, { scroll: false }));
   };
 
@@ -125,7 +177,9 @@ export function ReportBuilder({ events, eventId, options, initial, basePath = '/
       return;
     }
     setTask('report');
-    startBusy(() => router.push(presetUrl(definitionFromState(event, state), basePath)));
+    const url = presetUrl(definitionFromState(event, state), basePath);
+    onNavigate(landingKey(event, new URL(url, 'http://reports.local').searchParams), state);
+    startBusy(() => router.push(url));
   };
 
   const invalid = (field: string) => problem?.field === field || undefined;

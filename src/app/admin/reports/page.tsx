@@ -88,7 +88,6 @@ export default async function ReportsPage({
       </div>
       {events.length ? (
         <ReportBuilder
-          key={JSON.stringify([canRead ? eventId : '', initial])}
           events={events.map((event) => ({ id: event.id, name: event.name }))}
           eventId={canRead ? eventId : ''}
           options={options}
