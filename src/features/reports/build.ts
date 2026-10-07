@@ -1,5 +1,7 @@
 import { computeStandings } from '@/domain/standings';
 import { formatDate, formatDayLabel, formatTime } from '@/lib/format';
+
+import { withoutOptionalStats } from './coverage';
 import {
   REPORT_TEMPLATES,
   type ReportDefinition,
@@ -832,8 +834,12 @@ function playerLog(source: ReportSource, games: readonly ReportGame[], playerId:
   ];
 }
 
-export function buildReport(source: ReportSource, d: ReportDefinition, generatedAt: string): ReportDocument {
-  validate(source, d);
+export function buildReport(input: ReportSource, d: ReportDefinition, generatedAt: string): ReportDocument {
+  validate(input, d);
+  // Unless "Show all player stats" is ticked, only points, made shots and appearances are reported.
+  const source: ReportSource = d.allStats
+    ? input
+    : { ...input, games: input.games.map((g) => ({ ...g, manifests: withoutOptionalStats(g.manifests) })) };
   const { selectedCount, included, exclusions } = selectGames(source, d);
   const title = REPORT_TEMPLATES.find((t) => t.id === d.template)!.label;
   const notes = [
@@ -900,6 +906,10 @@ export function buildReport(source: ReportSource, d: ReportDefinition, generated
       notes.push('Games without explicit player evidence are omitted; omission does not mean did not play.');
       break;
   }
+  if (d.allStats)
+    notes.push(
+      'All player stats: rebounds, assists, steals, blocks and fouls for games recorded in the mobile app; shooting and turnovers only where the game stored that it tracked them.',
+    );
   if (!included.length) notes.push('No eligible games match this selection.');
   if (source.warnings?.length) notes.push(...source.warnings);
   if (included.some((g) => !g.mobileGameId || !g.mobileFinal))

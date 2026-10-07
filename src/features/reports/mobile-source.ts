@@ -3,6 +3,7 @@ import 'server-only';
 import { serverEnv } from '@/env';
 import { createClient } from '@/lib/supabase/server';
 
+import { sideManifests } from './coverage';
 import { createReportsMobileReader } from './mobile-reader';
 import {
   MOBILE_UNVERIFIED,
@@ -124,10 +125,23 @@ export async function enrichReportSourceWithMobile(
           playerId: event.player_id,
           type: event.type,
         }));
-        games.set(mapping.game.id, { ...mapping.game, mobileFinal: true, mobileEvents, manifests: [] });
+        const manifests = sideManifests(
+          final,
+          data.teams,
+          [
+            { teamId: mapping.game.homeTeamId!, mobileTeamId: mapping.mobileHome },
+            { teamId: mapping.game.awayTeamId!, mobileTeamId: mapping.mobileAway },
+          ],
+          mobileEvents,
+        );
+        games.set(mapping.game.id, { ...mapping.game, mobileFinal: true, mobileEvents, manifests });
+        // Players with an event, and those the attendance shows were there.
+        const named = new Set([
+          ...events.flatMap((event) => (event.player_id ? [event.player_id] : [])),
+          ...manifests.flatMap((manifest) => manifest.playerIds),
+        ]);
         for (const player of data.players)
-          if (events.some((event) => event.player_id === player.id))
-            players.set(player.id, { id: player.id, name: player.name });
+          if (named.has(player.id)) players.set(player.id, { id: player.id, name: player.name });
       }
     }
     return {

@@ -17,5 +17,6 @@ export function presetUrl(definition: ReportDefinition, base = '/admin/reports')
   if (definition.standingsScope) params.set('standings', definition.standingsScope);
   if (definition.minAppearances !== undefined) params.set('minAppearances', String(definition.minAppearances));
   if (definition.minAttempts !== undefined) params.set('minAttempts', String(definition.minAttempts));
+  if (definition.allStats) params.set('stats', 'all');
   return `${base}?${params.toString()}`;
 }

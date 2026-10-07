@@ -18,6 +18,8 @@ export interface ReportDefinition {
   standingsScope?: 'through-cutoff' | 'selected-games';
   minAppearances?: number;
   minAttempts?: number;
+  /** "Show all player stats": rebounds, assists, steals, blocks, fouls, shooting and turnovers where tracked. */
+  allStats?: boolean;
 }
 
 export interface ReportTeam {

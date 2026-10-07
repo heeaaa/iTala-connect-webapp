@@ -291,7 +291,9 @@ describe('Connect Reports calculations', () => {
   });
 
   it('uses only explicitly complete games for shooting percentages and turnover totals', () => {
-    const one = report('leaders');
+    // Shooting and turnovers are part of "Show all player stats"; without it they are left out.
+    expect(report('leaders').tables.some((table) => table.title.startsWith('2PT shooting'))).toBe(false);
+    const one = report('leaders', { allStats: true });
     const shot = one.tables.find((table) => table.title.startsWith('2PT shooting'))!;
     expect(shot.rows.find((row) => row.playerId === 'p')).toMatchObject({
       makes: 1,
@@ -300,16 +302,23 @@ describe('Connect Reports calculations', () => {
       eligibleGames: 1,
     });
     expect(one.tables.some((table) => table.title.startsWith('Turnovers'))).toBe(false);
-    expect(report('leaders', { minAttempts: 2 }).tables.some((table) => table.title.startsWith('2PT shooting'))).toBe(
-      false,
-    );
+    expect(
+      report('leaders', { minAttempts: 2, allStats: true }).tables.some((table) =>
+        table.title.startsWith('2PT shooting'),
+      ),
+    ).toBe(false);
 
     const mixed: ReportSource = structuredClone(source);
     mixed.games[0]!.mobileEvents.push({ id: 'miss', teamId: 'a', playerId: 'p', type: 'fg2_miss' });
     mixed.games[0]!.mobileEvents.push({ id: 'tov', teamId: 'a', playerId: 'p', type: 'tov' });
     mixed.games[0]!.manifests[0]!.eventCount = 5;
     mixed.games[0]!.manifests[0]!.turnovers = 'complete';
-    const measured = buildReport(mixed, definition('leaders'), '2026-10-02T01:00:00.000Z');
+    const measured = buildReport(mixed, definition('leaders', { allStats: true }), '2026-10-02T01:00:00.000Z');
+    expect(
+      buildReport(mixed, definition('leaders'), '2026-10-02T01:00:00.000Z').tables.some((t) =>
+        t.title.startsWith('Turnovers'),
+      ),
+    ).toBe(false);
     expect(
       measured.tables.find((table) => table.title.startsWith('2PT shooting'))!.rows.find((row) => row.playerId === 'p'),
     ).toMatchObject({
@@ -325,7 +334,7 @@ describe('Connect Reports calculations', () => {
     });
 
     mixed.games[0]!.manifests[0]!.shots.fg2 = 'partial';
-    const partial = buildReport(mixed, definition('leaders'), '2026-10-02T01:00:00.000Z');
+    const partial = buildReport(mixed, definition('leaders', { allStats: true }), '2026-10-02T01:00:00.000Z');
     expect(
       partial.tables.find((table) => table.title.startsWith('2PT shooting'))!.rows.some((row) => row.playerId === 'p'),
     ).toBe(false);
@@ -341,8 +350,18 @@ describe('Connect Reports calculations', () => {
     tracked.games[0]!.manifests[0]!.eventCount = 6;
     tracked.games[0]!.manifests[0]!.other = { rebounds: 'complete', assists: 'complete' };
     const one = (template: ReportDefinition['template'], options: Partial<ReportDefinition> = {}) =>
-      buildReport(tracked, definition(template, { gameIds: ['g1'], ...options }), '2026-10-02T01:00:00.000Z');
+      buildReport(
+        tracked,
+        definition(template, { gameIds: ['g1'], allStats: true, ...options }),
+        '2026-10-02T01:00:00.000Z',
+      );
+    // Not ticked: the same game shows points and made shots only.
+    const plain = one('box-score', { allStats: false });
+    expect(plain.tables[0]!.columns.map((c) => c.key)).not.toContain('rebounds');
+    expect(plain.notes.some((note) => note.startsWith('All player stats'))).toBe(false);
+    expect(one('league', { allStats: false }).tables.some((t) => t.title.startsWith('Rebounds'))).toBe(false);
     const box = one('box-score');
+    expect(box.notes.some((note) => note.startsWith('All player stats'))).toBe(true);
     expect(box.tables[0]!.rows.find((row) => row.playerId === 'p')).toMatchObject({ rebounds: 2, assists: 1 });
     expect(box.tables[0]!.rows.find((row) => row.playerId === 'q')).toMatchObject({ rebounds: null, assists: null });
     const league = one('league');

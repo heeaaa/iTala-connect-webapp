@@ -344,6 +344,26 @@ export function ReportBuilder({ events, eventId, options, initial, basePath = '/
             </label>
           ) : null}
 
+          {f.stats ? (
+            <div className={styles.check}>
+              <label>
+                <input
+                  type="checkbox"
+                  name="stats"
+                  value="all"
+                  checked={state.allStats}
+                  aria-describedby={`${id}-stats-hint`}
+                  onChange={(e) => change({ allStats: e.currentTarget.checked })}
+                />
+                Show all player stats
+              </label>
+              <span id={`${id}-stats-hint`} className={styles.hint}>
+                Adds rebounds, assists, steals, blocks and fouls, and shooting and turnovers where the game tracked
+                them.
+              </span>
+            </div>
+          ) : null}
+
           <details className={styles.more} open={moreOpenAtStart || undefined}>
             <summary>More options</summary>
             <div className={styles.fields}>

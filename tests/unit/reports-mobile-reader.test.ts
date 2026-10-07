@@ -34,4 +34,25 @@ describe('read-only Mobile report client', () => {
     expect(fetcher).not.toHaveBeenCalled();
     await expect(read('league-1', [gameId])).rejects.toThrow('Invalid mobile report source');
   });
+
+  it('reads what each game tracked when the function sends it, and still reads an older reply', async () => {
+    const newer = {
+      ...response,
+      games: [{ ...response.games[0], track_misses: true, track_turnovers: null, attendance: ['player-1'] }],
+      teams: [{ id: 'home', league_id: 'league-1', team_only: false, player_ids: ['player-1'] }],
+    };
+    const read = (body: unknown) =>
+      createReportsMobileReader('https://mobile.example', 'secret', (async () => Response.json(body)) as typeof fetch)(
+        'league-1',
+        [gameId],
+      );
+    const got = await read(newer);
+    expect(got.games[0]).toMatchObject({ track_misses: true, track_turnovers: null, attendance: ['player-1'] });
+    expect(got.teams).toEqual(newer.teams);
+    expect((await read(response)).teams).toEqual([]);
+    await expect(read({ ...newer, teams: [{ ...newer.teams[0], league_id: 'foreign' }] })).rejects.toThrow(
+      'Invalid mobile report source',
+    );
+    await expect(read({ ...newer, games: [{ ...newer.games[0], attendance: ['bad id'] }] })).rejects.toThrow();
+  });
 });

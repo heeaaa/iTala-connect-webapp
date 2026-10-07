@@ -21,6 +21,7 @@ export const reportDefinitionSchema = z.strictObject({
   standingsScope: z.enum(['through-cutoff', 'selected-games']).optional(),
   minAppearances: z.int().min(0).max(1000).optional(),
   minAttempts: z.int().min(0).max(1000).optional(),
+  allStats: z.boolean().optional(),
 });
 
 const cell = z.union([z.string().max(2000), z.number().finite(), z.null()]);

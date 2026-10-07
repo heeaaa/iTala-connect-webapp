@@ -1,3 +1,4 @@
+import { sideManifests } from '@/features/reports/coverage';
 import type { ReportEvent, ReportGame, ReportSource } from '@/features/reports/model';
 
 /**
@@ -5,6 +6,11 @@ import type { ReportEvent, ReportGame, ReportSource } from '@/features/reports/m
  * player or result. Two Saturdays are played, with player stats as an approved mobile result
  * would carry them, and a third is still to come. One Women game has only its Connect score,
  * and one Open game's official score is two points more than its recorded stats.
+ * Each player also has rebounds, assists, steals, blocks and fouls (shown when "Show all player
+ * stats" is ticked), worked out from their made shots so the numbers are easy to check:
+ * rebounds = 2PT made, assists = FT made, a steal if they made a three, a block when their
+ * 2PT made is odd, and two fouls. Games follow their league's miss and turnover settings, so
+ * shooting and turnovers stay unknown; everyone with a stat is on the attendance.
  */
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -127,11 +133,20 @@ function game(spec: Spec): ReportGame {
     ] as const)
       for (let i = 0; i < made; i++)
         events.push({ id: `e${spec.n}-${next++}`, teamId, playerId: teamOnly ? null : who, type });
+    if (teamOnly) continue;
+    for (const [type, count] of [
+      ['reb', fg2],
+      ['ast', ft],
+      ['stl', fg3 > 0 ? 1 : 0],
+      ['blk', fg2 % 2],
+      ['pf', 2],
+    ] as const)
+      for (let i = 0; i < count; i++) events.push({ id: `e${spec.n}-${next++}`, teamId, playerId: who, type });
   }
   const points = (teamId: string) =>
     events
       .filter((e) => e.teamId === teamId)
-      .reduce((sum, e) => sum + ({ fg2_make: 2, fg3_make: 3, ft_make: 1 } as Record<string, number>)[e.type]!, 0);
+      .reduce((sum, e) => sum + (({ fg2_make: 2, fg3_make: 3, ft_make: 1 } as Record<string, number>)[e.type] ?? 0), 0);
   const stats = !!spec.lines;
   const recorded: [number, number] = [points(spec.home), points(spec.away)];
   const [homeScore, awayScore] = spec.score ?? (stats ? recorded : [null, null]);
@@ -148,8 +163,38 @@ function game(spec: Spec): ReportGame {
     mobileGameId: stats ? `cg_${spec.n}` : null,
     mobileFinal: stats,
     mobileEvents: events,
-    manifests: [],
+    manifests: stats ? sampleManifests(spec, events) : [],
   };
+}
+
+/** What each side tracked, by the same rules as a real mobile read (coverage.ts). */
+function sampleManifests(spec: Spec, events: ReportEvent[]) {
+  const roster = (team: string) => Object.entries(PLAYERS).flatMap(([id, p]) => (p.team === team ? [id] : []));
+  const present = [...new Set(events.flatMap((e) => (e.playerId ? [e.playerId] : [])))];
+  return sideManifests(
+    {
+      id: `cg_${spec.n}`,
+      league_id: 'sample',
+      home_team_id: spec.home,
+      away_team_id: spec.away,
+      status: 'final',
+      default_winner_team_id: null,
+      track_misses: null,
+      track_turnovers: null,
+      attendance: present,
+    },
+    [spec.home, spec.away].map((team) => ({
+      id: team,
+      league_id: 'sample',
+      team_only: false,
+      player_ids: roster(team),
+    })),
+    [
+      { teamId: spec.home, mobileTeamId: spec.home },
+      { teamId: spec.away, mobileTeamId: spec.away },
+    ],
+    events,
+  );
 }
 
 export function sampleReportSource(): ReportSource {

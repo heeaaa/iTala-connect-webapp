@@ -296,6 +296,25 @@ describe('report form and address', () => {
     expect(definitionFromState(SAMPLE_REPORT_EVENT, state({ dateMode: 'range' })).dates).toEqual([]);
   });
 
+  it('carries "Show all player stats" through the form, the address and saved filters', () => {
+    expect(blank.allStats).toBe(false);
+    expect(stateFromQuery({ stats: 'all' }).allStats).toBe(true);
+    expect(stateFromQuery({ stats: 'yes' }).allStats).toBe(false);
+    const ticked = definitionFromState(SAMPLE_REPORT_EVENT, state({ template: 'box-score', allStats: true }));
+    expect(ticked.allStats).toBe(true);
+    // Results and standings have no player stats, so the choice is not sent for them.
+    expect(
+      definitionFromState(SAMPLE_REPORT_EVENT, state({ template: 'results', allStats: true })).allStats,
+    ).toBeUndefined();
+    expect(definitionFromState(SAMPLE_REPORT_EVENT, state({ template: 'league' })).allStats).toBeUndefined();
+    const query = Object.fromEntries(new URL(presetUrl(ticked), 'http://x').searchParams);
+    expect(query.stats).toBe('all');
+    expect(reportDefinitionSchema.parse(definitionFromQuery(query, SAMPLE_REPORT_EVENT))).toMatchObject({
+      allStats: true,
+    });
+    expect(new URL(presetUrl({ ...ticked, allStats: undefined }), 'http://x').searchParams.has('stats')).toBe(false);
+  });
+
   it('keeps the server reading an address exactly as before', () => {
     expect(definitionFromQuery({}, 'e')).toEqual({
       eventId: 'e',
@@ -399,6 +418,36 @@ describe('review follow-ups', () => {
 });
 
 describe('sample season', () => {
+  it('adds rebounds, assists, steals, blocks and fouls to a box score only when asked', () => {
+    const asked = (allStats: boolean) =>
+      buildReport(
+        source,
+        definitionFromState(SAMPLE_REPORT_EVENT, state({ template: 'box-score', gameId: uuid(101), allStats })),
+        '2026-10-17T07:00:00.000Z',
+      ).tables[0]!;
+    const plain = asked(false);
+    expect(plain.columns.map((c) => c.label)).not.toContain('Rebounds');
+    const full = asked(true);
+    expect(full.columns.map((c) => c.label)).toEqual(
+      expect.arrayContaining(['Rebounds', 'Assists', 'Steals', 'Blocks', 'Fouls']),
+    );
+    expect(full.rows.find((r) => r.player === 'Māia Te Aroha')).toMatchObject({
+      points: 21,
+      rebounds: 6,
+      assists: 3,
+      steals: 1,
+      blocks: 0,
+      fouls: 2,
+    });
+    // Te Kapa Rangi's points without a player carry no other stats; the team total adds every line.
+    expect(full.rows.find((r) => r.entry === 'Team total' && r.team === 'Te Kapa Rangi')).toMatchObject({
+      points: 35,
+      rebounds: 10,
+      assists: 5,
+      fouls: 6,
+    });
+  });
+
   it('builds a day of box scores with player lines, team totals and the one differing official score', () => {
     const doc = buildReport(
       source,

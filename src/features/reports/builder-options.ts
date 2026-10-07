@@ -61,19 +61,21 @@ export interface BuilderState {
   standingsScope: 'through-cutoff' | 'selected-games';
   minAppearances: number;
   minAttempts: number;
+  /** "Show all player stats" ticked. */
+  allStats: boolean;
 }
 
 /** Which choices each report uses. A field a report ignores is hidden and never sent. */
 export const TEMPLATE_FIELDS: Record<
   ReportTemplate,
-  { teamRequired: boolean; game: boolean; player: boolean; standings: boolean; minimums: boolean }
+  { teamRequired: boolean; game: boolean; player: boolean; standings: boolean; minimums: boolean; stats: boolean }
 > = {
-  'box-score': { teamRequired: false, game: true, player: false, standings: false, minimums: false },
-  league: { teamRequired: false, game: true, player: false, standings: false, minimums: false },
-  team: { teamRequired: true, game: true, player: false, standings: false, minimums: false },
-  results: { teamRequired: false, game: true, player: false, standings: true, minimums: false },
-  leaders: { teamRequired: false, game: true, player: false, standings: false, minimums: true },
-  'player-log': { teamRequired: false, game: false, player: true, standings: false, minimums: false },
+  'box-score': { teamRequired: false, game: true, player: false, standings: false, minimums: false, stats: true },
+  league: { teamRequired: false, game: true, player: false, standings: false, minimums: false, stats: true },
+  team: { teamRequired: true, game: true, player: false, standings: false, minimums: false, stats: true },
+  results: { teamRequired: false, game: true, player: false, standings: true, minimums: false, stats: false },
+  leaders: { teamRequired: false, game: true, player: false, standings: false, minimums: true, stats: true },
+  'player-log': { teamRequired: false, game: false, player: true, standings: false, minimums: false, stats: true },
 };
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -169,6 +171,7 @@ export function definitionFromQuery(
     standingsScope: (one(query.standings) as ReportDefinition['standingsScope']) || undefined,
     minAppearances: one(query.minAppearances) ? Number(one(query.minAppearances)) : undefined,
     minAttempts: one(query.minAttempts) ? Number(one(query.minAttempts)) : undefined,
+    allStats: one(query.stats) === 'all' || undefined,
   };
 }
 
@@ -199,6 +202,7 @@ export function stateFromQuery(query: Record<string, string | string[] | undefin
     standingsScope: one(query.standings) === 'selected-games' ? 'selected-games' : 'through-cutoff',
     minAppearances: whole(one(query.minAppearances), 0),
     minAttempts: whole(one(query.minAttempts), 0),
+    allStats: one(query.stats) === 'all',
   };
 }
 
@@ -225,6 +229,7 @@ export function definitionFromState(eventId: string, s: BuilderState): ReportDef
     standingsScope: f.standings ? s.standingsScope : undefined,
     minAppearances: f.minimums ? s.minAppearances : undefined,
     minAttempts: f.minimums ? s.minAttempts : undefined,
+    allStats: f.stats && s.allStats ? true : undefined,
   };
 }
 

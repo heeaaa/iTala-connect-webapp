@@ -271,6 +271,22 @@ describe('Report form', () => {
     });
   });
 
+  it('offers "Show all player stats" for reports with player stats, and sends it when ticked', async () => {
+    const user = show({ template: 'results' });
+    expect(screen.queryByRole('checkbox', { name: 'Show all player stats' })).not.toBeInTheDocument();
+    await user.selectOptions(select('Report'), 'Game Box Score Book');
+    const box = screen.getByRole('checkbox', { name: 'Show all player stats' });
+    expect(box).not.toBeChecked();
+    expect(box).toHaveAccessibleDescription(
+      'Adds rebounds, assists, steals, blocks and fouls, and shooting and turnovers where the game tracked them.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Show report' }));
+    expect(pushed().searchParams.has('stats')).toBe(false);
+    await user.click(box);
+    await user.click(screen.getByRole('button', { name: 'Show report' }));
+    expect(pushed().searchParams.get('stats')).toBe('all');
+  });
+
   it('keeps more options open when one is in use, and sends the leaderboard minimums', async () => {
     const user = show({ template: 'leaders', minAppearances: '2', relative: 'last-five' });
     const more = screen.getByText('More options').closest('details')!;

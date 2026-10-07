@@ -114,6 +114,46 @@ test('an organiser picks a league, a day and its games, and reads each box score
   await expect(page.getByRole('row', { name: /^Bea Cooper 19/ })).toBeVisible();
 });
 
+test('"Show all player stats" adds rebounds, assists, steals, blocks and fouls to the box score', async ({ page }) => {
+  await page.goto('/prototype/reports');
+  await page.getByRole('combobox', { name: 'Event' }).selectOption({ label: 'Te Whānau League 2026' });
+  await expect(page.getByRole('combobox', { name: 'League / division' })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Report' }).selectOption({ label: 'Game Box Score Book' });
+  await page.getByText('One day', { exact: true }).click();
+  await page
+    .getByRole('group', { name: 'Choose a day' })
+    .getByRole('button', { name: 'Sat 03/10/2026, 3 games' })
+    .click();
+  await page
+    .getByRole('combobox', { name: 'Game' })
+    .selectOption({ label: '6:00 pm · Open · Kōwhai Warriors 38 - 35 Te Kapa Rangi' });
+  const stats = page.getByRole('checkbox', { name: 'Show all player stats' });
+  await expect(stats).not.toBeChecked();
+  await stats.check();
+  await page.getByRole('button', { name: 'Show report' }).click();
+  await expect(page).toHaveURL(/stats=all/);
+  const box = page.getByRole('region', {
+    name: 'Sat 03/10/2026 · 6:00 pm · Open: Kōwhai Warriors 38 - 35 Te Kapa Rangi table',
+  });
+  await expect(box.locator('thead th')).toHaveText([
+    'Player',
+    'Points',
+    '2PT made',
+    '3PT made',
+    'FT made',
+    'Rebounds',
+    'Assists',
+    'Steals',
+    'Blocks',
+    'Fouls',
+  ]);
+  // Māia: 6 two-pointers, 2 threes, 3 free throws; 6 rebounds, 3 assists, 1 steal, 0 blocks, 2 fouls.
+  await expect(box.getByRole('row', { name: /^Māia Te Aroha 21 6 2 3 6 3 1 0 2$/ })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Show all player stats' })).toBeChecked();
+  await noSidewaysScroll(page);
+  await expectNoSeriousA11yViolations(page);
+});
+
 test('a recorded total that differs from the official score shows the final score under it', async ({ page }) => {
   await page.goto('/prototype/reports');
   await page.getByRole('combobox', { name: 'Event' }).selectOption({ label: 'Te Whānau League 2026' });
