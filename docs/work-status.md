@@ -26,6 +26,8 @@ Last updated: 07/10/2026 (Claude, Reports form and link wizard leagues)
 
 **Not run:** the real mobile project and the deployed `connect-reports` reader: NOT RUN (player stats on the real Reports page need `MOBILE_REPORTS_READ_SECRET` and the deployed function).
 
+**Mobile reader (07/10/2026, user asked):** the user found no player stats on the PR #16 preview. The mobile `connect-reports` function had never been committed (not on any `iTala-official` branch, nor either laptop; `connect-link-state` is a different, push-only function). It is now written in `iTala-official` PR #58 (`feature/connect-reports-reader`): GET only, `x-connect-reports-secret` against `CONNECT_REPORTS_READ_SECRET`, final games of one league, their events and the players named, PostgREST GETs only. Its `npm test` passed, and a scratch check ran Connect's real `createReportsMobileReader` against it (accepted; wrong secret refused). Deploy steps: that repo's `supabase/functions/README.md` "Connect reports". Deploying and the live read: NOT RUN (user's go-ahead and Supabase access needed).
+
 **Known, left as is:** the calendar's arrow keys stop at month edges and each day is a tab stop (same as the approved event-date picker); edits made while "Show report" is loading are replaced by the loaded report's choices; the player log no longer offers a Game filter (a one-game log is one row).
 
 ## Current handoff (05/10/2026, schedule start times)
