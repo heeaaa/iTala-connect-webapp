@@ -218,6 +218,10 @@ test('moves, swaps and unschedules games by drag and drop, warning about short r
   await page.keyboard.press('Tab');
   await expect(moveButton(first!)).toBeFocused();
   await expect(cell(first!.start_time!)).toContainText(matchup(first!));
+  // A cancelled drag ends a render or two later (dnd-kit then returns to idle and clears the
+  // highlighted target); a pick-up before that is ignored. Focus never left the Move button, so
+  // wait for no highlighted target, as a person's next key comes much later.
+  await expect(grid.locator('[data-drop-target="true"]')).toHaveCount(0);
 
   // Keyboard: pick up, one row down to the free slot an hour later, drop.
   await page.keyboard.press('Space');
