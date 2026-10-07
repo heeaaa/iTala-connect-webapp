@@ -22,7 +22,9 @@ Last updated: 07/10/2026 (Claude, Reports form and link wizard leagues)
 - Coverage, one file at a time: 85 files, 1124 passed, 1 failed (the Windows-only `clean-build-cache.test.ts` junction baseline, which also fails on a clean `main` here); thresholds met (95.73% statements, 91.54% branches, 96.55% lines); new modules: `builder-options.ts` 100% lines and 95.58% branches, `report-builder.tsx` 97.7% and 91.15%, `report-calendar.tsx` 93.33% and 82.35%, `display.ts` 93.75% and 100%, `preview.tsx` 100% and 91.11%, `mobile-link.ts` 100%.
 - `tests/e2e/reports-prototype.spec.ts` through a scratch config (no database): 6 passed at 390 and 1440 px, with axe (no serious or critical) and no sideways scroll. Captures in `.impeccable/review/reports-builder/` (ignored) inspected at both widths.
 
-**Not run here (Docker):** `tests/e2e/reports.spec.ts` (the real `/admin/reports` on a seeded event, through to a fixed report and its PDF) and the extended `mobile-link.spec.ts`; CI on the PR runs them. Real mobile project and the deployed `connect-reports` reader: NOT RUN (player stats on the real Reports page need `MOBILE_REPORTS_READ_SECRET` and the deployed function).
+**CI on PR #16 (`6f10046`, run 37555616176, all jobs passed):** unit and component with coverage, lint, typecheck, gitleaks, build; pgTAP 21 files, 428 tests, PASS; E2E 111 passed, 5 skipped by design, including `reports.spec.ts` (the real `/admin/reports` on a seeded event, through to a fixed report and its PDF), the three prototype journeys and `mobile-link.spec.ts` with the drop-in check, on the phone and desktop projects; the Netlify deploy preview built.
+
+**Not run:** the real mobile project and the deployed `connect-reports` reader: NOT RUN (player stats on the real Reports page need `MOBILE_REPORTS_READ_SECRET` and the deployed function).
 
 **Known, left as is:** the calendar's arrow keys stop at month edges and each day is a tab stop (same as the approved event-date picker); edits made while "Show report" is loading are replaced by the loaded report's choices; the player log no longer offers a Game filter (a one-game log is one row).
 
