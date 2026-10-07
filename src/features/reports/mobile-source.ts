@@ -4,9 +4,15 @@ import { serverEnv } from '@/env';
 import { createClient } from '@/lib/supabase/server';
 
 import { createReportsMobileReader } from './mobile-reader';
-import type { ReportDefinition, ReportEvent, ReportGame, ReportSource } from './model';
+import {
+  MOBILE_UNVERIFIED,
+  type ReportDefinition,
+  type ReportEvent,
+  type ReportGame,
+  type ReportSource,
+} from './model';
 
-const warning = 'Mobile player statistics could not be verified. Connect scores remain available.';
+const warning = MOBILE_UNVERIFIED;
 
 function candidates(source: ReportSource, definition: ReportDefinition): ReportGame[] {
   let games = source.games.filter(

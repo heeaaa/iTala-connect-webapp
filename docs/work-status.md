@@ -1,6 +1,30 @@
 # Work status
 
-Last updated: 06/10/2026 (Claude, On court and score lock)
+Last updated: 07/10/2026 (Claude, Reports form and link wizard leagues)
+
+## Current handoff (07/10/2026, Reports form and link wizard leagues)
+
+**Objective (user, 07/10/2026):** (1) the Reports tab only added, removed or narrowed its inputs after a submit; make every dependent choice update straight away, and make the usual owner jobs easy: pick the league, pick dates with a date selector, pick one game or all games that day, and read box scores with each player's stats and totals. (2) The division link wizard listed the mobile app's drop-in spaces ("Recreational/Drop-in Games", "Private Drop-In Games"); list leagues only. Branch `fix/reports-builder-link-leagues` from `main` at `2920f6f`, with a PR.
+
+**Changed:**
+- Link wizard: `linkableLeagues` (`src/lib/mobile-link.ts`) drops `kind = 'recreational'` spaces (the mobile app stores both drop-in spaces that way), keeping one the division is already linked to; `?league=<drop-in>` falls back. No new server refusal (lenient rules). Import page unchanged (it already hides them behind a toggle). PRD M-03 and MOBILE_INTEGRATION.md updated.
+- Reports form: new client `ReportBuilder` (`src/features/reports/report-builder.tsx`, rules in `builder-options.ts`, calendar in `report-calendar.tsx`). Choosing an event loads its lists at once; each report shows only the choices it uses (Player for the game log, Standings for results, minimums for leaderboards, Recent games under More options); league narrows teams, players, game days and games; dates on the platform calendar (one day, range, several days with chips) with game days marked; the Game list reads "All 2 games on Sat 03/10/2026" or "7:00 pm · Aces 34 - 28 Blues". "Show report" opens the same address as before (`presetUrl`), so saved filters, fixed reports and downloads work unchanged.
+- Box scores (`build.ts`): each player's line (most points first), "Team (no player)", "Team total", and "Final score (n not in player stats)" only when the official score differs; score-only games show the final score; books of more than one game open with Player totals (Points next to the name). Preview groups rows under each team with a sticky first column; notes fold into "About these numbers"; IDs hidden on screen and in the PDF (XLSX and CSV keep them); dates DD/MM/YYYY on screen and in the PDF, real dates in XLSX, ISO in CSV; blank cells "-" (no long dash).
+- Bug fixed on the way: dates and the latest or last-five choice now narrow the selection instead of listing every other game as excluded. Before, a fixed report of one day on an event with more than 100 games failed `reportDocumentSchema` (selectedCount and exclusions were capped at 100), so "Create fixed report and downloads" said "Could not save that report". Exclusions now carry a game label; old saved reports still parse and read.
+- The page reads mobile stats once for the whole event (player list) and again for the chosen league or team only when that read is unverified (`readReportSources`); the form then offers "Find players".
+- `/prototype/reports` renders the real form and builder on `src/prototype/report-sample.ts` (sample stats), behind ENABLE_PROTOTYPES.
+- DESIGN.md: "Report form" and "Report tables" components. ITALA_WEB_INTEGRATION_PLAN.md: dated update.
+
+**Verified on this laptop (Windows, Node 24.13.0):**
+- Bug proofs: `tests/component/mobile-link-page.test.tsx` failed 3/3 on the unfixed page (drop-ins listed, `?league=rec-private` opened) and passes after; the 100-game snapshot test failed on the unfixed builder ("Too big: expected number to be <=100", "<=100 items") and passes after; the More options test failed with the panel collapsing and passes after; the phone journeys failed (taps landed on the wrong element: an auto-fill grid capped at 40rem forced a 672 px layout) and pass after the flex fix.
+- Independent reviews (subagents): design finish review (ship with fixes, all 8 applied) and a correctness review (2 bugs and the listed risks fixed: player log on events over 100 linked games, More options collapsing, spreadsheet date sorting, old snapshot rows, chip focus, chosen game's day, calendar fallback month, PDF header).
+- `npm run lint`, `npm run typecheck` (zz-guard parked), a production build with ENABLE_PROTOTYPES (known font warnings only), `npm run check:secrets` (also against `.env` and `.env.local` server-only values, names only) passed.
+- Coverage, one file at a time: 85 files, 1124 passed, 1 failed (the Windows-only `clean-build-cache.test.ts` junction baseline, which also fails on a clean `main` here); thresholds met (95.73% statements, 91.54% branches, 96.55% lines); new modules: `builder-options.ts` 100% lines and 95.58% branches, `report-builder.tsx` 97.7% and 91.15%, `report-calendar.tsx` 93.33% and 82.35%, `display.ts` 93.75% and 100%, `preview.tsx` 100% and 91.11%, `mobile-link.ts` 100%.
+- `tests/e2e/reports-prototype.spec.ts` through a scratch config (no database): 6 passed at 390 and 1440 px, with axe (no serious or critical) and no sideways scroll. Captures in `.impeccable/review/reports-builder/` (ignored) inspected at both widths.
+
+**Not run here (Docker):** `tests/e2e/reports.spec.ts` (the real `/admin/reports` on a seeded event, through to a fixed report and its PDF) and the extended `mobile-link.spec.ts`; CI on the PR runs them. Real mobile project and the deployed `connect-reports` reader: NOT RUN (player stats on the real Reports page need `MOBILE_REPORTS_READ_SECRET` and the deployed function).
+
+**Known, left as is:** the calendar's arrow keys stop at month edges and each day is a tab stop (same as the approved event-date picker); edits made while "Show report" is loading are replaced by the loaded report's choices; the player log no longer offers a Game filter (a one-game log is one row).
 
 ## Current handoff (05/10/2026, schedule start times)
 

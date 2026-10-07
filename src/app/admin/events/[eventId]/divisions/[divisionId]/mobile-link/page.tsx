@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { z } from 'zod';
 
+import { linkableLeagues } from '@/lib/mobile-link';
 import { createClient } from '@/lib/supabase/server';
 import { canEditEvent, requireAdmin } from '@/server/auth';
 import { mobileConfigured, mobileReader } from '@/server/mobile/reader';
@@ -58,7 +59,7 @@ export default async function MobileLinkPage({
   let data: LinkPageData;
   try {
     const reader = mobileReader();
-    const leagues = await reader.listLeagues();
+    const leagues = linkableLeagues(await reader.listLeagues(), link?.league_id ?? null);
     const asked = typeof (await searchParams).league === 'string' ? String((await searchParams).league) : '';
     const leagueId = leagues.some((l) => l.id === asked) ? asked : (link?.league_id ?? '');
     const [mobileTeams, linkCount] = leagueId

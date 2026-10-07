@@ -54,6 +54,18 @@ export const unpairedHint = (count: number) =>
     ? `${count} team${count === 1 ? '' : 's'} not paired. Results involving them will be listed but cannot be approved.`
     : '';
 
+/**
+ * Leagues a division can link to: drop-in spaces (`kind = 'recreational'`, the shared community
+ * space and every private one) are not leagues, so they are left out. A space this division is
+ * already linked to stays, so an existing link still reads correctly.
+ */
+export function linkableLeagues<T extends { id: string; kind: 'league' | 'recreational' }>(
+  leagues: readonly T[],
+  currentLeagueId: string | null,
+): T[] {
+  return leagues.filter((l) => l.kind !== 'recreational' || l.id === currentLeagueId);
+}
+
 /** "Harbour League (2026) · archived", as the old league picker listed them. */
 export const leagueLabel = (l: { name: string; season?: string | null; is_archived?: boolean; is_closed?: boolean }) =>
   `${l.name}${l.season ? ` (${l.season})` : ''}${l.is_archived ? ' · archived' : l.is_closed ? ' · closed' : ''}`;

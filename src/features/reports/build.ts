@@ -1,4 +1,5 @@
 import { computeStandings } from '@/domain/standings';
+import { formatDate, formatDayLabel, formatTime } from '@/lib/format';
 import {
   REPORT_TEMPLATES,
   type ReportDefinition,
@@ -21,6 +22,8 @@ const OTHER_STATS: { key: OtherCategory; label: string; eventTypes: string[] }[]
   { key: 'fouls', label: 'Fouls', eventTypes: ['pf'] },
 ];
 const MAX_GAMES = 100;
+/** Matches reportDocumentSchema, so a saved report always validates. */
+const MAX_EXCLUSIONS = 5000;
 const isoDay = /^\d{4}-\d{2}-\d{2}$/;
 
 export class ReportInputError extends Error {}
@@ -104,6 +107,11 @@ function matchesDate(g: ReportGame, d: ReportDefinition): boolean {
   return d.dates.includes(g.date);
 }
 
+/**
+ * The chosen dates and recent games are part of the selection, so games outside them are simply
+ * not selected. Only a selected game that cannot be used (no score yet, no teams) is left out,
+ * with its reason, so a one-day report of a long season lists nothing it did not choose.
+ */
 function selectGames(source: ReportSource, d: ReportDefinition) {
   const exclusions: ReportDocument['exclusions'] = [];
   const requestedIds = d.gameIds ? new Set(d.gameIds) : null;
@@ -111,11 +119,13 @@ function selectGames(source: ReportSource, d: ReportDefinition) {
     (g) =>
       (!d.divisionId || g.divisionId === d.divisionId) &&
       (!d.teamId || g.homeTeamId === d.teamId || g.awayTeamId === d.teamId) &&
-      (!requestedIds || requestedIds.has(g.id)),
+      (!requestedIds || requestedIds.has(g.id)) &&
+      matchesDate(g, d),
   );
   const eligible = selected.filter((g) => {
-    const problem = eligibleGame(source, g) ?? (!matchesDate(g, d) ? 'Outside selected dates' : null);
-    if (problem) exclusions.push({ gameId: g.id, reason: problem });
+    const problem = eligibleGame(source, g);
+    if (problem && exclusions.length < MAX_EXCLUSIONS)
+      exclusions.push({ gameId: g.id, label: gameName(source, g), reason: problem });
     return !problem;
   });
   eligible.sort(
@@ -123,13 +133,27 @@ function selectGames(source: ReportSource, d: ReportDefinition) {
   );
   const included = d.relative ? eligible.slice(d.relative === 'latest' ? -1 : -5) : eligible;
   if (included.length > MAX_GAMES) throw new ReportInputError('Select at most 100 games');
-  for (const g of eligible)
-    if (!included.includes(g)) exclusions.push({ gameId: g.id, reason: 'Outside relative selection' });
   return { selectedCount: selected.length, included, exclusions };
 }
 
 function name(source: ReportSource, teamId: string): string {
   return source.teams.find((t) => t.id === teamId)?.name ?? 'Team unavailable';
+}
+/** "Sat 04/10/2026" for a valid day, else the stored text. */
+function dayLabel(day: string): string {
+  return validDay(day) ? formatDayLabel(day) : day || 'Date TBC';
+}
+function timeLabel(time: string): string {
+  try {
+    return formatTime(time);
+  } catch {
+    return '';
+  }
+}
+/** "Sat 04/10/2026 · Aces vs Blues": how a person finds a game, never its ID. */
+function gameName(source: ReportSource, g: ReportGame): string {
+  const side = (teamId: string | null) => (teamId ? name(source, teamId) : 'TBC');
+  return `${dayLabel(g.date)} · ${side(g.homeTeamId)} vs ${side(g.awayTeamId)}`;
 }
 function playerName(source: ReportSource, playerId: string): string {
   return source.players.find((p) => p.id === playerId)?.name ?? 'Player unavailable';
@@ -516,15 +540,67 @@ const RESULT_COLUMNS = columns(
   ['away', 'Away', 'text'],
 );
 
+/** Line names in a box score: the Entry column (kept for downloads) and the Player column say the same. */
+const LINE = {
+  player: 'Player',
+  team: 'Team (no player)',
+  total: 'Team total',
+  final: 'Final score',
+} as const;
+
+/** Each player's totals over the games of a box score book, most points first. */
+function playerTotals(source: ReportSource, games: readonly ReportGame[]): ReportTable {
+  return table(
+    `Player totals · ${games.length} games`,
+    // Points straight after the name, so a phone shows them without scrolling sideways.
+    columns(
+      ['playerId', 'Player ID', 'text'],
+      ['player', 'Player', 'text'],
+      ['points', 'Points', 'number'],
+      ['fg2', '2PT made', 'number'],
+      ['fg3', '3PT made', 'number'],
+      ['ft', 'FT made', 'number'],
+      ['teamId', 'Team ID', 'text'],
+      ['team', 'Team', 'text'],
+      ['games', 'Games with stats', 'number'],
+    ),
+    playerStints(games)
+      .map((s) => ({
+        playerId: s.playerId,
+        player: playerName(source, s.playerId),
+        teamId: s.teamId,
+        team: name(source, s.teamId),
+        games: s.gamesWithEvents.size,
+        points: s.points,
+        fg2: s.fg2,
+        fg3: s.fg3,
+        ft: s.ft,
+      }))
+      .sort(
+        (a, b) =>
+          b.points - a.points || a.player.localeCompare(b.player) || `${a.playerId}`.localeCompare(`${b.playerId}`),
+      ),
+  );
+}
+
+/**
+ * One box score per game: for each team, every player's stat line (most points first), points
+ * recorded without a player, and the team total. Connect's score stays the official result in
+ * the title; when the recorded total differs, the final score follows the total. A game with no
+ * approved mobile stats shows each side's final score only.
+ */
 function boxScore(source: ReportSource, games: readonly ReportGame[]): ReportTable[] {
   const out: ReportTable[] = [];
+  if (games.length > 1 && games.some((g) => g.mobileGameId && g.mobileFinal)) out.push(playerTotals(source, games));
   for (const g of games) {
     const categories = OTHER_STATS.filter(({ key }) =>
       [g.homeTeamId!, g.awayTeamId!].some((teamId) => manifest(g, teamId)?.other?.[key] === 'complete'),
     );
+    const time = timeLabel(g.startTime);
+    const division = source.divisions.find((d) => d.id === g.divisionId)?.name ?? 'Division';
     out.push(
       table(
-        `${g.date} · ${source.divisions.find((division) => division.id === g.divisionId)?.name ?? 'Division'}: ${name(source, g.homeTeamId!)} ${g.homeScore} - ${g.awayScore} ${name(source, g.awayTeamId!)}`,
+        `${dayLabel(g.date)}${time ? ` · ${time}` : ''} · ${division}: ${name(source, g.homeTeamId!)} ${g.homeScore} - ${g.awayScore} ${name(source, g.awayTeamId!)}`,
         columns(
           ['gameId', 'Game ID', 'text'],
           ['teamId', 'Team ID', 'text'],
@@ -539,88 +615,54 @@ function boxScore(source: ReportSource, games: readonly ReportGame[]): ReportTab
           ...categories.map(({ key, label }) => [key, label, 'number'] as [string, string, 'number']),
         ),
         [g.homeTeamId!, g.awayTeamId!].flatMap((teamId) => {
-          const events = mobileEvents(g, teamId);
-          const side = manifest(g, teamId);
-          const ids = new Set([
-            ...events.flatMap((e) => (e.playerId ? [e.playerId] : [])),
-            ...(manifest(g, teamId)?.playerIds ?? []),
-          ]);
-          const summary = {
-            gameId: g.id,
-            teamId,
-            team: name(source, teamId),
-            entry: 'Connect score',
+          const side = { gameId: g.id, teamId, team: name(source, teamId) };
+          const official = sideScore(g, teamId);
+          const finalLine = {
+            ...side,
+            entry: LINE.final,
             playerId: '',
-            player: '',
-            points: sideScore(g, teamId),
+            player: LINE.final,
+            points: official,
             fg2: null,
             fg3: null,
             ft: null,
             ...Object.fromEntries(categories.map(({ key }) => [key, null])),
           };
-          const players = [...ids].map((id) => {
-            const own = events.filter((e) => e.playerId === id);
-            return {
-              gameId: g.id,
-              teamId,
-              team: name(source, teamId),
-              entry: 'Recorded player',
+          if (!g.mobileGameId || !g.mobileFinal) return [finalLine];
+          const events = mobileEvents(g, teamId);
+          const m = manifest(g, teamId);
+          const stats = (own: readonly ReportEvent[]) => ({
+            points: recordedPoints(own),
+            fg2: count(own, 'fg2_make'),
+            fg3: count(own, 'fg3_make'),
+            ft: count(own, 'ft_make'),
+            ...Object.fromEntries(
+              categories.map(({ key }) => [key, m?.other?.[key] === 'complete' ? otherCount(own, key) : null]),
+            ),
+          });
+          const ids = new Set([...events.flatMap((e) => (e.playerId ? [e.playerId] : [])), ...(m?.playerIds ?? [])]);
+          const players = [...ids]
+            .map((id) => ({
+              ...side,
+              entry: LINE.player,
               playerId: id,
               player: playerName(source, id),
-              points: recordedPoints(own),
-              fg2: count(own, 'fg2_make'),
-              fg3: count(own, 'fg3_make'),
-              ft: count(own, 'ft_make'),
-              ...Object.fromEntries(
-                categories.map(({ key }) => [key, side?.other?.[key] === 'complete' ? otherCount(own, key) : null]),
-              ),
-            };
-          });
-          const teamEvents = events.filter((event) => !event.playerId);
-          const teamPoints = recordedPoints(teamEvents);
-          const teamRow = teamPoints
-            ? [
-                {
-                  gameId: g.id,
-                  teamId,
-                  team: name(source, teamId),
-                  entry: 'Recorded team',
-                  playerId: '',
-                  player: '',
-                  points: teamPoints,
-                  fg2: count(teamEvents, 'fg2_make'),
-                  fg3: count(teamEvents, 'fg3_make'),
-                  ft: count(teamEvents, 'ft_make'),
-                  ...Object.fromEntries(
-                    categories.map(({ key }) => [
-                      key,
-                      side?.other?.[key] === 'complete' ? otherCount(teamEvents, key) : null,
-                    ]),
-                  ),
-                },
-              ]
+              ...stats(events.filter((e) => e.playerId === id)),
+            }))
+            .sort(
+              (a, b) => b.points - a.points || a.player.localeCompare(b.player) || a.playerId.localeCompare(b.playerId),
+            );
+          const teamOnly = stats(events.filter((e) => !e.playerId));
+          const teamLine = Object.values(teamOnly).some((value) => typeof value === 'number' && value > 0)
+            ? [{ ...side, entry: LINE.team, playerId: '', player: LINE.team, ...teamOnly }]
             : [];
-          const difference =
-            manifest(g, teamId)?.scoring === 'complete' ? sideScore(g, teamId) - recordedPoints(events) : null;
-          const differenceRow =
-            difference === null || difference === 0
-              ? []
-              : [
-                  {
-                    gameId: g.id,
-                    teamId,
-                    team: name(source, teamId),
-                    entry: 'Score difference',
-                    playerId: '',
-                    player: '',
-                    points: difference,
-                    fg2: null,
-                    fg3: null,
-                    ft: null,
-                    ...Object.fromEntries(categories.map(({ key }) => [key, null])),
-                  },
-                ];
-          return [summary, ...players, ...teamRow, ...differenceRow];
+          const total = { ...side, entry: LINE.total, playerId: '', player: LINE.total, ...stats(events) };
+          const gap = official - total.points;
+          const officialLine = {
+            ...finalLine,
+            player: `${LINE.final} (${gap > 0 ? `${gap} not in player stats` : `${-gap} more in player stats`})`,
+          };
+          return [...players, ...teamLine, total, ...(gap === 0 ? [] : [officialLine])];
         }),
       ),
     );
@@ -803,6 +845,9 @@ export function buildReport(source: ReportSource, d: ReportDefinition, generated
   switch (d.template) {
     case 'box-score':
       tables = boxScore(source, included);
+      notes.push(
+        'Team total adds up the recorded stats. When it differs from the official score, the final score follows it.',
+      );
       break;
     case 'league':
       tables = [
@@ -842,7 +887,7 @@ export function buildReport(source: ReportSource, d: ReportDefinition, generated
       notes.push(
         d.standingsScope === 'selected-games'
           ? 'Selected-games standings.'
-          : `Standings include all scored group games through ${included.at(-1)?.date ?? 'the selected cutoff'} using wins, point difference and points for.`,
+          : `Standings include all scored group games through ${included.length ? formatDate(included.at(-1)!.date) : 'the selected cutoff'} using wins, point difference and points for.`,
       );
       break;
     case 'leaders':

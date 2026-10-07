@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DUPLICATE, duplicateMobileTeams, leagueLabel, startingPairs, unpairedHint } from '@/lib/mobile-link';
+import {
+  DUPLICATE,
+  duplicateMobileTeams,
+  leagueLabel,
+  linkableLeagues,
+  startingPairs,
+  unpairedHint,
+} from '@/lib/mobile-link';
 
 const fake = vi.hoisted(() => ({
   authorize: vi.fn(),
@@ -65,6 +72,18 @@ describe('Link wizard rules (M-03)', () => {
       'Autumn (2025) · archived',
     );
     expect(leagueLabel({ name: 'Drop-in', season: '', is_closed: true })).toBe('Drop-in · closed');
+  });
+
+  it('offers real leagues only, keeping a drop-in space the division is already linked to', () => {
+    const leagues = [
+      { id: 'l1', kind: 'league' as const },
+      { id: 'shared', kind: 'recreational' as const },
+      { id: 'private', kind: 'recreational' as const },
+    ];
+    expect(linkableLeagues(leagues, null).map((l) => l.id)).toEqual(['l1']);
+    expect(linkableLeagues(leagues, 'l1').map((l) => l.id)).toEqual(['l1']);
+    expect(linkableLeagues(leagues, 'private').map((l) => l.id)).toEqual(['l1', 'private']);
+    expect(linkableLeagues([], null)).toEqual([]);
   });
 });
 

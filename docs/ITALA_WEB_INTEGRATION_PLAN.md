@@ -2,6 +2,8 @@
 
 Status: implementation in progress, 3 October 2026. The plan was written before application code. A migration file for new Connect report tables has been drafted but has not been applied to any database. A GET-only Mobile Edge Function and Connect reader are implemented in code but not deployed. No hosted database operation or mobile data write has occurred.
 
+**07/10/2026 update (report form and box scores):** the builder is now a client form (`src/features/reports/report-builder.tsx`, rules in `builder-options.ts`). Choosing an event loads its leagues, teams and games straight away; each report shows only the choices it uses; the league narrows teams, players, game days and games; dates are picked on the platform calendar (one day, a range or several days) with game days marked; "Show report" opens the same address saved filters use. The Game Box Score Book lists each player's line (most points first), points recorded without a player, a team total, and the official final score only where it differs; a book of more than one game opens with player totals. Dates and the latest or last-five choice now narrow the selection rather than listing every other game as excluded, so saving a one-day report of an event with more than 100 games no longer fails the stored-report check. The preview and PDF hide internal IDs; spreadsheets and CSV keep them.
+
 ## Decisions and source audit
 
 - Build Reports inside iTala Connect under `/admin/reports`, beside Events, Dashboard, Settings, and Admins. Use Connect sign-in and show all events the signed-in admin can manage. Do not embed or deploy the standalone app.

@@ -6,6 +6,7 @@ import ExcelJS from 'exceljs';
 import { strToU8, zipSync } from 'fflate';
 import { PDFDocument, rgb, type PDFPage, type PDFFont } from 'pdf-lib';
 
+import { displayColumns, displayValue, leftOut, madeAt } from './display';
 import type { ReportCell, ReportDocument, ReportTable } from './model';
 
 /** CSV encoding adapted from iTala-web (MIT, revision 8385a7a). */
@@ -46,7 +47,10 @@ function metadata(report: ReportDocument): ReportCell[][] {
     ...report.gameIds.map((gameId, index): ReportCell[] => [`Included game ${index + 1}`, gameId]),
     ...report.tables.map((table, index): ReportCell[] => [`Table ${index + 1}`, table.title]),
     ...report.notes.map((note, index): ReportCell[] => [`Note ${index + 1}`, note]),
-    ...report.exclusions.map((excluded): ReportCell[] => [`Excluded ${excluded.gameId}`, excluded.reason]),
+    ...report.exclusions.map((excluded): ReportCell[] => [
+      `Excluded ${excluded.gameId}`,
+      excluded.label ? `${excluded.label}: ${excluded.reason}` : excluded.reason,
+    ]),
   ];
 }
 
@@ -66,9 +70,22 @@ export function exportCsvZip(report: ReportDocument): Uint8Array {
   return zipSync(files, { level: 6 });
 }
 
-function addRows(sheet: ExcelJS.Worksheet, rows: ReportCell[][]): void {
-  for (const row of rows)
-    sheet.addRow(row.map((cell) => (typeof cell === 'string' ? safeSpreadsheetText(cell) : cell)));
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Date columns become real spreadsheet dates shown as DD/MM/YYYY, so they sort and filter as dates. */
+function addRows(sheet: ExcelJS.Worksheet, rows: ReportCell[][], dateColumns: ReadonlySet<number> = new Set()): void {
+  for (const row of rows) {
+    const added = sheet.addRow(
+      row.map((cell, index) =>
+        typeof cell === 'string' && dateColumns.has(index) && ISO_DAY.test(cell)
+          ? new Date(`${cell}T00:00:00Z`)
+          : typeof cell === 'string'
+            ? safeSpreadsheetText(cell)
+            : cell,
+      ),
+    );
+    for (const index of dateColumns) added.getCell(index + 1).numFmt = 'dd/mm/yyyy';
+  }
   sheet.views = [{ state: 'frozen', ySplit: 1 }];
   sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
   sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0B3241' } };
@@ -86,7 +103,13 @@ export async function exportXlsx(report: ReportDocument): Promise<Uint8Array> {
   workbook.creator = 'iTala Connect';
   workbook.created = new Date(report.generatedAt);
   addRows(workbook.addWorksheet('Metadata'), metadata(report));
-  report.tables.forEach((table, index) => addRows(workbook.addWorksheet(`Table ${index + 1}`), tableCells(table)));
+  report.tables.forEach((table, index) =>
+    addRows(
+      workbook.addWorksheet(`Table ${index + 1}`),
+      tableCells(table),
+      new Set(table.columns.flatMap((column, i) => (column.key === 'date' ? [i] : []))),
+    ),
+  );
   const buffer = await workbook.xlsx.writeBuffer();
   return new Uint8Array(buffer);
 }
@@ -112,7 +135,8 @@ export async function exportPdf(report: ReportDocument): Promise<Uint8Array> {
   const font = await doc.embedFont(fontBytes, { subset: true });
   doc.setTitle(`${report.title} | ${report.eventName}`);
   doc.setAuthor('iTala Connect');
-  const wide = report.tables.some((table) => table.columns.length > 8);
+  // The PDF is for reading: it shows the same columns as the preview (no internal IDs).
+  const wide = report.tables.some((table) => displayColumns(table).length > 8);
   const dimensions: [number, number] = wide ? [1191, 842] : [842, 595];
   let page!: PDFPage;
   let y = 0;
@@ -130,15 +154,19 @@ export async function exportPdf(report: ReportDocument): Promise<Uint8Array> {
   };
   pageStart();
   line(report.title, 19, INK);
-  line(`Generated ${report.generatedAt} · Source read ${report.sourceReadAt} · ${report.timezone}`);
-  line(`${report.includedCount} included of ${report.selectedCount} selected games`);
+  line(`Made ${madeAt(report)} · dates in ${report.timezone}`);
+  const problems = leftOut(report).length;
+  line(
+    `${report.includedCount} game${report.includedCount === 1 ? '' : 's'}${problems ? ` · ${problems} left out` : ''}`,
+  );
   for (const note of report.notes) line(note);
   for (const table of report.tables) {
-    const colWidth = (dimensions[0] - MARGIN * 2) / Math.max(1, table.columns.length);
+    const shown = displayColumns(table);
+    const colWidth = (dimensions[0] - MARGIN * 2) / Math.max(1, shown.length);
     const header = () => {
       if (y < MARGIN + 55) pageStart();
       page.drawRectangle({ x: MARGIN, y: y - 11, width: dimensions[0] - MARGIN * 2, height: 27, color: TEAL });
-      table.columns.forEach((column, index) => {
+      shown.forEach((column, index) => {
         page.drawText(fit(column.label, font, 8, colWidth - 12), {
           x: MARGIN + index * colWidth + 6,
           y,
@@ -161,9 +189,9 @@ export async function exportPdf(report: ReportDocument): Promise<Uint8Array> {
       }
       if (rowIndex % 2 === 0)
         page.drawRectangle({ x: MARGIN, y: y - 7, width: dimensions[0] - MARGIN * 2, height: 21, color: PALE });
-      table.columns.forEach((column, index) => {
-        const value = row[column.key];
-        const text = value === null || value === undefined ? '—' : String(value);
+      shown.forEach((column, index) => {
+        const value = displayValue(row, column.key);
+        const text = value === null || value === undefined ? '-' : String(value);
         page.drawText(fit(text, font, 8, colWidth - 12), {
           x: MARGIN + index * colWidth + 6,
           y,

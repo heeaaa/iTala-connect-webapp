@@ -120,7 +120,7 @@ Tests assert that no insert, update, delete or RPC call is ever sent to the mobi
 
 ## 4. How the later stages reuse this
 
-- **Stage 2 (results inbox)** needs a division link and team map. Imported divisions already have both, so no link wizard step and no name matching are needed for them. The link wizard stays for divisions created by hand.
+- **Stage 2 (results inbox)** needs a division link and team map. Imported divisions already have both, so no link wizard step and no name matching are needed for them. The link wizard stays for divisions created by hand. It lists real leagues only: drop-in spaces (`kind = 'recreational'`, shared and private) are left out, except one the division is already linked to (07/10/2026).
 - **Stage 3 scheduled games:** the mobile Schedule flow uses published Connect fixtures linked by division and team map. Connect admins can open a league deep link, create an event or choose an editable existing division, review pairs and save the link. A `cg_<UUID>` mobile final is offered only for its validated fixture; the admin still approves it. A draft must be published before its schedule is available to mobile. The optional score push in [SCHEDULER_INTEGRATION_PLAN.md](SCHEDULER_INTEGRATION_PLAN.md) remains parked.
 
 ### Scheduled-result migration preflight (CSI-10)
