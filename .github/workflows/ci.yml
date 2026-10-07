@@ -96,8 +96,8 @@ jobs:
       - name: Secret scan of build output
         run: npm run check:secrets
 
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Playwright Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
 
       - name: E2E journeys
         run: npm run test:e2e

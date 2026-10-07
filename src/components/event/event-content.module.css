@@ -353,13 +353,21 @@
   min-width: 0;
 }
 
+/*
+ * Slots take a set width, not a flex-basis. WebKit (Safari, every iPad
+ * browser) ignores flex-basis when it measures a list, so before a lazy logo
+ * loaded its slot counted as 0 px, the list shrank to nothing, and a logo
+ * hidden in it never loaded.
+ */
 .sponsorsLarge li {
-  flex: 0 0 12rem;
+  flex: none;
+  width: 12rem;
   height: 4.5rem;
 }
 
 .sponsorsSmall li {
-  flex: 0 0 7rem;
+  flex: none;
+  width: 7rem;
   height: 2.75rem;
 }
 

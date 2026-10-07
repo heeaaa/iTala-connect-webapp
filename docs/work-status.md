@@ -1,6 +1,26 @@
 # Work status
 
-Last updated: 07/10/2026 (Claude, Reports form and link wizard leagues)
+Last updated: 08/10/2026 (Claude, sponsor logos on iPad)
+
+## Current handoff (08/10/2026, sponsor logos on iPad)
+
+**Objective (user, 07/10/2026):** a user on an iPad Air 11" (M4) saw no sponsor logos on connect.itala.fyi event pages (photos: BPBL 2026 showed "Major sponsors" with no logo and one of four small logos; Brotherhood Basketball 2026 showed "Sponsors" with nothing). Reproduce, fix, and prove it on phones, tablets and desktop without breaking anything. Branch `fix/ipad-sponsor-logos` from `main` at `50be73d`.
+
+**Root cause:** the sponsor slots were sized only by `flex: 0 0 12rem` / `7rem`. WebKit (Safari, and every iPad and iPhone browser) ignores flex-basis when it measures the section (`width: max-content`) and each list, so before a lazy logo loads its slot counts as 0 px. Each list is a sideways scroller (`overflow-x: auto`), so it shrank to 0 px (or 88 px) and clipped its logos, and a clipped `loading="lazy"` image is never in view, so it never loaded. Chromium counts flex-basis, so it never showed. It hit every WebKit width of 48rem and up (iPad both ways, Mac Safari, large iPhones in landscape); phones below 48rem use the grid layout and were fine. Not the WebP files: WebKit decoded the WebP platform logo once it was in view. Live read-only GETs (07/10/2026) found the markup and all five image URLs correct (HTTP 200, right content types).
+
+**Changed:**
+- `src/components/event/event-content.module.css`: slots are `flex: none; width: 12rem` / `7rem` (the phone grid still overrides to `width: 100%`). Chromium geometry is unchanged.
+- `/prototype/today?sponsors=one|full` (and a Sponsors row in the prototype controls) renders the real `EventSponsors` with SAMPLE logos (`sampleSponsors`, `SAMPLE_SPONSOR_LOGOS` in `src/prototype/league-night.ts`) served as SVG by `src/app/prototype/sponsor-logo/[name]/route.ts` (404 unless `ENABLE_PROTOTYPES=1`), so they load over the network and lazily like real logos.
+- `tests/e2e/event-sponsors.spec.ts` (new) and five new Playwright projects that run only that spec: `tablet` (Chromium 820 px), `ipad-webkit` (820 x 1180), `ipad-landscape-webkit` (1180 x 820), `iphone-webkit`, `desktop-webkit` (1440 px). CI installs WebKit as well as Chromium; README updated. The spec drops `upgrade-insecure-requests` from the CSP for WebKit page loads only: WebKit applies it to the plain-http test server (Chromium exempts localhost), which otherwise fails every script, style and image.
+- `tests/unit/league-night.test.ts`: the sample sponsor sets.
+
+**Verified on this laptop (Windows, Playwright 1.63, WebKit 2359):**
+- Live reproduction (read-only GETs of the BPBL and Brotherhood pages, scratch WebKit probe): at 820 x 1180, 1180 x 820 and 1440 x 900 the Major list measured 0 px and the Sponsors list 0 px (Brotherhood) or 88 px (BPBL, first logo only), with the other logos never loaded, matching the iPad photos. Chromium at the same sizes loaded all of them. The same pages with the new slot rules injected loaded every logo, with WebKit measuring exactly what Chromium measured.
+- Bug proof: `event-sponsors.spec.ts` on the unfixed CSS failed 6 of 14 (ipad, ipad-landscape and desktop WebKit, both tests: list narrower than one slot, logo not loaded); phones and every Chromium project passed. After the fix, 14 of 14 passed, again on a clean final build. The harness probe then measured identical geometry in both engines at 390, 820, 1180 and 1440 px, equal to Chromium's live measurements before the fix.
+- `npm run lint`, `npm run typecheck`, `next build` (the two known Big Shoulders font warnings), `npm run check:secrets` and the `.env`-values scan passed. Unit and component suite with coverage, one file at a time: 1142 passed, 1 failed, every threshold met (95.78% statements, 91.53% branches, 96.61% lines). The failure, `clean-build-cache.test.ts` junction refusal, fails identically on a clean `main` worktree at `50be73d` (baseline). `today-prototype.spec.ts`: 18 passed, 2 skipped by design.
+- Captures (ignored): `.impeccable/review/sponsor-logos/` (`live-before`, `live-after-css`, `harness-before`, `harness-after`).
+
+**Remaining:** a real iPad check after deploy is NOT RUN (Playwright WebKit on Windows is the same engine, not iPadOS Safari or the Messenger in-app browser). `admin-images-rules.spec.ts` (sponsor strip on a seeded event) needs Docker: CI is the check. Existing behaviour kept: on a narrow tablet with many sponsors the small row still scrolls sideways (BPBL in iPad portrait shows two of four small logos in full until swiped), as in Chromium before.
 
 ## Current handoff (07/10/2026, Reports form and link wizard leagues)
 
