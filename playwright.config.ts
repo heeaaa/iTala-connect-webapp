@@ -6,6 +6,8 @@ if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 
 const PORT = 3100;
 const baseURL = `http://localhost:${PORT}`;
+/** Specs that also run at tablet size and in WebKit (the iPad sponsor logos of 07/10/2026). */
+const ENGINE_LAYOUT_SPECS = /event-sponsors\.spec\.ts/;
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -33,6 +35,46 @@ export default defineConfig({
   projects: [
     { name: 'mobile', use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } } },
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    // Tablet sizes and WebKit (Safari, and every browser on an iPad or iPhone)
+    // run only the specs that guard layout which differs between engines.
+    // The WebKit projects clear launchOptions, which may name a Chromium binary.
+    {
+      name: 'tablet',
+      testMatch: ENGINE_LAYOUT_SPECS,
+      use: { ...devices['Desktop Chrome'], viewport: { width: 820, height: 1180 } },
+    },
+    {
+      name: 'ipad-webkit',
+      testMatch: ENGINE_LAYOUT_SPECS,
+      use: {
+        ...devices['iPad Pro 11'],
+        viewport: { width: 820, height: 1180 },
+        launchOptions: {},
+      },
+    },
+    {
+      name: 'ipad-landscape-webkit',
+      testMatch: ENGINE_LAYOUT_SPECS,
+      use: {
+        ...devices['iPad Pro 11 landscape'],
+        viewport: { width: 1180, height: 820 },
+        launchOptions: {},
+      },
+    },
+    {
+      name: 'iphone-webkit',
+      testMatch: ENGINE_LAYOUT_SPECS,
+      use: { ...devices['iPhone 13'], launchOptions: {} },
+    },
+    {
+      name: 'desktop-webkit',
+      testMatch: ENGINE_LAYOUT_SPECS,
+      use: {
+        ...devices['Desktop Safari'],
+        viewport: { width: 1440, height: 900 },
+        launchOptions: {},
+      },
+    },
   ],
   webServer: [
     {

@@ -5,12 +5,13 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { EventShell } from '@/components/event/event-shell';
-import { RulesTab, StandingsTab, TeamsTab } from '@/components/event/event-tabs-content';
+import { EventSponsors, RulesTab, StandingsTab, TeamsTab } from '@/components/event/event-tabs-content';
 import { type EventTabId } from '@/components/event/tabs';
 import { type FeedState, type TodayEvent, type TodayGame } from '@/components/event/today/model';
 import { TodaySchedule } from '@/components/event/today/today-schedule';
 import { type Clock, gameStatus } from '@/domain/game-day';
 import { clockInZone } from '@/lib/event-time';
+import { type EventModel } from '@/lib/public-event/model';
 import { sampleRoster } from '@/prototype/league-night';
 
 type ScoreOverride = Pick<TodayGame, 'score1' | 'score2' | 'changedAt'>;
@@ -26,6 +27,8 @@ export interface PrototypeTodayProps {
   fontClassName: string;
   /** Sample rules, already sanitised on the server. */
   rulesHtml: string;
+  /** Sample sponsor logos, or none. */
+  sponsors: EventModel['sponsors'] | null;
 }
 
 /**
@@ -34,7 +37,7 @@ export interface PrototypeTodayProps {
  * set_score action until phase 4.
  */
 export function PrototypeToday(props: PrototypeTodayProps) {
-  const { event, liveClock, selectedDay, tab, feed, owner, fontClassName, rulesHtml } = props;
+  const { event, liveClock, selectedDay, tab, feed, owner, fontClassName, rulesHtml, sponsors } = props;
   const [clock, setClock] = useState(props.clock);
   const [overrides, setOverrides] = useState<Record<string, ScoreOverride>>({});
 
@@ -78,7 +81,14 @@ export function PrototypeToday(props: PrototypeTodayProps) {
           Prototype controls
         </a>
       </p>
-      <EventShell name={event.name} days={event.days} theme={event.theme} tab={tab} fontClassName={fontClassName}>
+      <EventShell
+        name={event.name}
+        days={event.days}
+        theme={event.theme}
+        tab={tab}
+        fontClassName={fontClassName}
+        sponsors={sponsors ? <EventSponsors sponsors={sponsors} /> : undefined}
+      >
         {tab === 'schedule' ? (
           <TodaySchedule
             event={shown}
@@ -182,6 +192,11 @@ function PrototypeControls({ canSimulate, onSimulate }: { canSimulate: boolean; 
         {group('Viewer', 'owner', [
           [null, 'Spectator'],
           ['1', 'Event owner (score entry)'],
+        ])}
+        {group('Sponsors', 'sponsors', [
+          [null, 'None'],
+          ['one', 'One logo'],
+          ['full', 'Major and four logos'],
         ])}
         <div className="flex flex-wrap items-center gap-2">
           <span className="w-24 text-sm font-semibold">Scores</span>

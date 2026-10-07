@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { gameStatus, toMinutes } from '@/domain/game-day';
-import { SAMPLE_DAYS, SAMPLE_GAME_DAY, sampleLeague } from '@/prototype/league-night';
+import {
+  SAMPLE_DAYS,
+  SAMPLE_GAME_DAY,
+  SAMPLE_SPONSOR_LOGOS,
+  sampleLeague,
+  sampleSponsors,
+} from '@/prototype/league-night';
 
 const at = (hhmm: string) => ({ date: SAMPLE_GAME_DAY, minutes: toMinutes(hhmm) });
 
@@ -56,5 +62,26 @@ describe('prototype sample league', () => {
     const event = sampleLeague({ courts: 2, clock: at('23:00') });
     const past = event.games.filter((g) => g.day! < SAMPLE_GAME_DAY);
     expect(past.every((g) => g.score1 !== null && g.score2 !== null)).toBe(true);
+  });
+});
+
+describe('prototype sample sponsors', () => {
+  const name = (logo: { url: string }) => /^\/prototype\/sponsor-logo\/(\w+)\.svg$/.exec(logo.url)?.[1];
+
+  it('"one" is a lone platform logo, as on an event with no sponsors of its own', () => {
+    const sponsors = sampleSponsors('one');
+    expect(sponsors).toMatchObject({ major: null, minor: [], platformPrimary: [] });
+    expect(sponsors.platformSecondary.map(name)).toEqual(['platform']);
+  });
+
+  it('"full" adds a major logo and three minor logos of other shapes', () => {
+    const sponsors = sampleSponsors('full');
+    expect(name(sponsors.major!)).toBe('major');
+    expect(sponsors.minor.map(name)).toEqual(['landscape', 'wide', 'square']);
+    expect(sponsors.platformSecondary.map(name)).toEqual(['platform']);
+    const all = [sponsors.major!, ...sponsors.minor, ...sponsors.platformSecondary];
+    // Every logo is one the sample route serves, and no two share a URL (list keys).
+    expect(all.every((logo) => Object.hasOwn(SAMPLE_SPONSOR_LOGOS, name(logo)!))).toBe(true);
+    expect(new Set(all.map((logo) => logo.url)).size).toBe(all.length);
   });
 });

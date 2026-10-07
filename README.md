@@ -15,7 +15,7 @@ Specs and plans live in `docs/`: [PRD](docs/PRD.md) (feature parity), [Migration
 npm ci
 npm run db:start              # local Supabase in Docker, applies supabase/migrations
 npm run env:local             # writes .env.local with the LOCAL stack keys
-npx playwright install chromium
+npx playwright install chromium webkit   # WebKit runs the Safari and iPad layout checks
 npm run admin:create -- --email you@example.com --name "Your Name" --role superadmin
 npm run dev                   # http://localhost:3000
 ```
@@ -37,7 +37,7 @@ Set-up links expire after Supabase Auth's email link lifetime (1 hour by default
 | `npm run test:coverage` | Same, with coverage thresholds (80% overall, 100% for `src/domain`) |
 | `npm run test:db` | pgTAP tests for RLS, functions and storage (`supabase test db`) |
 | `npm run test:integration` | Auth, PostgREST and Storage against the local stack |
-| `npm run test:e2e` | Playwright journeys at 390 px and 1440 px (run `npm run build` first) |
+| `npm run test:e2e` | Playwright journeys at 390 px and 1440 px, plus the sponsor logo checks at tablet size and in WebKit (run `npm run build` first) |
 | `npm run build` | Production build |
 | `npm run golden:generate` | Rewrite `tests/golden/*.json` from the legacy code in `scripts/golden/legacy` (only when the case list changes; never to make a test pass) |
 | `npm run migrate:firebase -- --file <export.json>` | Dry run of the Firebase import: plans every event from a Firebase console JSON export and prints the verification report (counts, issues, and where each game appears, its score, the standings and playoff teams, from the old code against the new). Writes nothing. Give event ids as `--event=<id>`; keep the export outside the repository |

@@ -2,6 +2,7 @@ import { type Clock, slotEnd, toMinutes } from '@/domain/game-day';
 import { DEFAULT_EVENT_THEME, type EventTheme } from '@/components/event/theme';
 import { type TodayDivision, type TodayEvent, type TodayGame, type TodayTeam } from '@/components/event/today/model';
 import { minutesToTime } from '@/lib/event-time';
+import { type EventModel } from '@/lib/public-event/model';
 
 /**
  * SAMPLE DATA for the Today screen prototype (/prototype/today). Not a real
@@ -202,3 +203,33 @@ export const SAMPLE_RULES_HTML =
   '<h2>Game time</h2><p>Four <strong>10-minute</strong> quarters, running clock except the last two minutes of the fourth.</p>' +
   '<h3>Fouls</h3><ul><li>Five personal fouls and you are out.</li><li>Team bonus from the fifth team foul each half.</li></ul>' +
   '<h3>Ties</h3><ol><li>A tied group game stays level.</li><li>Playoff games go to a two-minute overtime.</li></ol>';
+
+/**
+ * SAMPLE sponsor logos, sized like the real uploads they stand in for (a wide
+ * major logo, a square platform logo, minor logos of other shapes). Served
+ * over the network by /prototype/sponsor-logo/[name], so they load lazily
+ * like real logos.
+ */
+export const SAMPLE_SPONSOR_LOGOS: Record<string, { width: number; height: number; label: string }> = {
+  major: { width: 1361, height: 645, label: 'Major' },
+  platform: { width: 1600, height: 1600, label: 'Platform' },
+  landscape: { width: 1206, height: 621, label: 'Minor A' },
+  wide: { width: 1297, height: 416, label: 'Minor B' },
+  square: { width: 1254, height: 1254, label: 'Minor C' },
+};
+
+/**
+ * SAMPLE sponsor rows for /prototype/today?sponsors=. "one" is a lone
+ * platform logo; "full" adds a major logo and three minor ones.
+ */
+export function sampleSponsors(set: 'one' | 'full'): EventModel['sponsors'] {
+  const logo = (name: string) => ({ url: `/prototype/sponsor-logo/${name}.svg` });
+  return set === 'one'
+    ? { major: null, minor: [], platformPrimary: [], platformSecondary: [logo('platform')] }
+    : {
+        major: logo('major'),
+        minor: [logo('landscape'), logo('wide'), logo('square')],
+        platformPrimary: [],
+        platformSecondary: [logo('platform')],
+      };
+}

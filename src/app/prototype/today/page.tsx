@@ -7,7 +7,13 @@ import { toMinutes } from '@/domain/game-day';
 import { serverEnv } from '@/env';
 import { clockInZone } from '@/lib/event-time';
 import { sanitizeRulesHtml } from '@/lib/rules-html';
-import { LIGHT_ORGANISER_THEME, SAMPLE_GAME_DAY, SAMPLE_RULES_HTML, sampleLeague } from '@/prototype/league-night';
+import {
+  LIGHT_ORGANISER_THEME,
+  SAMPLE_GAME_DAY,
+  SAMPLE_RULES_HTML,
+  sampleLeague,
+  sampleSponsors,
+} from '@/prototype/league-night';
 
 import { eventFontClassName } from '../../event-fonts';
 import { PrototypeToday } from './prototype-today';
@@ -34,6 +40,7 @@ export default async function TodayPrototypePage({ searchParams }: PageProps<'/p
   const courts = one('courts') === '4' ? 4 : 2;
   const cadence = one('cadence') === '65' ? 65 : one('cadence') === '45' ? 45 : 60;
   const theme = one('theme') === 'light' ? LIGHT_ORGANISER_THEME : DEFAULT_EVENT_THEME;
+  const sponsors = one('sponsors');
   const clock = liveClock
     ? clockInZone(new Date(), 'America/Vancouver')
     : { date: SAMPLE_GAME_DAY, minutes: toMinutes(at && HHMM.test(at) ? at : '19:25') };
@@ -51,6 +58,7 @@ export default async function TodayPrototypePage({ searchParams }: PageProps<'/p
       owner={one('owner') === '1'}
       fontClassName={eventFontClassName}
       rulesHtml={sanitizeRulesHtml(SAMPLE_RULES_HTML)}
+      sponsors={sponsors === 'one' || sponsors === 'full' ? sampleSponsors(sponsors) : null}
     />
   );
 }
